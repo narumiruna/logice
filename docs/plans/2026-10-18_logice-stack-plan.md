@@ -49,6 +49,74 @@ flowchart LR
 
 For the self-hosted deployment, authenticate ingestion credentials and derive the project identity from trusted configuration or server-side lookup. Do not trust a client-supplied project attribute. Enforce project access in the query API. One organization per deployment does not remove the need for authentication. The exact authentication component is not selected yet.
 
+## Repository Structure (Proposed)
+
+Use one repository, one Go module at the root, and one frontend package in `web/`. No monorepo build framework is needed.
+
+```text
+logice/
+├── cmd/logice/main.go          # Go application entry point
+├── internal/
+│   ├── httpapi/                # Routes, middleware, handlers, and static frontend serving
+│   ├── auth/                   # Password, session, passkey, TOTP, and OIDC logic
+│   ├── projects/               # Project management and ingestion credential logic
+│   ├── postgres/               # Application-data queries and persistence
+│   └── clickhouse/             # Telemetry queries and result mapping
+├── web/
+│   ├── src/
+│   │   ├── app/                # Router, providers, and application shell
+│   │   ├── features/
+│   │   │   ├── auth/
+│   │   │   ├── explorer/       # Trace/log tree, time selection, and duration bars
+│   │   │   └── settings/
+│   │   ├── components/        # Shared UI components
+│   │   └── lib/               # Shared API client and small utilities
+│   ├── public/
+│   ├── e2e/                   # Playwright browser flows
+│   ├── package.json
+│   ├── package-lock.json
+│   ├── biome.json
+│   ├── playwright.config.ts
+│   └── vite.config.ts
+├── api/openapi.yaml           # Application API contract, not OTLP
+├── migrations/
+│   ├── postgres/
+│   └── clickhouse/
+├── deploy/otel-collector.yaml
+├── tests/integration/         # Database and ingestion tests
+├── docs/plans/
+├── compose.yaml
+├── Dockerfile                 # Planned multi-stage frontend and Go build
+├── .env.example               # Variable names and non-secret examples only
+├── go.mod
+└── README.md
+```
+
+- Create directories only when they contain required code or configuration; this tree is not an instruction to create empty scaffolding.
+- Keep Go unit tests beside the code as `*_test.go`; keep frontend unit tests beside their components or feature logic.
+- Keep explorer-specific UI inside `features/explorer/`, not in shared components. Avoid generic service/repository layers until they solve a demonstrated problem.
+- Keep Collector configuration under `deploy/`. Add tunnel configuration only if Logice will manage `cloudflared`; never commit tunnel credentials.
+- Keep Playwright tests, configuration, and dependencies in `web/`. Keep cross-component database and ingestion tests in `tests/integration/`.
+- `cmd/logice` creates database clients, connects application components, and starts HTTP serving. Database packages must not import `httpapi`. Define small persistence interfaces in the consuming feature package only when needed; database implementations must not depend on concrete feature services. Do not add a generic repository framework.
+- Define OpenAPI generation commands before adding generated code. Keep generated outputs separate from handwritten code and verify generated clients in CI.
+
+### Build and Asset Packaging (Proposed)
+
+- Use filesystem assets initially, not `go:embed`. Build the frontend in a Node.js Docker stage using the manifest and lockfile in `web/`; build the Go executable in a separate Go stage.
+- Copy the Go executable and `web/dist/` into the runtime image. Run from `/app` and serve the frontend from `/app/web/dist/`. Verify that the built image serves `index.html` and its referenced assets, and that missing API routes do not return the SPA HTML fallback.
+- Copy versioned SQL into `/app/migrations/postgres/` and `/app/migrations/clickhouse/` for the selected migration runner. Do not embed migrations initially. Specify the runner and its deployment command after verifying Goose support for both databases.
+- Development uses Vite with an API proxy. Go unit tests and builds must not require an existing frontend build.
+- If embedding is selected later, place assets or SQL below the embedding package. Go embed patterns cannot reference parent directories with `..`.
+
+### Template Tooling Migration (Planned)
+
+- Replace the template `src/` and `tests/index.test.ts` when implementation is approved. Move the frontend manifest, lockfile, TypeScript configuration, and Biome configuration into `web/`; update their relative paths. Do not retain a root npm manifest or lockfile without a demonstrated need.
+- Keep Git hooks and shared scripts at the repository root. Update Husky setup to work when dependencies are installed in `web/`, and make hook commands use the correct working directory and `web/node_modules` executables. Remove automatic Biome configuration migration and unrelated file rewrites from the pre-commit check.
+- Replace the existing CI install-only job with explicit Go formatting, vet, and test checks, plus frontend install, Biome, TypeScript, unit-test, and build checks. Set the npm cache dependency path to `web/package-lock.json`.
+- Run Playwright from `web/` against the application and run database/ingestion integration tests with their required services. Verify the runtime image build and frontend asset serving separately from unit tests.
+- Remove the template npm publishing workflow, Changesets configuration, and npm release scripts. Define application image and Go binary releases separately when a release target is selected; do not publish Logice as the template npm package.
+- Update README commands and dependency-update configuration for the root Go module and `web/` npm package. Verify installation and checks from a clean checkout, including hook setup.
+
 ## UI Reference
 
 The user supplied this reference during stack planning: https://sharex.narumi.dev/2026/10/18/snqDm641jrlzck6R.png. Treat it as a design reference, not approval to implement every visible control.
@@ -122,6 +190,9 @@ Proposed supporting choices:
 - [x] Select the deployment target and record explicit user acceptance here. The user selected self-hosted, with one organization per deployment.
 - [ ] Define the first user workflow and expected load, with measurable acceptance criteria.
 - [ ] Confirm or replace each proposed stack component and record the reasons.
+- [ ] Specify package ownership and test locations using the proposed repository structure; verify that frontend tests use `web/` dependencies and Go package dependencies have no import cycles.
+- [ ] Validate the proposed image and migration packaging with a build design that names asset paths, migration commands, and frontend-serving smoke tests.
+- [ ] Define the template-tooling migration with clean-checkout install commands, explicit Go/frontend CI checks, hook setup, and removal of npm publishing.
 - [ ] Test Collector-to-ClickHouse ingestion with sample traces and logs; verify attribute preservation and trace lookup.
 - [ ] Specify user authentication and recovery flows; verify the design against the authentication acceptance criteria above.
 - [ ] Specify ingestion authentication, project isolation, retention, and retry behavior for the selected target.
@@ -132,4 +203,5 @@ Proposed supporting choices:
 - [ ] The user accepts the initial target and stack.
 - [ ] A sample telemetry fixture can be ingested and queried through the proposed data path.
 - [ ] Required authentication and isolation checks are defined.
+- [ ] The implementation plan specifies test ownership, runtime asset and migration paths, and clean-checkout tooling checks.
 - [ ] An implementation plan has finite acceptance checks for the first usable release.
