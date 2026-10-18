@@ -145,6 +145,10 @@ The real-service suite passed in 93.021 seconds: telemetry compatibility 57.84 s
 
 The complete diff was reviewed for correctness, security, lifecycle safety, compatibility, regressions, and scope. The integration deadline/cleanup issue found in independent review is resolved as described above. No production resources, secrets, package publication, version tags, or release workflows were used.
 
+### Hosted CI and handoff
+
+[PR #3](https://github.com/narumiruna/logice/pull/3) delivers this scope. [Hosted run 39094171550](https://github.com/narumiruna/logice/actions/runs/39094171550) passed on implementation revision `598b7a6`: `go-checks`, `web-checks`, `check-failure-validation`, `web-layout-validation`, and `stack-validation`. The integration job completed in 2m31s; no job was skipped. Local and hosted evidence close only the automated foundation scope. The completed execution plan is removed; the implementation sequence and this evidence remain.
+
 ## Unverified paths and acceptance gates
 
 - The Go server currently provides development liveness only; the React package provides a shell, not the observability workflow. Browser behavior, feature APIs, static-serving images, OpenAPI generation, and production migrations remain future work.
