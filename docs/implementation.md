@@ -2,9 +2,9 @@
 
 ## Status and scope
 
-This document defines future work. It does not authorize or execute application implementation. No application, database, browser, image, or load check below has run as part of this document. Each acceptance item requires recorded evidence before its stage can close. A skipped check remains pending; a mock does not prove external compatibility.
+This document defines the full application sequence. Each acceptance item requires recorded evidence before its stage can close. A skipped check remains pending; a mock does not prove external compatibility. The automated foundation implements only a development server, a frontend shell, repository tooling, and disposable telemetry compatibility tests. It does not complete stages 0–8 or authorize production deployment. Actual commands and evidence are in [validation.md](validation.md).
 
-Sources: [initial stack plan](plans/2026-10-18_logice-stack-plan.md), [stack decisions](stack.md), and [authentication design](authentication.md). The repository retains root npm files, `src/hello.ts`, and a Vitest example until the application migration. The validation branch adds a real-service Go proof, explicit CI checks, and a read-only hook. The legacy Changesets publishing workflow still needs removal during stage 1. Commands described as future application commands below do not exist yet; current proof commands are in [validation.md](validation.md).
+Sources: [initial stack design](plans/2026-10-18_logice-stack-plan.md), [stack decisions](stack.md), and [authentication design](authentication.md). The root Go module and private `web/` npm package now replace the TypeScript template. npm publishing is removed. Feature APIs, authentication, production schemas, static-serving images, and browser workflows remain future work.
 
 The target is a small self-hosted deployment with one organization. The first workflow is: authenticate, select an authorized project and time range, find a trace or log, expand its trace hierarchy, and inspect a correlated trace waterfall and logs. Metrics, alerts, dashboards, billing, and LLM views are deferred. Do not add Kafka, Redis, Kubernetes, a custom SDK, or a custom query language without a verified requirement. Node.js is build tooling, not the backend runtime.
 
@@ -12,7 +12,22 @@ Use Go and React with TypeScript. Keep application metadata and all authenticati
 
 ## Dependencies and evidence rules
 
-Run stages 0–8 in order. Each stage depends on the preceding stage's acceptance evidence. Resolve an external decision before work that depends on it, not by silently choosing a default. Do not create empty directories to match a diagram.
+Run full application stages 0–8 in order. Each stage depends on the preceding stage's acceptance evidence. Resolve an external decision before work that depends on it, not by silently choosing a default. Do not create empty directories to match a diagram.
+
+The user authorized an automation-only foundation before the full stage 0 contract. Its prerequisites are the existing Go module, `net/http`, the locked React/TypeScript/Vite toolchain, and the existing disposable Collector/PostgreSQL/ClickHouse proof. The foundation does not require production defaults. Deferred decisions retain these blocking dependencies:
+
+| Open decision | Dependent stage |
+| --- | --- |
+| Remaining proposed libraries, REST/OpenAPI contract, production schemas, roles, and migration safety | 2; authentication libraries also block 3; TanStack/UI choices block 6 |
+| Administrator bootstrap, enrollment, recovery, permissions, and per-login-method TOTP policy | 3 |
+| Ingestion authentication, dynamic trusted project resolution, payload/loss/retry limits | 4 |
+| Query/result limits and deadlines | 5 |
+| Polling and rendering limits, final first-release workflow | 6 |
+| Hostname, WebAuthn RP ID, OIDC registration, and operator secrets | Public authentication in 3 and public deployment in 7 |
+| Tunnel placement, retention/deletion policy, backup and key management | 7 |
+| Hardware/disk budget and approved steady/burst/latency targets | Capacity validation in 8 |
+
+The fixed single-project identity, 24-hour fixture TTL, and queue settings remain proof settings, not approved production policies. No authentication, public transport, performance, or production migration gate closes with this foundation.
 
 For each stage, record the revision, pinned tool/service versions, exact commands, fixture identifiers, expected and actual results, and relevant sanitized logs or reports. For failures, record the cause and rerun evidence. Keep credentials and production telemetry out of reports. Record a bounded timeout for every service wait and test; never use an unbounded retry loop.
 
@@ -271,4 +286,4 @@ Acceptance evidence: all stage records complete, a fresh-checkout install/check 
 - Operator-owned hostname, tunnel placement/credentials, Pocket ID configuration, and secret/key management.
 - Production Collector schema/roles and verification of the proposed dynamic ingestion-proxy project-resolution path; the static one-project proof does not satisfy this gate.
 - Explicit nontransactional ClickHouse migration review and execution of the specified runner commands from the production image. Pinned Goose source/build and provider feasibility do not close production migration acceptance.
-- Application implementation authorization and all stage acceptance evidence. This documentation alone closes none of the application validation gates.
+- Authorization for feature implementation beyond the automation-only foundation and all remaining stage acceptance evidence. This documentation alone closes none of the full application validation gates.

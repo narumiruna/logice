@@ -1,8 +1,8 @@
 # Logice
 
-A planned self-hosted observability platform with a Go backend, React/TypeScript frontend, PostgreSQL application data, and ClickHouse telemetry.
+A self-hosted observability platform under development, with a Go backend, React/TypeScript frontend, PostgreSQL application data, and ClickHouse telemetry.
 
-**Current status:** stack selection and an executable ingestion proof. There is no application API, authentication UI, trace explorer, or production deployment image yet. The existing TypeScript example is retained until the application migration.
+**Current status:** a loopback-only Go development server, a React application shell, and a real-service ingestion proof. Authentication, telemetry query APIs, the trace explorer, browser workflow tests, and a production deployment image are not implemented.
 
 ## Design
 
@@ -51,17 +51,37 @@ docker compose --project-name logice-validation down
 
 Do not expose this proof through Cloudflare Tunnel. Never commit `.env`, tunnel credentials, database dumps, or authentication secrets. Changing `.env` does not rotate a password already stored in a PostgreSQL volume.
 
-## Repository checks
+## Local development
 
-The template currently requires Node.js 26 and npm:
+Use Go 1.26 or later and Node.js 26.11.1 with npm 11.20.0. Install the private frontend package once:
 
 ```sh
-npm ci
-npm run ci
+npm --prefix web ci
+```
+
+In separate terminals, run:
+
+```sh
+go run ./cmd/logice
+npm --prefix web run dev
+```
+
+Go listens on `127.0.0.1:8080`; `GET /api/healthz` reports process liveness, not database or application readiness. Vite listens on `127.0.0.1:5173` and forwards `/api` to Go. A port conflict fails instead of selecting another port. Go does not yet serve frontend assets. Do not expose these development servers publicly.
+
+## Repository checks
+
+```sh
+go mod verify
+sh scripts/check-go.sh
+npm --prefix web ci
+npm --prefix web run ci
+npm --prefix web audit --audit-level=low
 ./scripts/validate-web-layout.sh
-go vet ./...
-go test ./...
+sh scripts/validate-checks.sh
+go test -tags=integration -count=1 -timeout=8m -v ./tests/integration/...
 git diff --check
 ```
 
-The frontend-layout script installs a locked compatibility fixture into a temporary directory; it does not create the application or run a browser. CI runs it separately and also runs the tagged Docker integration test. Git hooks run read-only checks; they do not migrate Biome configuration or rewrite source files. The full move of npm tooling into `web/`, application CI, and replacement of template npm publishing are specified in the implementation sequence. No package publication or version tag is part of stack validation.
+Go checks need neither Node.js nor frontend assets. `scripts/validate-checks.sh` clones the committed revision into a temporary checkout, verifies independent Go checks with no Node.js on PATH, installs hooks, and verifies that injected Go/web formatting and test failures are rejected without source/index edits. It does not test uncommitted changes.
+
+The frontend-layout script installs a separate locked compatibility fixture into a temporary directory. It collects Playwright tests but does not run a browser. CI retains this proof separately from the application frontend checks and real-service integration tests. Hooks run read-only checks with web-local tools; they do not rewrite source files. There is no npm publishing or replacement release pipeline.

@@ -1,3 +1,6 @@
+# Local Go build output
+/logice
+
 # Logs
 logs
 *.log
