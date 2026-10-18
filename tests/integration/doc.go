@@ -1,0 +1,3 @@
+// Package integration validates the proposed database and Collector stack.
+// Run the Docker-backed tests with go test -tags=integration -count=1 -timeout=8m ./tests/integration/...
+package integration

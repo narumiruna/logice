@@ -14,7 +14,9 @@ Select a small initial stack for a Logfire-like observability platform built on 
 - Confirmed authentication methods: account and password, passkeys, OTP, and basic OIDC with Pocket ID compatibility.
 - Confirmed UI toolkit: Radix Primitives, Radix Colors, Radix Themes, and Radix Icons. Do not use shadcn/ui; Tailwind CSS is not selected.
 - Confirmed external access: Cloudflare Tunnel provides public HTTPS. Do not add Caddy for certificate management. Whether `cloudflared` runs in Compose or outside it remains undecided.
-- Work remains in planning. Do not implement application or infrastructure files without explicit approval. Supporting libraries below remain proposals unless marked confirmed.
+- The user authorized execution of this plan on 2026-10-18. Its goal is stack selection, a real ingestion feasibility proof, and an implementation sequence, not a full application release.
+- Execution uses branch `narumi/feat/validate-stack-plan` from `origin/main`. Supporting library selections and operating targets are submitted for final acceptance in the pull request; do not record that acceptance on the user's behalf.
+- Results: [stack decisions](../stack.md), [authentication design](../authentication.md), [application implementation sequence](../implementation.md), and [validation evidence](../validation.md).
 
 ## Tech Stack
 
@@ -104,7 +106,7 @@ logice/
 
 - Use filesystem assets initially, not `go:embed`. Build the frontend in a Node.js Docker stage using the manifest and lockfile in `web/`; build the Go executable in a separate Go stage.
 - Copy the Go executable and `web/dist/` into the runtime image. Run from `/app` and serve the frontend from `/app/web/dist/`. Verify that the built image serves `index.html` and its referenced assets, and that missing API routes do not return the SPA HTML fallback.
-- Copy versioned SQL into `/app/migrations/postgres/` and `/app/migrations/clickhouse/` for the selected migration runner. Do not embed migrations initially. Specify the runner and its deployment command after verifying Goose support for both databases.
+- Copy versioned SQL into `/app/migrations/postgres/` and `/app/migrations/clickhouse/`. Select a pinned Goose 3.29.0 CLI at `/app/goose`; its standalone PostgreSQL and ClickHouse provider feasibility is verified. Do not embed migrations initially. The implementation sequence specifies per-database `status` and `up` commands; actual application-image deployment remains a future acceptance test.
 - Development uses Vite with an API proxy. Go unit tests and builds must not require an existing frontend build.
 - If embedding is selected later, place assets or SQL below the embedding package. Go embed patterns cannot reference parent directories with `..`.
 
@@ -188,20 +190,36 @@ Proposed supporting choices:
 ## Plan
 
 - [x] Select the deployment target and record explicit user acceptance here. The user selected self-hosted, with one organization per deployment.
-- [ ] Define the first user workflow and expected load, with measurable acceptance criteria.
-- [ ] Confirm or replace each proposed stack component and record the reasons.
-- [ ] Specify package ownership and test locations using the proposed repository structure; verify that frontend tests use `web/` dependencies and Go package dependencies have no import cycles.
-- [ ] Validate the proposed image and migration packaging with a build design that names asset paths, migration commands, and frontend-serving smoke tests.
-- [ ] Define the template-tooling migration with clean-checkout install commands, explicit Go/frontend CI checks, hook setup, and removal of npm publishing.
-- [ ] Test Collector-to-ClickHouse ingestion with sample traces and logs; verify attribute preservation and trace lookup.
-- [ ] Specify user authentication and recovery flows; verify the design against the authentication acceptance criteria above.
-- [ ] Specify ingestion authentication, project isolation, retention, and retry behavior for the selected target.
-- [ ] Draft the implementation sequence with tests for ingestion, querying, and the first browser workflow.
+- [x] Define the first user workflow and expected load, with measurable acceptance criteria. `docs/stack.md` defines the trace/log workflow and proposed numeric validation targets. These are not measured capacity claims; final acceptance remains open.
+- [x] Confirm or replace each proposed stack component and record the reasons. `docs/stack.md` selects validation versions with reasons; `docs/authentication.md` records authentication-library maintenance risks. Proposed selections are not represented as explicit user approvals.
+- [x] Specify package ownership and test locations using the proposed repository structure; verify that frontend tests use `web/` dependencies and Go package dependencies have no import cycles. `scripts/validate-web-layout.sh` passed isolated install, typecheck, unit test, build, and Playwright collection without a root dependency tree. Ordinary and tagged Go vet/test checks passed. This is layout feasibility, not application behavior.
+- [x] Validate the proposed image and migration packaging with a build design that names asset paths, migration commands, and frontend-serving smoke tests. `docs/implementation.md` stages 2 and 7 specify `/app/web/dist/`, `/app/goose`, separate SQL directories, deployment commands, and static/API smoke tests. Real Goose provider fixtures passed for both databases; no application image is claimed built.
+- [x] Define the template-tooling migration with clean-checkout install commands, explicit Go/frontend CI checks, hook setup, and removal of npm publishing. `docs/implementation.md` stage 1 specifies these steps. Current validation CI and the read-only hook are implemented; the full web migration and npm-release removal remain application-stage work.
+- [x] Test Collector-to-ClickHouse ingestion with sample traces and logs; verify attribute preservation and trace lookup. Real HTTP/gRPC export, native-driver queries, correlation, scalar string-conversion behavior, nanosecond timestamps, reserved-project spoof rejection, retry recovery, and volume persistence passed. Exact column types and TTL are asserted by `tests/integration/`.
+- [x] Specify user authentication and recovery flows; verify the design against the authentication acceptance criteria above. `docs/authentication.md` maps password, session, WebAuthn, TOTP, recovery, and Pocket ID flows to positive/negative application tests. Only Pocket ID discovery/JWKS feasibility ran; no application authentication test or complete OIDC login is claimed passed.
+- [x] Specify ingestion authentication, project isolation, retention, and retry behavior for the selected target. `docs/stack.md` distinguishes the verified single-project proof from the proposed dynamic project-authentication path and defines its failure tests and data-loss limits.
+- [x] Draft the implementation sequence with tests for ingestion, querying, and the first browser workflow. `docs/implementation.md` has dependency-ordered stages with finite evidence, release, and recovery gates. All application-stage acceptance items remain pending.
+
+## Execution Evidence
+
+- Base: `origin/main` at `af0a893`; the initial working tree was clean. No scoped repository `AGENTS.md` was present.
+- Real-service proof: `GOTOOLCHAIN=go1.26.9 go test -tags=integration -count=1 -timeout=8m -v ./tests/integration/...` passed in 35.60 seconds, including minimum-tool-version tests. Required missing credentials fail configuration; test resources are random, loopback-only, and project-owned.
+- Frontend feasibility: `./scripts/validate-web-layout.sh` passed isolated installation, audit, typecheck, one unit test, Vite build, and one Playwright collection sentinel. No browser was launched. Dependency `use client` warnings remain visible and documented.
+- Baseline checks: fresh `npm ci`, `npm run ci`, `npm audit --audit-level=high`, `go mod verify`, ordinary/tagged Go vet, and ordinary Go test passed. The read-only pre-commit script passed and before/after diff comparisons showed no index or worktree changes. A deliberately failed frontend install returned status 42 and cleaned its temporary project. The integration-tagged test dependency scan with govulncheck 1.9.0 on Go 1.27.2 reported no vulnerabilities at validation time.
+- A fresh local clone of `f9188b9` passed installation, Husky setup, direct hook checks, frontend feasibility, and the full Go 1.26.9 integration suite in 34.84 seconds. Its worktree remained clean; the clone and its test resources were removed.
+- Initial failures and fixes are recorded in `docs/validation.md`: template formatting/schema mismatch, vulnerable `shell-quote` lock entry, reserved span/log project attributes, ephemeral ports after database restart, and the template hook script's missing executable bit.
+- Production authentication, browser behavior, load tests, application-image smoke tests, dynamic project isolation, public Tunnel transport, backup/restore, and production migrations remain explicit downstream application gates. The plan's design tasks do not mark those gates complete.
+
+## Rollback / Recovery
+
+- This change does not migrate production data, modify an existing identity provider/tunnel, publish a package, or deploy the application.
+- The proof removes only its random project's disposable resources. Forced-kill recovery instructions are in `docs/validation.md`; do not prune unrelated Docker resources or delete operator volumes.
+- Application migration, release compatibility, partial ClickHouse DDL recovery, and separate encryption-key backup/restore are required in `docs/implementation.md` before deployment.
 
 ## Completion Checklist
 
-- [ ] The user accepts the initial target and stack.
-- [ ] A sample telemetry fixture can be ingested and queried through the proposed data path.
-- [ ] Required authentication and isolation checks are defined.
-- [ ] The implementation plan specifies test ownership, runtime asset and migration paths, and clean-checkout tooling checks.
-- [ ] An implementation plan has finite acceptance checks for the first usable release.
+- [ ] The user accepts the initial target and stack. The target and core choices were explicitly accepted earlier. Final recommended libraries, policy choices, and operating targets await pull-request review. This gate is blocked on user acceptance; preserve this plan until it is accepted.
+- [x] A sample telemetry fixture can be ingested and queried through the proposed data path. Real-service tagged tests passed; `docs/validation.md` records scope and limits.
+- [x] Required authentication and isolation checks are defined. See `docs/authentication.md`, `docs/stack.md`, and application stages 3–5.
+- [x] The implementation plan specifies test ownership, runtime asset and migration paths, and clean-checkout tooling checks. See application stages 1, 2, 7, and 8; fixture feasibility passed.
+- [x] An implementation plan has finite acceptance checks for the first usable release. All stages in `docs/implementation.md` require explicit evidence; unsupported paths remain open.
