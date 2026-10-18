@@ -59,7 +59,9 @@ Telemetry evidence: `go test -count=2 -timeout=2m ./tests/fixtures/telemetry` an
 
 ### 5. Validate from a clean checkout
 
-- [ ] Run the complete check set from a disposable checkout with no root `node_modules`, no frontend build output, and no inherited Compose project or repository credentials. Evidence: installation, hooks, independent Go build, web build, compatibility fixture, and real-service tests all pass; `git status --porcelain` is empty afterward, and the test-owned containers, networks, and volumes are gone. Repeat the deterministic fixture tests with the same inputs to confirm reproducibility.
+- [x] Run the complete check set from a disposable checkout with no root `node_modules`, no frontend build output, and no inherited Compose project or repository credentials. Evidence: installation, hooks, independent Go build, web build, compatibility fixture, and real-service tests all pass; `git status --porcelain` is empty afterward, and the test-owned containers, networks, and volumes are gone. Repeat the deterministic fixture tests with the same inputs to confirm reproducibility.
+
+Clean-checkout evidence: clone `9598246` passed all required checks on Go 1.26.9, including two fixture-test repetitions, three web tests, eight negative checks, the isolated layout fixture, and the full real-service suite (93.021 seconds). Exact-project checks found no containers/networks/volumes for either generated stack, git status was empty, and the clone was removed. `docs/validation.md` records commands and fixture IDs. The complete diff review and vulnerability scan passed; the discovered deadline/cleanup issue was fixed and tested.
 
 Required check commands after the migration exists:
 
@@ -91,10 +93,10 @@ Run every command with an outer finite deadline. Keep the existing 8-minute inte
 
 ## Completion Checklist
 
-- [ ] All plan tasks have passing evidence; required unknowns are resolved, and deferred decisions still block their dependent application stages.
-- [ ] The Go application builds without Node.js or frontend assets, and the private web package installs and passes checks without root npm dependencies.
-- [ ] Template npm publishing is absent, hooks remain read-only, and automated negative checks prove failure propagation.
-- [ ] Deterministic fixture unit tests and the full real-service suite pass; compatibility claims identify the pinned exporter and named assertions.
-- [ ] Clean-checkout evidence and cleanup results are recorded in `docs/validation.md`; no credentials, production telemetry, or binary test artifacts are committed.
+- [x] All plan tasks have passing evidence; required unknowns are resolved, and deferred decisions still block their dependent application stages.
+- [x] The Go application builds without Node.js or frontend assets, and the private web package installs and passes checks without root npm dependencies.
+- [x] Template npm publishing is absent, hooks remain read-only, and automated negative checks prove failure propagation.
+- [x] Deterministic fixture unit tests and the full real-service suite pass; compatibility claims identify the pinned exporter and named assertions.
+- [x] Clean-checkout evidence and cleanup results are recorded in `docs/validation.md`; no credentials, production telemetry, or binary test artifacts are committed.
 - [ ] All configured CI jobs pass on the implementation revision. If hosted execution is unavailable, this item remains open even when local checks pass.
-- [ ] Documentation states that browser behavior, production authentication, dynamic isolation, capacity, and deployment remain unverified. No release or deployment is required for this scope.
+- [x] Documentation states that browser behavior, production authentication, dynamic isolation, capacity, and deployment remain unverified. No release or deployment is required for this scope.

@@ -133,6 +133,18 @@ The private application package pins only React and React DOM at runtime. Develo
 - Review correction: the outer integration deadline must be at least 9 minutes, not 300 seconds. Each stack now uses the earlier of its existing 6m45s work limit and the suite deadline minus 70 seconds. This reserves 12 seconds for failure logs, 40 seconds for cleanup, and 18 seconds of margin. `TestStackWorkDeadline` covers five budget cases; the full suite passed again in 92.953 seconds after this change. A later test cannot consume the suite's cleanup reserve.
 - Initial lifecycle-test correction: TCP redial after listener closure was unreliable on this host. The assertion now checks `Accept` for `net.ErrClosed` and explicitly joins service/request work; ten repeated race runs passed. Production behavior was not changed to hide the test failure.
 
+### Clean-checkout verification
+
+A new local clone of implementation `9598246` passed the full check set on Go 1.26.9, Node 26.11.1/npm 11.20.0, and the service versions above. It began without root npm dependencies, frontend output, or `.env`.
+
+Commands: `go mod verify`; `sh scripts/check-go.sh`; `go test -count=2 -timeout=2m ./tests/fixtures/telemetry`; `npm --prefix web ci`; `npm --prefix web run ci`; `npm --prefix web audit --audit-level=low`; `sh scripts/pre-commit.sh`; `./scripts/validate-web-layout.sh`; `sh scripts/validate-checks.sh`; tagged vet; and `go test -tags=integration -count=1 -timeout=8m -v ./tests/integration/...`. Ordinary commands had 300-second outer deadlines; integration had a separate 9-minute outer deadline, within a 15-minute validation deadline.
+
+All commands passed. The application ran three Vitest tests; all eight injected failures were rejected without source/index changes; the isolated layout fixture passed installation, audit, typecheck, unit test, build, and Playwright collection. Its existing dependency `use client` warnings remain visible. No browser was launched.
+
+The real-service suite passed in 93.021 seconds: telemetry compatibility 57.84 seconds, original stack proof 35.17 seconds, and deadline/tool-version tests passed. Non-secret inherited `COMPOSE_PROJECT_NAME`, an invalid `COMPOSE_FILE`, and inherited credential placeholders did not change the test targets. Exact-project Docker queries found no remaining containers, networks, or volumes for `logice-validation-8d10190bc23567cb` and `logice-validation-beb889e358b04f04`. `git status --porcelain` was empty and the temporary clone was removed.
+
+The complete diff was reviewed for correctness, security, lifecycle safety, compatibility, regressions, and scope. The integration deadline/cleanup issue found in independent review is resolved as described above. No production resources, secrets, package publication, version tags, or release workflows were used.
+
 ## Unverified paths and acceptance gates
 
 - The Go server currently provides development liveness only; the React package provides a shell, not the observability workflow. Browser behavior, feature APIs, static-serving images, OpenAPI generation, and production migrations remain future work.
