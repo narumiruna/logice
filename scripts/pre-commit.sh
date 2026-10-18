@@ -3,10 +3,5 @@ set -eu
 
 cd "$(dirname "$0")/.."
 
-npm run ci
-if [ -f go.mod ]; then
-  test -z "$(gofmt -l tests/integration/*.go)"
-  go vet ./...
-  go vet -tags=integration ./tests/integration/...
-  go test ./...
-fi
+timeout --kill-after=5s 300 npm --prefix web run ci
+timeout --kill-after=5s 300 sh scripts/check-go.sh

@@ -13,18 +13,48 @@ permissions:
   contents: read
 
 jobs:
-  ci:
+  go-checks:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
         with:
-          fetch-depth: 0
+          go-version: 1.26.9
+          cache: true
+      - run: go mod verify
+      - run: sh scripts/check-go.sh
+
+  web-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
-          node-version: 26
+          node-version: 26.11.1
           cache: npm
-      - run: npm ci
-      - run: npm run ci
+          cache-dependency-path: web/package-lock.json
+      - run: test "$(npm --version)" = 11.20.0
+      - run: HUSKY=0 npm --prefix web ci
+      - run: npm --prefix web run ci
+      - run: npm --prefix web audit --audit-level=low
+
+  check-failure-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version: 1.26.9
+          cache: true
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26.11.1
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: sh scripts/validate-checks.sh
 
   web-layout-validation:
     runs-on: ubuntu-latest
@@ -33,7 +63,9 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
-          node-version: 26
+          node-version: 26.11.1
+          cache: npm
+          cache-dependency-path: tests/fixtures/web-layout/web/package-lock.json
       - name: Validate isolated frontend dependencies and test layout
         run: ./scripts/validate-web-layout.sh
 
@@ -44,13 +76,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version: 1.26.9
           cache: true
-      - name: Check Go formatting
-        run: test -z "$(gofmt -l tests/integration/*.go)"
-      - run: go vet ./...
-      - run: go vet -tags=integration ./tests/integration/...
-      - run: go test ./...
       - name: Validate ingestion and database migrations
         run: go test -tags=integration -count=1 -timeout=8m -v ./tests/integration/...
-
