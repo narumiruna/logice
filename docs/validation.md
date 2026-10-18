@@ -1,8 +1,8 @@
-# Stack validation
+# Foundation and stack validation
 
 ## Scope
 
-Validate the selected storage, Collector, native Go drivers, and migration behavior with disposable data. This is not the application or a production deployment. Authentication design, the browser workflow, load targets, and public Cloudflare routing have separate future acceptance tests.
+Validate the Go development server, private frontend tooling, selected storage, Collector, native Go drivers, and migration behavior with disposable data. This foundation is not a usable observability application or a production deployment. Authentication, browser workflows, load targets, and public Cloudflare routing have separate future acceptance tests.
 
 ## Reproduce
 
@@ -11,19 +11,18 @@ Use a local Docker Engine 28 or later with Compose 2.24 or later, Go 1.26 or lat
 From the repository root:
 
 ```sh
-npm ci
-npm run ci
-npm audit --audit-level=high
+npm --prefix web ci
+npm --prefix web run ci
+npm --prefix web audit --audit-level=low
 ./scripts/validate-web-layout.sh
+sh scripts/validate-checks.sh
 go mod verify
-go vet ./...
-go vet -tags=integration ./tests/integration/...
-go test ./...
+sh scripts/check-go.sh
 go test -tags=integration -count=1 -timeout=8m -v ./tests/integration/...
 git diff --check
 ```
 
-The non-tagged Go package is only the integration harness's package documentation. It does not contain application unit tests. The tagged command must run the real Docker test, not skip because a service is missing.
+Ordinary Go tests cover HTTP handlers, lifecycle behavior, and deterministic telemetry fixture generation without databases or Node.js. The tagged command must run real Docker tests, not skip because a service is missing. Commands have finite deadlines in the check scripts or CI jobs; the integration suite retains an 8-minute ceiling.
 
 The integration harness:
 
@@ -63,7 +62,7 @@ The fixture uses current timestamps so the 24-hour TTL does not remove it during
 | Short outage | Stop ClickHouse, submit a span, wait beyond the batch timeout, restart the database, and verify retry recovery. The fixture expects exactly one recovered row, not a general exactly-once guarantee. |
 | Persistence | Restart both databases and verify the application fixture, migration proof, and telemetry survive in their named volumes. |
 
-The tested default exporter schema stores attributes in `Map(LowCardinality(String), String)`. String, integer, boolean, and floating-point scalar values are checked after string conversion. This is **not preservation of original OTLP attribute types**. Nested attributes, events, links, numeric extremes, and application-specific schema choices still need representative fixtures before production DDL is selected.
+The tested default exporter schema stores attributes in `Map(LowCardinality(String), String)`. String, integer, boolean, and floating-point scalar values are checked after string conversion. This is **not preservation of original OTLP attribute types**. Extended assertions and version-specific source references are specified in the [telemetry compatibility matrix](telemetry-compatibility.md). Application-specific production DDL remains unselected.
 
 ## Frontend layout feasibility
 
@@ -71,7 +70,7 @@ The tested default exporter schema stores attributes in `Map(LowCardinality(Stri
 
 The final main-agent rerun passed: 140 packages installed, zero audit vulnerabilities, typecheck success without `skipLibCheck`, one unit test passed, 403 Vite modules transformed, and one Playwright test collected. A separate deliberate `npm ci` failure returned exit status 42 and the cleanup trap removed its temporary project. A first run required Vite's CSS-import types; the fixture includes `vite/client`. Vite emits unsuppressed dependency `use client` directive warnings. No browser was launched, and this client-only fixture does not establish accessibility or application behavior.
 
-The root Vitest configuration excludes these isolated fixtures. CI runs the fixture through its own script so missing fixture dependencies cannot be hidden by the repository's existing root `node_modules`.
+The application Vitest configuration selects only `web/src/**/*.test.ts` and `web/src/**/*.test.tsx`; it excludes Playwright files and does not load this isolated fixture. CI runs the fixture through its own script so missing fixture dependencies cannot be hidden by another package's `node_modules`.
 
 ## Migration feasibility and deployment design
 
@@ -91,7 +90,7 @@ The application build design will include this pinned runner as `/app/goose` and
 
 The [pinned ClickHouse dialect documentation](https://github.com/pressly/goose/blob/v3.29.0/doc/dialect-clickhouse.md) requires retry-safe DDL for interrupted nontransactional migrations. DDL and the version row are not atomic. Initial support is a standalone server; this result does not validate replicated/clustered migration behavior. Serialize runners externally and test recovery rather than assuming Goose provides a portable cross-database lock.
 
-## Evidence record
+## Initial stack-proof evidence
 
 - `npm run ci` initially failed on three template formatting differences and a Biome schema-version mismatch. This PR fixes only those formatting differences and the schema URL.
 - Initial `npm audit` reported critical `shell-quote` advisory [GHSA-pqg4-j6r4-53mv](https://github.com/advisories/GHSA-pqg4-j6r4-53mv). The lockfile now resolves 1.12.0; the rerun reported zero vulnerabilities. This statement is limited to the audit database and lockfile at validation time.
@@ -104,9 +103,39 @@ The [pinned ClickHouse dialect documentation](https://github.com/pressly/goose/b
 - A fresh local clone of commit `f9188b9` passed `npm ci`, direct hook checks, expected Husky hook-path setup, the isolated frontend fixture, and the real-service integration suite on Go 1.26.9 in 34.84 seconds. Its tracked/untracked worktree remained clean, and the temporary clone was removed. The actual commit hook also passed after the executable-bit fix.
 - A separate new Pocket ID 2.18.0 instance returned discovery/JWKS supporting Code, S256, Basic client authentication, and RS256. It was removed with its temporary key. No OIDC login was tested; see [authentication.md](authentication.md).
 
+## Automated foundation evidence
+
+Execution base: `ebdfe31`; branch: `narumi/feat/automated-foundation`.
+
+| Component | Version used |
+| --- | --- |
+| Go | 1.27.1 locally; minimum-version checks use 1.26.9 |
+| Node.js / npm | 26.11.1 / 11.20.0 |
+| Docker / Compose | 29.7.2 / 5.5.1 |
+| PostgreSQL image | 18.6-alpine3.23, digest pinned in `compose.yaml` |
+| ClickHouse image | 26.8.30.8, digest pinned in `compose.yaml` |
+| Collector distribution | 0.163.1, digest pinned in `compose.yaml` |
+| Application React / React DOM | 19.3.1 / 19.3.1 |
+| TypeScript / Vite / Vitest | 7.0.2 / 8.3.4 / 5.0.5 |
+| Biome / Husky | 2.5.15 / 9.1.7 |
+
+The private application package pins only React and React DOM at runtime. Development dependencies and resolved versions are locked in `web/package-lock.json`; the larger isolated layout fixture remains separate. No production library, retention, hardware, authentication, or public-hostname decision is inferred from these pins.
+
+- Baseline: the original root `npm ci`, `npm run ci`, `npm audit --audit-level=high`, layout validation, `go mod verify`, ordinary/tagged Go vet, ordinary Go tests, and the full real-service suite passed before migration. The suite took 42.30 seconds on `ebdfe31`.
+- Foundation: `npm --prefix web ci`, `npm --prefix web run ci`, and `npm --prefix web audit --audit-level=low` passed. Audit reported zero vulnerabilities in 49 packages. The shell renders in a Node.js SSR test; unit tests also check loopback/strict-port proxy configuration and Playwright exclusion. This is not a browser test.
+- Lifecycle: focused vet, unit tests, and `go test -race -count=10 -timeout=2m ./cmd/logice/... ./internal/httpapi/...` passed. HTTP package coverage was 100%. Tests cover liveness, JSON errors, cancellation, active-request drain, forced-close request cancellation, pre-canceled startup, listener failure, and twenty explicitly joined shutdown cycles.
+- Independent build: an isolated tree containing only `go.mod`, `go.sum`, `cmd/logice/`, and `internal/httpapi/` passed tests and build with no Node.js, npm, `web/`, or frontend output. `scripts/validate-checks.sh` also enforces a Go-only PATH in a clean committed checkout before installing web dependencies.
+- Failure propagation: `scripts/validate-checks.sh` passed on foundation `6b541a6`. The real hook and CI commands rejected Go formatting, Go unit-test, web formatting, and web unit-test sentinels. Every invocation preserved source hashes, worktree/index diffs, and status. Installation set `.husky/_`; a clean hook run from outside the checkout passed; the temporary clone was removed.
+- Development transport: a built Go binary and Vite ran together on `127.0.0.1:8080` and `127.0.0.1:5173`. HTTP requests verified the shell, proxied JSON liveness, and proxied JSON 404 without SPA fallback. A second Go process exited 1 on the occupied API port; a second Vite listener rejected its occupied port. Vite closed and Go exited 0 after SIGTERM. No browser was launched; Go does not serve frontend assets in this scope.
+- Security/tool checks: `GOTOOLCHAIN=go1.27.2 go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 -test -tags=integration ./...` reported no vulnerabilities at validation time. `GOTOOLCHAIN=go1.26.9 sh scripts/check-go.sh`, `actionlint .github/workflows/ci.yml`, shell syntax checks, and `go mod verify` passed. No dependency manifest change was needed for the Go foundation or fixtures.
+- Telemetry: ordinary fixture tests passed twice, tagged vet passed, and the full real-service suite passed in 93.405 seconds (`TestTelemetryCompatibility` 58.21 seconds; `TestStackFeasibility` 35.19 seconds). Eight cases run through both HTTP and gRPC with exact final counts of 56 spans and 34 logs. Actual Nested event/link columns, string conversions, scope differences, later-parent intermediate state, empty exports, and expanded rejection/spoofing are asserted. See [the pinned source matrix](telemetry-compatibility.md) for field-level claims and limitations.
+- Initial telemetry correction: a datetime-typed query parameter rounded a nanosecond boundary and hid valid stored logs. The query now compares integer `toUnixTimestamp64Nano(Timestamp)` bounds; scanned timestamps still require exact equality. The full suite rerun passed. Initial contrib v0.163.1 source URLs returned 404; image revision metadata identifies exporter v0.163.0 and pdata v1.69.0, whose exact sources were used before assertions were written.
+- Review correction: the outer integration deadline must be at least 9 minutes, not 300 seconds. Each stack now uses the earlier of its existing 6m45s work limit and the suite deadline minus 70 seconds. This reserves 12 seconds for failure logs, 40 seconds for cleanup, and 18 seconds of margin. `TestStackWorkDeadline` covers five budget cases; the full suite passed again in 92.953 seconds after this change. A later test cannot consume the suite's cleanup reserve.
+- Initial lifecycle-test correction: TCP redial after listener closure was unreliable on this host. The assertion now checks `Accept` for `net.ErrClosed` and explicitly joins service/request work; ten repeated race runs passed. Production behavior was not changed to hide the test failure.
+
 ## Unverified paths and acceptance gates
 
-- The Go application, production frontend, browser behavior tests, static-serving image, OpenAPI generation, and production migrations are future work. A small isolated frontend compatibility build passed; it is not an application build.
+- The Go server currently provides development liveness only; the React package provides a shell, not the observability workflow. Browser behavior, feature APIs, static-serving images, OpenAPI generation, and production migrations remain future work.
 - Password, TOTP, passkey, session, account recovery, and a complete Pocket ID login require application implementation. No compatibility claim is based only on discovery.
 - Dynamic per-project token lookup/revocation, private Collector metadata enrichment, query isolation, least-privilege production roles, and public Tunnel access are not proved by a single static-token fixture.
 - Queue saturation, restart loss, retry exhaustion, duplicate delivery under ambiguous insert failures, request/decompression limits, load/latency targets, retention expiry, and backup/restore remain release tests.

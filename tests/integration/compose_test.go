@@ -41,13 +41,30 @@ func randomHex(t *testing.T, size int) string {
 	return hex.EncodeToString(b)
 }
 
+// stackWorkDeadline leaves time for failure logs (12s), Compose cleanup (40s),
+// and an 18s margin before Go's suite-wide hard timeout. Each stack also keeps
+// its existing 6m45s work ceiling. A later test cannot consume cleanup time.
+func stackWorkDeadline(now, suiteDeadline time.Time) time.Time {
+	deadline := now.Add(6*time.Minute + 45*time.Second)
+	if !suiteDeadline.IsZero() && suiteDeadline.Add(-70*time.Second).Before(deadline) {
+		deadline = suiteDeadline.Add(-70 * time.Second)
+	}
+	return deadline
+}
+
 func newStack(t *testing.T) *stack {
 	t.Helper()
 	_, source, _, ok := runtime.Caller(0)
 	if !ok {
 		t.Fatal("locate repository root")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Minute+45*time.Second)
+	now := time.Now()
+	suiteDeadline, _ := t.Deadline()
+	deadline := stackWorkDeadline(now, suiteDeadline)
+	if !deadline.After(now) {
+		t.Fatal("insufficient suite time for stack work and 70-second cleanup reserve")
+	}
+	ctx, cancel := context.WithDeadline(context.Background(), deadline)
 	s := &stack{
 		t: t, ctx: ctx, root: filepath.Clean(filepath.Join(filepath.Dir(source), "../..")),
 		project: "logice-validation-" + randomHex(t, 8),
