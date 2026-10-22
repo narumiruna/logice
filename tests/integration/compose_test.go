@@ -106,7 +106,7 @@ func newStack(t *testing.T) *stack {
 	// Collector has no image healthcheck. Do not use --wait as a substitute
 	// for the explicit HTTP readiness check below.
 	s.started = true
-	s.run("up", "--detach")
+	s.run("up", "--detach", "postgres", "clickhouse", "collector")
 	s.checkBindings()
 	s.refreshPorts()
 	s.eventually("Collector health endpoint", 60*time.Second, func(ctx context.Context) error {

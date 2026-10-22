@@ -8,7 +8,7 @@ go test -tags=integration -count=1 -timeout=8m ./tests/integration/...
 
 Requirements: Go 1.26 or later, Docker Engine 28 or later, and Docker Compose 2.24 or later. The selected Docker daemon must permit containers, networks, volumes, and loopback port publication. The first run must be able to pull the pinned images in `compose.yaml`.
 
-Each top-level test starts its own Compose project. Do not start the stack manually. It generates credentials, ignores inherited Compose settings and `.env` files, and uses the selected Docker connection settings. It reads ports from its own containers, not from fixed localhost ports. It checks the resolved configuration before startup and checks container ownership and loopback bindings after startup. Database clients are recreated after database restarts because Docker can assign new random host ports.
+Each top-level test starts only PostgreSQL, ClickHouse, and the Collector in its own Compose project. Web/API containers are checked separately with `sh scripts/validate-compose-web.sh`. Do not start the stack manually. It generates credentials, ignores inherited Compose settings and `.env` files, and uses the selected Docker connection settings. It reads ports from its own containers, not from fixed localhost ports. It checks the resolved configuration before startup and checks container ownership and loopback bindings after startup. Database clients are recreated after database restarts because Docker can assign new random host ports.
 
 ## Checks
 
@@ -26,6 +26,10 @@ Each top-level test starts its own Compose project. Do not start the stack manua
 - HTTP and gRPC reject missing and incorrect tokens for traces and logs. Authenticated malformed HTTP protobuf requests return 4xx. Rejected requests do not change telemetry row counts.
 - A short ClickHouse outage causes export retries. The Collector exports the queued span after ClickHouse returns, without a duplicate in this test.
 - Both databases retain fixture data, and ClickHouse retains telemetry, after database container restarts.
+
+## Local query API
+
+`TestTelemetryQueries` sends real Collector traces/logs, then uses the application's HTTP handler with its read-only ClickHouse store. It checks summaries, details, service/text/severity/error filters, project isolation with duplicate IDs, nanosecond time bounds, row/truncation limits, missing traces, and unavailable storage with independent liveness. It does not change schemas or start the operator's application containers.
 
 ## Deterministic telemetry compatibility
 

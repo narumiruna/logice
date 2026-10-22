@@ -49,8 +49,19 @@ func (s *stack) checkConfig() {
 	// Parse only selected fields. Never log the rendered configuration,
 	// because it contains environment credentials.
 	s.must("decode Compose config", json.Unmarshal([]byte(s.run("config", "--format", "json")), &config))
-	if len(config.Services) != 3 {
-		s.t.Fatal("expected only postgres, clickhouse, and collector services")
+	if len(config.Services) != 5 {
+		s.t.Fatal("expected api, web, postgres, clickhouse, and collector services")
+	}
+	api, hasAPI := config.Services["api"]
+	web, hasWeb := config.Services["web"]
+	if !hasAPI || !hasWeb || len(api.Ports) != 0 || len(web.Ports) != 1 {
+		s.t.Fatal("only the web service may publish an application port")
+	}
+	if api.ContainerName != "" || api.NetworkMode != "" || web.ContainerName != "" || web.NetworkMode != "" {
+		s.t.Fatal("application services must use project-scoped container names and networks")
+	}
+	if port := web.Ports[0]; port.HostIP != "127.0.0.1" || port.Published != "5173" || port.Target != 8080 {
+		s.t.Fatal("web must publish container port 8080 on 127.0.0.1:5173")
 	}
 	for service, ports := range map[string][]int{"postgres": {5432}, "clickhouse": {9000}, "collector": {4317, 4318, 13133}} {
 		definition, exists := config.Services[service]

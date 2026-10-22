@@ -1,0 +1,90 @@
+# Local trace and log views
+
+## Start
+
+Create `.env` as described in [README.md](../README.md), then run:
+
+```sh
+docker compose up --build --detach --wait --wait-timeout 120
+```
+
+Open `http://127.0.0.1:5173`. If the page still shows the old foundation message, rebuild the web/API services and reload the page. Do not remove database volumes to update the application.
+
+The application reads only the fixed `validation` project. Authentication and multi-project authorization are not implemented. Keep the published ports on loopback; do not expose this stack through a public proxy or tunnel.
+
+## Use the views
+
+1. Open **Traces** or **Logs**.
+2. Select a time range. Optionally enter an exact service name and a text search.
+   - Trace search matches span names or trace IDs.
+   - Log search matches the body. Searches are case-sensitive literal substrings; `%` and `_` are not wildcards.
+   - **Errors only** selects traces with an error among the matching spans.
+   - **Minimum severity** selects logs at or above the selected OpenTelemetry severity number.
+3. Select **Apply filters**. Select **Refresh** to move a relative time window forward. There is no automatic polling.
+4. Select a trace name to see its spans and correlated logs. Expand a span or log to see its IDs and attributes.
+   - A log with a valid trace ID links to that trace in the same time window.
+   - A log without a trace ID still has a detail view. The exporter does not give logs a durable record ID.
+
+Trace links retain absolute time bounds. Detail pages can be reloaded or bookmarked. An old link can become empty when telemetry passes the Collector's 24-hour retention period.
+
+The application does not automatically insert sample records. You can send sample data with the [Python examples](../examples/python/README.md). Empty views mean that no matching telemetry is available. They are not evidence of a failed web build.
+
+## Send data
+
+Use `docker compose port collector 4318` to find the OTLP/HTTP endpoint. Configure an instrumented application with these standard OpenTelemetry SDK settings:
+
+```sh
+export OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+export OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:REPLACE_WITH_COLLECTOR_PORT
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${OTLP_TOKEN}"
+export OTEL_SERVICE_NAME=my-application
+```
+
+`OTLP_TOKEN` must match the protected `.env` value. Set it in the application's environment; do not commit it or paste it into shared logs. These settings require an SDK that supports them; they do not instrument an application by themselves. Send traces to `/v1/traces` and logs to `/v1/logs`. Include the trace and span IDs on log records for correlation.
+
+The Collector replaces the resource project attribute with `validation`. Clients cannot choose another project with a browser query parameter.
+
+## Query API
+
+All routes use GET and return JSON:
+
+| Route | Result | Filters |
+| --- | --- | --- |
+| `/api/traces` | Trace summaries | `from`, `to`, `service`, `search`, `errorsOnly`, `limit` |
+| `/api/logs` | Log records with detail fields | `from`, `to`, `service`, `search`, `minSeverity`, `traceId`, `limit` |
+| `/api/traces/{traceId}` | Spans and correlated logs | `from`, `to` |
+
+- `from` and `to` are RFC3339 timestamps with up to nine fractional digits. Supply both or neither. The default is the last hour.
+  - The interval includes `from` and excludes `to`. The maximum interval is 24 hours.
+- `limit` defaults to 50 and must be from 1 through 100. Lists return `{items, hasMore}`. Narrow the window or filters when `hasMore` is true; pagination is not implemented.
+- `service` and `search` have a maximum length of 200 bytes each.
+- `minSeverity` must be from 0 through 24. `errorsOnly` is a Boolean.
+- Trace IDs must have 32 hexadecimal digits and must not be all zeroes.
+- Duplicate and unknown parameters are rejected. No route accepts SQL or a project override.
+- Trace detail returns at most 500 spans and 200 logs, with separate truncation flags.
+- Timestamps preserve nanoseconds in JSON. Duration values are decimal nanosecond strings to avoid JavaScript integer precision loss.
+
+Every storage query enforces the fixed project and time bounds. Queries have a five-second deadline, a 128 MiB ClickHouse memory limit, and an 8 MiB result limit. The application uses read-only query settings with the existing local database account; this is not a separate least-privilege production role.
+
+HTTP 400 indicates invalid filters. HTTP 404 indicates an unknown trace in the selected window. HTTP 503 indicates unavailable storage or a query resource limit. `/api/healthz` remains a process-liveness check, not a database-readiness check.
+
+## Limits
+
+Summaries include only spans that match the selected window, service, and search. A root span outside those bounds can be absent. Details also apply the selected time window and row caps. Missing parents, incomplete traces, late arrivals, and duplicate exporter rows are not reconstructed or deduplicated. A duration bar uses one time scale for the returned spans, not for a complete trace.
+
+Attribute values use the exporter's string representation, not the original OTLP types. The initial views do not display span events, links, metrics, or histograms. No throughput, durability, public-access, or production-security claim follows from the local views.
+
+## Development and validation
+
+Compose supplies `CLICKHOUSE_ADDR=clickhouse:9000` and `CLICKHOUSE_PASSWORD` to the API. The user and database are fixed at `logice`. For a host-run API, set `CLICKHOUSE_ADDR` to the random native address from `docker compose port clickhouse 9000`, and supply the same password in its environment. Without an address, liveness works and query routes return HTTP 503.
+
+```sh
+sh scripts/check-go.sh
+npm --prefix web ci
+npm --prefix web run ci
+npm --prefix web exec -- playwright install --with-deps chromium
+sh scripts/validate-compose-web.sh
+go test -tags=integration -count=1 -timeout=8m -v ./tests/integration/...
+```
+
+The browser script requires Docker Compose 2.24.4 or later, curl, OpenSSL, GNU timeout, and the web-local Playwright installation. It starts only a unique disposable project, generates credentials, sends fixtures through its own Collector, checks the built web/API containers, and removes its own containers, volumes, network, and image tags. It must not use the operator's project or read `.env`. Playwright artifacts stay under the ignored `web/test-results/` directory.

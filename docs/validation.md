@@ -2,7 +2,28 @@
 
 ## Scope
 
-Validate the Go development server, private frontend tooling, selected storage, Collector, native Go drivers, and migration behavior with disposable data. This foundation is not a usable observability application or a production deployment. Authentication, browser workflows, load targets, and public Cloudflare routing have separate future acceptance tests.
+Validate the local trace/log workflow, Go API, frontend tooling, selected storage, Collector, native Go drivers, and migration behavior with disposable data. This is not a production deployment. Authentication, multi-project authorization, load targets, and public Cloudflare routing remain separate acceptance gates. Historical foundation evidence below applies to its recorded revision.
+
+## Local web/API containers
+
+The root Compose file now includes local web/API images. Nginx serves the built React application on `127.0.0.1:5173` and proxies `/api` to an unpublished Go container. Go retains its loopback default outside Compose; the API container explicitly uses `-listen 0.0.0.0:8080`. Docker DNS resolution follows API address changes. The API reads ClickHouse for the fixed `validation` project. These images do not implement authentication, multi-project access, PostgreSQL application data, production migrations, or production deployment hardening.
+
+Run `sh scripts/validate-compose-web.sh` with Docker Compose 2.24.4 or later, curl, OpenSSL, GNU timeout, and the web-local Playwright Chromium installation. This check does not read operator credentials. It starts web/API/ClickHouse/Collector services with generated credentials and a random project and web port. CI runs it in a separate job with a seven-minute work limit and a one-minute termination allowance so cleanup does not consume the ingestion suite's execution budget.
+
+Local verification passed:
+
+- Pinned Go 1.26.9, Node.js 26.11.1, Alpine 3.24, and Nginx 1.30.6 container builds.
+- HTML, compiled JavaScript, proxied JSON liveness, JSON 404 responses for `/api` and an unknown API route, SPA fallback, and a real 404 for missing assets.
+- No API host port, a loopback-only web port, and a non-root API process.
+- API replacement with its previous IP occupied by a temporary container; the web proxy recovered through Docker DNS without a web restart.
+- One complete five-service startup with an isolated project and generated credentials served liveness through `http://127.0.0.1:5173/api/healthz`. All test containers, networks, volumes, and project image tags were removed.
+- `go mod verify`, `sh scripts/check-go.sh`, `npm --prefix web ci`, and `npm --prefix web run ci`.
+- The full real-service suite passed in 111.839 seconds, including `TestTelemetryQueries` (15.95 seconds). It selects only PostgreSQL, ClickHouse, and the Collector while validating all five service definitions. It does not build application images or bind port 5173.
+- The query proof checks actual Collector data through the HTTP API: root selection, error filtering, attributes, exact nanosecond boundaries, literal search, limits, missing traces, and storage failure with independent liveness. Duplicate trace/span IDs inserted under a different project do not appear. A 501-span/201-log trace is capped at 500 spans and 200 logs with both truncation flags.
+- All 42 frontend unit tests, ordinary Go checks, and Go race tests passed. The web audit reported zero vulnerabilities at validation time. Actionlint, shell syntax checks, and `git diff --check` passed.
+- Four Chromium Playwright workflows passed against the built images and real OTLP input: trace filters and span/log details; log severity/body filters and trace links; empty/error/truncation states; and a narrow viewport plus unknown-trace error. Deep-link reloads retain their time bounds. Log text containing a script tag remains text. A screenshot was inspected under ignored `web/test-results/`.
+
+The first browser attempts exposed test-selector mismatches and fixture re-seeding after worker restarts. The suite now scopes attribute assertions to the selected span and runs its shared fixture as one serial workflow. Subsequent complete runs passed. These checks do not establish authentication, public transport, full accessibility conformance, or production load limits. See [local telemetry usage and limits](local-telemetry.md).
 
 ## Reproduce
 
@@ -18,6 +39,8 @@ npm --prefix web audit --audit-level=low
 sh scripts/validate-checks.sh
 go mod verify
 sh scripts/check-go.sh
+npm --prefix web exec -- playwright install --with-deps chromium
+sh scripts/validate-compose-web.sh
 go test -tags=integration -count=1 -timeout=8m -v ./tests/integration/...
 git diff --check
 ```
@@ -86,7 +109,7 @@ GOTOOLCHAIN=go1.27.2 GOBIN="$TOOLS/bin" go install \
 "$TOOLS/bin/goose" -version
 ```
 
-The application build design will include this pinned runner as `/app/goose` and separate SQL directories under `/app/migrations/`. [implementation.md](implementation.md) specifies its per-database `status` and `up` commands. Those future production-image commands have not run; this PR has no application image or production schemas.
+The application build design will include this pinned runner as `/app/goose` and separate SQL directories under `/app/migrations/`. [implementation.md](implementation.md) specifies its per-database `status` and `up` commands. Those future production-image commands have not run. The local API image does not include Goose or production schemas.
 
 The [pinned ClickHouse dialect documentation](https://github.com/pressly/goose/blob/v3.29.0/doc/dialect-clickhouse.md) requires retry-safe DDL for interrupted nontransactional migrations. DDL and the version row are not atomic. Initial support is a standalone server; this result does not validate replicated/clustered migration behavior. Serialize runners externally and test recovery rather than assuming Goose provides a portable cross-database lock.
 
@@ -151,7 +174,7 @@ The complete diff was reviewed for correctness, security, lifecycle safety, comp
 
 ## Unverified paths and acceptance gates
 
-- The Go server currently provides development liveness only; the React package provides a shell, not the observability workflow. Browser behavior, feature APIs, static-serving images, OpenAPI generation, and production migrations remain future work.
+- The current API and React application provide local trace/log queries and detail views. Authentication, multi-project authorization, production image hardening, OpenAPI generation, and production migrations remain future work. The local browser checks do not close the full authenticated workflow gate.
 - Password, TOTP, passkey, session, account recovery, and a complete Pocket ID login require application implementation. No compatibility claim is based only on discovery.
 - Dynamic per-project token lookup/revocation, private Collector metadata enrichment, query isolation, least-privilege production roles, and public Tunnel access are not proved by a single static-token fixture.
 - Queue saturation, restart loss, retry exhaustion, duplicate delivery under ambiguous insert failures, request/decompression limits, load/latency targets, retention expiry, and backup/restore remain release tests.

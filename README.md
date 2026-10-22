@@ -2,7 +2,11 @@
 
 A self-hosted observability platform under development, with a Go backend, React/TypeScript frontend, PostgreSQL application data, and ClickHouse telemetry.
 
-**Current status:** a loopback-only Go development server, a React application shell, and a real-service ingestion proof. Authentication, telemetry query APIs, the trace explorer, browser workflow tests, and a production deployment image are not implemented.
+**Current status:** local trace/log lists, structured filters, span and log details, ClickHouse query APIs, web/API container images, and real-service validation. Authentication, multi-project access, and production deployment are not implemented.
+
+## Usage
+
+See [local trace and log views](docs/local-telemetry.md) for filters, detail pages, OTLP setup, API routes, and limits. Use the [Python examples](examples/python/README.md) to send sample traces and correlated logs.
 
 ## Design
 
@@ -22,9 +26,9 @@ go test -tags=integration -count=1 -timeout=8m -v ./tests/integration/...
 
 The test starts a randomly named isolated Compose project, generates temporary credentials, checks real PostgreSQL/ClickHouse connections and Goose migrations, and sends traces/logs through the Collector. It deletes only its own containers, network, and volumes after success or failure. It does not use a production database or modify an existing tunnel or identity provider. Do not interrupt it with an uncatchable process kill; see the cleanup guidance in the validation document.
 
-## Run the local proof manually
+## Run with Docker Compose
 
-This Compose file is for local validation, not a production deployment. It uses one ingestion token and one fixed project ID. All published ports bind to loopback and use random host ports.
+This Compose file starts the web application, Go API, PostgreSQL, ClickHouse, and OpenTelemetry Collector. It is for local validation, not a production deployment. It uses one ingestion token and one fixed project ID. All published ports bind to loopback. The web port is fixed at `5173`; database and Collector host ports are random. Docker builds the application images, so host Go and Node.js installations are not required.
 
 In a new checkout, create a protected `.env` once. This command refuses to overwrite an existing file:
 
@@ -37,11 +41,13 @@ test ! -e .env && (
     "$(openssl rand -hex 32)" > .env
 )
 docker compose --project-name logice-validation config --quiet
-docker compose --project-name logice-validation up --detach --wait --wait-timeout 120
+docker compose --project-name logice-validation up --build --detach --wait --wait-timeout 120
 docker compose --project-name logice-validation port collector 4318
 ```
 
-Use the displayed address as the OTLP/HTTP endpoint and send `Authorization: Bearer <OTLP_TOKEN>`. Use `/v1/traces` and `/v1/logs`. Query port `4317` for the local gRPC endpoint or `13133` for the Collector health endpoint. The test harness waits for Collector HTTP readiness separately; Compose's `--wait` alone does not establish Collector readiness.
+Open **http://127.0.0.1:5173**. Select **Traces** or **Logs**, apply filters, and open a record for details. Views are empty until your applications send matching telemetry. Nginx serves the built frontend and forwards `/api` to the Go container. The API has no published host port. Check liveness with `curl http://127.0.0.1:5173/api/healthz`. The API reads the fixed `validation` project from ClickHouse; it does not use PostgreSQL yet. Stop Vite first if it already uses port `5173`.
+
+Use the displayed Collector address as the OTLP/HTTP endpoint and send `Authorization: Bearer <OTLP_TOKEN>`. Use `/v1/traces` and `/v1/logs`. Query port `4317` for the local gRPC endpoint or `13133` for the Collector health endpoint. The test harness waits for Collector HTTP readiness separately; Compose's `--wait` alone does not establish Collector readiness.
 
 Stop without deleting data:
 
@@ -66,7 +72,7 @@ go run ./cmd/logice
 npm --prefix web run dev
 ```
 
-Go listens on `127.0.0.1:8080`; `GET /api/healthz` reports process liveness, not database or application readiness. Vite listens on `127.0.0.1:5173` and forwards `/api` to Go. A port conflict fails instead of selecting another port. Go does not yet serve frontend assets. Do not expose these development servers publicly.
+Go defaults to `127.0.0.1:8080`; Compose explicitly uses `-listen 0.0.0.0:8080` inside the API container. `GET /api/healthz` reports process liveness, not database or application readiness. Vite listens on `127.0.0.1:5173` and forwards `/api` to Go. A port conflict fails instead of selecting another port. Go does not yet serve frontend assets. Do not expose these development servers publicly.
 
 ## Repository checks
 
@@ -78,9 +84,12 @@ npm --prefix web run ci
 npm --prefix web audit --audit-level=low
 ./scripts/validate-web-layout.sh
 sh scripts/validate-checks.sh
+sh scripts/validate-compose-web.sh
 go test -tags=integration -count=1 -timeout=8m -v ./tests/integration/...
 git diff --check
 ```
+
+`scripts/validate-compose-web.sh` needs Docker Compose 2.24.4 or later, `curl`, OpenSSL, GNU `timeout`, and web-local Playwright Chromium (`npm --prefix web exec -- playwright install --with-deps chromium`). It builds the web/API images and starts a disposable web/API/ClickHouse/Collector project with a random loopback web port. It checks static files, API routing, trace/log browser workflows, and proxy recovery after API IP replacement. It removes its own containers, volumes, network, and image tags. It does not read `.env` or change operator data.
 
 Go checks need neither Node.js nor frontend assets. `scripts/validate-checks.sh` clones the committed revision into a temporary checkout, verifies independent Go checks with no Node.js on PATH, installs hooks, and verifies that injected Go/web formatting and test failures are rejected without source/index edits. It does not test uncommitted changes.
 

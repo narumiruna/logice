@@ -6,14 +6,16 @@ import (
 	"net"
 	"net/http"
 	"time"
+
+	"github.com/narumiruna/logice/internal/telemetry"
 )
 
 const shutdownTimeout = 5 * time.Second
 
-// NewServer returns the loopback development API server without opening a socket.
-func NewServer() *http.Server {
+// NewServer returns the API server without opening a socket.
+func NewServer(reader ...telemetry.Reader) *http.Server {
 	return &http.Server{
-		Handler:           newHandler(),
+		Handler:           newHandler(reader...),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      15 * time.Second,

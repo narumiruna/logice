@@ -69,6 +69,21 @@ jobs:
       - name: Validate isolated frontend dependencies and test layout
         run: ./scripts/validate-web-layout.sh
 
+  compose-web-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26.11.1
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: HUSKY=0 npm --prefix web ci
+      - run: npm --prefix web exec -- playwright install --with-deps chromium
+      - name: Validate containerized telemetry workflow
+        run: timeout --kill-after=60s 420 sh scripts/validate-compose-web.sh
+
   stack-validation:
     runs-on: ubuntu-latest
     timeout-minutes: 15

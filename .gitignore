@@ -1,3 +1,7 @@
+# Browser test output
+/web/test-results/
+/web/playwright-report/
+
 # Local Go build output
 /logice
 
