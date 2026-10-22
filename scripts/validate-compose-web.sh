@@ -84,7 +84,9 @@ timeout --kill-after=5s 20 docker run --detach --name "$replacement" \
   --network "${project}_default" --network-alias api \
   --env CLICKHOUSE_ADDR=clickhouse:9000 --env CLICKHOUSE_PASSWORD "$image" > /dev/null
 new_ip=$(timeout --kill-after=5s 20 docker inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$replacement")
-test -n "$old_ip" && test -n "$new_ip" && test "$new_ip" != "$old_ip"
+test -n "$old_ip"
+test -n "$new_ip"
+test "$new_ip" != "$old_ip"
 # After removal, only the replacement remains at the api DNS alias.
 compose rm --stop --force api
 curl --fail --silent --show-error --max-time 5 --retry 10 --retry-delay 1 \
