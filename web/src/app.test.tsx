@@ -6,6 +6,7 @@ import { Attributes, Notice } from "./components"
 import { FilterForm } from "./filters"
 import { LogList, LogRecord, TraceList } from "./lists"
 import { parseRoute } from "./telemetry"
+import { ThemeProvider } from "./theme"
 import { TraceDetail } from "./trace-detail"
 
 const window = { from: "2026-10-22T10:00:00.123456789Z", to: "2026-10-22T11:00:00.987654321Z" }
@@ -49,7 +50,11 @@ describe("application shell", () => {
   it("renders without browser APIs or fetching on the server", () => {
     const fetcher = vi.spyOn(globalThis, "fetch")
     try {
-      const html = renderToStaticMarkup(<App />)
+      const html = renderToStaticMarkup(
+        <ThemeProvider>
+          <App />
+        </ThemeProvider>,
+      )
       expect(html).toContain("Logice")
       expect(html).toContain("Local validation")
       expect(html).toContain("Validation project only")
