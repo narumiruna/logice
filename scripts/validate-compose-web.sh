@@ -4,7 +4,7 @@ set -eu
 root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 work=$(mktemp -d)
 project="logice-web-check-$(openssl rand -hex 8)"
-reservation="$project-ip-reservation"
+replacement="$project-api-replacement"
 
 # Do not read operator credentials or inherited Compose selection settings.
 unset COMPOSE_FILE COMPOSE_PROJECT_NAME COMPOSE_PROFILES COMPOSE_ENV_FILES
@@ -25,7 +25,7 @@ cleanup() {
     timeout --kill-after=2s 5 docker compose --project-directory "$root" --project-name "$project" \
       --file "$root/compose.yaml" --file "$work/ports.yaml" logs --no-color --tail 40 api web >&2 || true
   fi
-  timeout --kill-after=2s 5 docker rm --force "$reservation" >/dev/null 2>&1 || true
+  timeout --kill-after=2s 5 docker rm --force "$replacement" >/dev/null 2>&1 || true
   if ! timeout --kill-after=2s 30 docker compose --project-directory "$root" --project-name "$project" \
     --file "$root/compose.yaml" --file "$work/ports.yaml" down --timeout 5 --volumes --remove-orphans --rmi local; then
     status=1
@@ -76,13 +76,19 @@ export LOGICE_E2E_OTLP_URL="http://$(compose port collector 4318)"
 export LOGICE_E2E_PROJECT="$project"
 export LOGICE_E2E_TOKEN="$OTLP_TOKEN"
 timeout --kill-after=5s 180 npm --prefix "$root/web" run test:e2e
-# Keep the old API address occupied to prove that Nginx follows Docker DNS.
+# Allocate the replacement while the old API still owns its address. This
+# guarantees a different dynamic IP without a fixed subnet or a static --ip.
 image=$(timeout --kill-after=5s 20 docker inspect --format '{{.Config.Image}}' "$api")
 old_ip=$(timeout --kill-after=5s 20 docker inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$api")
+timeout --kill-after=5s 20 docker run --detach --name "$replacement" \
+  --network "${project}_default" --network-alias api \
+  --env CLICKHOUSE_ADDR=clickhouse:9000 --env CLICKHOUSE_PASSWORD "$image" > /dev/null
+new_ip=$(timeout --kill-after=5s 20 docker inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$replacement")
+test -n "$old_ip"
+test -n "$new_ip"
+test "$new_ip" != "$old_ip"
+# After removal, only the replacement remains at the api DNS alias.
 compose rm --stop --force api
-timeout --kill-after=5s 20 docker run --detach --name "$reservation" \
-  --network "${project}_default" --ip "$old_ip" --entrypoint sleep "$image" 120 > /dev/null
-compose up --detach --wait --wait-timeout 60 api
 curl --fail --silent --show-error --max-time 5 --retry 10 --retry-delay 1 \
   --retry-max-time 30 --retry-all-errors "$base/api/healthz" > "$work/replaced-health.json"
 grep -qx '{"status":"ok"}' "$work/replaced-health.json"
