@@ -7,7 +7,7 @@ Select a small initial stack for a trace and log observability platform built on
 ## Context
 
 - At initial planning, the repository was a TypeScript template. The template migration is now complete.
-- Revalidation base `b665784` includes local Go query APIs, React trace/log views, web/API images, Python examples, and real-service/browser tests. It does not provide authentication, dynamic project authorization, production migrations, or public deployment.
+- Current execution base `ca036fb` includes local Go query APIs, React trace/log views, the live explorer preview, web/API images, Python examples, and real-service/browser tests. It does not provide authentication, dynamic project authorization, production migrations, or public deployment.
 - Confirmed initial target: self-hosted, with one organization per deployment.
 - Confirmed database responsibilities: ClickHouse stores telemetry; PostgreSQL stores application data only.
 - Confirmed application languages and framework: Go backend and React with TypeScript frontend.
@@ -15,7 +15,7 @@ Select a small initial stack for a trace and log observability platform built on
 - Confirmed UI toolkit: Radix Primitives, Radix Colors, Radix Themes, and Radix Icons. Do not use shadcn/ui; Tailwind CSS is not selected.
 - Confirmed external access: Cloudflare Tunnel provides public HTTPS. Do not add Caddy for certificate management. Whether `cloudflared` runs in Compose or outside it remains undecided.
 - The user authorized execution of this plan on 2026-10-18. Its goal is stack selection, a real ingestion feasibility proof, and an implementation sequence, not a full application release.
-- Initial execution used `narumi/feat/validate-stack-plan`. Revalidation uses `narumi/fix/revalidate-stack` from `origin/main` at `b665784`, separate from the open UI-preview PR #4. Supporting library selections, policies, and operating targets still require explicit acceptance; do not record it on the user's behalf.
+- Initial execution used `narumi/feat/validate-stack-plan`. Prior revalidation used `narumi/fix/revalidate-stack` from `origin/main` at `b665784`. Current execution uses `narumi/docs/stack-plan-handoff` from `origin/main` at `ca036fb`, after PRs #4–#6 merged. Supporting library selections, policies, and operating targets still require explicit acceptance; do not record it on the user's behalf.
 - Results: [stack decisions](../stack.md), [authentication design](../authentication.md), [application implementation sequence](../implementation.md), and [validation evidence](../validation.md).
 
 ## Tech Stack
@@ -202,11 +202,11 @@ Proposed supporting choices:
 
 ## Current Revalidation
 
-The current execution rechecks the initial stack-selection scope, not the full application sequence. Evidence is recorded in [the dated validation record](../validation.md#stack-plan-revalidation-2026-10-22).
+The current execution rechecks the initial stack-selection scope on merged `main`, not the full application sequence. Current results belong in [the 2026-10-23 validation record](../validation.md#stack-plan-handoff-2026-10-23); the [2026-10-22 record](../validation.md#stack-plan-revalidation-2026-10-22) preserves the prior security repair and validation history.
 
-The initial security scan found standard-library vulnerability GO-2026-6809 in Go 1.27.2. Go 1.26.10 is the fixed version on the existing Go 1.26 line; the API builder and all Go CI jobs now use that release. The pinned scanner reports no vulnerabilities with the patched toolchain. CI also runs this scan so a future advisory cannot be hidden by an old evidence statement. The module language version and public API remain unchanged.
+The API builder and all Go CI jobs use patched Go 1.26.10. Local verification explicitly selects that toolchain rather than the host's Go 1.27.1. The module language version and public API remain unchanged. PR #6 merged the Docker-compatible API replacement check; its [hosted run](https://github.com/narumiruna/logice/actions/runs/39811819512) passed all six CI jobs.
 
-PR #1 merged the feasibility work but explicitly retained the final acceptance gate. Its reviews contain no explicit user acceptance of the remaining recommendations. Automated review and the separate UI-preview approval are not substituted for that acceptance. Preserve the unchecked completion item below.
+PRs #1 and #5 merged the feasibility and revalidation work but retained the final acceptance gate. Their reviews and comments contain no explicit user acceptance of the remaining recommendations. Automated review, execution authorization, and the separate UI-preview approval are not substituted for that acceptance. Preserve the unchecked completion item below.
 
 ## Historical Execution Evidence
 
