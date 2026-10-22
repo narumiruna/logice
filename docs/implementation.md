@@ -2,9 +2,9 @@
 
 ## Status and scope
 
-This document defines the full application sequence. Each acceptance item requires recorded evidence before its stage can close. A skipped check remains pending; a mock does not prove external compatibility. The automated foundation implements only a development server, a frontend shell, repository tooling, and disposable telemetry compatibility tests. It does not complete stages 0–8 or authorize production deployment. Actual commands and evidence are in [validation.md](validation.md).
+This document defines the full application sequence. Each acceptance item requires recorded evidence before its stage can close. A skipped check remains pending; a mock does not prove external compatibility. The automated foundation introduced a development server, frontend shell, repository tooling, and disposable telemetry compatibility tests. Later authorized local work added bounded query APIs, trace/log views, web/API containers, browser checks, and Python examples. These results do not complete stages 0–8 or authorize production deployment. Actual commands and evidence are in [validation.md](validation.md).
 
-Sources: [initial stack design](plans/2026-10-18_logice-stack-plan.md), [stack decisions](stack.md), and [authentication design](authentication.md). The root Go module and private `web/` npm package now replace the TypeScript template. npm publishing is removed. Feature APIs, authentication, production schemas, static-serving images, and browser workflows remain future work.
+Sources: [initial stack design](plans/2026-10-18_logice-stack-plan.md), [stack decisions](stack.md), and [authentication design](authentication.md). The root Go module and private `web/` npm package now replace the TypeScript template. npm publishing is removed. The local feature APIs and static-serving images are covered in `validation.md`. Authentication, production schemas, the proposed Go-served production image, and the full authenticated browser workflow remain future work.
 
 The target is a small self-hosted deployment with one organization. The first workflow is: authenticate, select an authorized project and time range, find a trace or log, expand its trace hierarchy, and inspect a correlated trace waterfall and logs. Metrics, alerts, dashboards, billing, and LLM views are deferred. Do not add Kafka, Redis, Kubernetes, a custom SDK, or a custom query language without a verified requirement. Node.js is build tooling, not the backend runtime.
 
@@ -104,9 +104,9 @@ Keep `.husky/pre-commit` and `scripts/pre-commit.sh` at the root. Have the scrip
 
 Remove `.github/workflows/publish.yml`, `.changeset/`, `@changesets/cli`, and the `changeset`/`release` scripts. Do not publish the template npm package. Select image/Go binary release targets later; do not add a replacement release pipeline without that decision. Update README, ignore rules, and Dependabot for root Go and `/web` npm dependencies, while retaining required GitHub Actions/Docker updates.
 
-#### Future clean-checkout commands
+#### Clean-checkout foundation commands
 
-Prerequisites are Git, the pinned Go and Node.js/npm versions, and Docker Compose for integration/image checks. Run from the repository root after stage 1 has introduced the baseline Go code, frontend, files, and scripts. These commands were not run against the current template:
+Prerequisites are Git, the pinned Go and Node.js/npm versions, and Docker Compose for integration/image checks. Run from the repository root after stage 1 has introduced the baseline Go code, frontend, files, and scripts. The foundation commands have run against the migrated repository; see `validation.md` for revision-specific evidence. They do not exercise the later production contract or schema:
 
 ```sh
 go mod download
@@ -152,7 +152,7 @@ Resolve schema ownership before running the Collector: migrations own production
 
 Select Goose 3.29.0 for the initial standalone databases. Research built its CLI with PostgreSQL and ClickHouse drivers; the Go proof applies separate real-database fixtures through the same version's provider API. See [validation.md](validation.md) for actual results and limits. Do not claim that both databases share a transaction model or that the production schemas are validated.
 
-Build a pinned Goose CLI in the Go build stage and copy it to `/app/goose` in the runtime image. Include PostgreSQL and ClickHouse drivers; verify the binary and driver set during image checks. The application image and production runner are not implemented by the proof.
+Build a pinned Goose CLI in the Go build stage and copy it to `/app/goose` in the runtime image. Include PostgreSQL and ClickHouse drivers; verify the binary and driver set during image checks. The local API image exists, but it does not include the production runner, migrations, or Go-served frontend packaging. These remain production-stage work.
 
 Proposed deployment commands, after database bootstrap and after an operator injects separate migration DSNs into the runner environment:
 
@@ -286,4 +286,4 @@ Acceptance evidence: all stage records complete, a fresh-checkout install/check 
 - Operator-owned hostname, tunnel placement/credentials, Pocket ID configuration, and secret/key management.
 - Production Collector schema/roles and verification of the proposed dynamic ingestion-proxy project-resolution path; the static one-project proof does not satisfy this gate.
 - Explicit nontransactional ClickHouse migration review and execution of the specified runner commands from the production image. Pinned Goose source/build and provider feasibility do not close production migration acceptance.
-- Authorization for feature implementation beyond the automation-only foundation and all remaining stage acceptance evidence. This documentation alone closes none of the full application validation gates.
+- Evidence for every remaining full-application acceptance gate. Separately authorized local query/UI/container/example work does not imply approval of production authentication, public deployment, or the proposed validation budget.

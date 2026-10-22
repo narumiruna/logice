@@ -2,12 +2,12 @@
 
 ## Goal
 
-Select a small initial stack for a Logfire-like observability platform built on ClickHouse.
+Select a small initial stack for a trace and log observability platform built on ClickHouse.
 
 ## Context
 
-- The repository is a TypeScript template with Biome, Vitest, and a TypeScript build.
-- There is no observability application yet.
+- At initial planning, the repository was a TypeScript template. The template migration is now complete.
+- Revalidation base `b665784` includes local Go query APIs, React trace/log views, web/API images, Python examples, and real-service/browser tests. It does not provide authentication, dynamic project authorization, production migrations, or public deployment.
 - Confirmed initial target: self-hosted, with one organization per deployment.
 - Confirmed database responsibilities: ClickHouse stores telemetry; PostgreSQL stores application data only.
 - Confirmed application languages and framework: Go backend and React with TypeScript frontend.
@@ -15,7 +15,7 @@ Select a small initial stack for a Logfire-like observability platform built on 
 - Confirmed UI toolkit: Radix Primitives, Radix Colors, Radix Themes, and Radix Icons. Do not use shadcn/ui; Tailwind CSS is not selected.
 - Confirmed external access: Cloudflare Tunnel provides public HTTPS. Do not add Caddy for certificate management. Whether `cloudflared` runs in Compose or outside it remains undecided.
 - The user authorized execution of this plan on 2026-10-18. Its goal is stack selection, a real ingestion feasibility proof, and an implementation sequence, not a full application release.
-- Execution uses branch `narumi/feat/validate-stack-plan` from `origin/main`. Supporting library selections and operating targets are submitted for final acceptance in the pull request; do not record that acceptance on the user's behalf.
+- Initial execution used `narumi/feat/validate-stack-plan`. Revalidation uses `narumi/fix/revalidate-stack` from `origin/main` at `b665784`, separate from the open UI-preview PR #4. Supporting library selections, policies, and operating targets still require explicit acceptance; do not record it on the user's behalf.
 - Results: [stack decisions](../stack.md), [authentication design](../authentication.md), [application implementation sequence](../implementation.md), and [validation evidence](../validation.md).
 
 ## Tech Stack
@@ -110,7 +110,7 @@ logice/
 - Development uses Vite with an API proxy. Go unit tests and builds must not require an existing frontend build.
 - If embedding is selected later, place assets or SQL below the embedding package. Go embed patterns cannot reference parent directories with `..`.
 
-### Template Tooling Migration (Planned)
+### Template Tooling Migration Requirements
 
 - Replace the template `src/` and `tests/index.test.ts` when implementation is approved. Move the frontend manifest, lockfile, TypeScript configuration, and Biome configuration into `web/`; update their relative paths. Do not retain a root npm manifest or lockfile without a demonstrated need.
 - Keep Git hooks and shared scripts at the repository root. Update Husky setup to work when dependencies are installed in `web/`, and make hook commands use the correct working directory and `web/node_modules` executables. Remove automatic Biome configuration migration and unrelated file rewrites from the pre-commit check.
@@ -185,22 +185,30 @@ Proposed supporting choices:
 - Restrict direct origin access, trust forwarded headers only from the tunnel proxy, and configure the external URL explicitly for secure cookies, WebAuthn origins/RP ID, and OIDC redirects. These checks remain required even when TLS terminates at Cloudflare.
 - What backup and restore process covers PostgreSQL, ClickHouse, and the separate TOTP encryption key?
 - What event rate, retention period, and deployment budget must the first version support?
-- Which Logfire workflows are essential for the first version?
+- Which telemetry workflows are essential for the first version?
 
 ## Plan
 
 - [x] Select the deployment target and record explicit user acceptance here. The user selected self-hosted, with one organization per deployment.
 - [x] Define the first user workflow and expected load, with measurable acceptance criteria. `docs/stack.md` defines the trace/log workflow and proposed numeric validation targets. These are not measured capacity claims; final acceptance remains open.
 - [x] Confirm or replace each proposed stack component and record the reasons. `docs/stack.md` selects validation versions with reasons; `docs/authentication.md` records authentication-library maintenance risks. Proposed selections are not represented as explicit user approvals.
-- [x] Specify package ownership and test locations using the proposed repository structure; verify that frontend tests use `web/` dependencies and Go package dependencies have no import cycles. `scripts/validate-web-layout.sh` passed isolated install, typecheck, unit test, build, and Playwright collection without a root dependency tree. Ordinary and tagged Go vet/test checks passed. This is layout feasibility, not application behavior.
-- [x] Validate the proposed image and migration packaging with a build design that names asset paths, migration commands, and frontend-serving smoke tests. `docs/implementation.md` stages 2 and 7 specify `/app/web/dist/`, `/app/goose`, separate SQL directories, deployment commands, and static/API smoke tests. Real Goose provider fixtures passed for both databases; no application image is claimed built.
-- [x] Define the template-tooling migration with clean-checkout install commands, explicit Go/frontend CI checks, hook setup, and removal of npm publishing. `docs/implementation.md` stage 1 specifies these steps. Current validation CI and the read-only hook are implemented; the full web migration and npm-release removal remain application-stage work.
+- [x] Specify package ownership and test locations using the proposed repository structure; verify web-local dependencies and the Go import graph. The isolated Radix/TanStack fixture, migrated repository checks, Go-only clean-checkout build, read-only hooks, and negative checks pass. Separate local browser tests cover the implemented trace/log views; they do not establish the full authenticated release workflow.
+- [x] Validate the proposed image/migration packaging design. Implementation stages 2 and 7 specify `/app/web/dist/`, `/app/goose`, separate SQL histories, deployment commands, and production image gates. Local web/API images now have actual static/API/browser smoke checks; they use Nginx rather than the proposed production Go asset server and do not contain Goose or production schemas. Real Goose provider/failure fixtures validate both databases, not production deployment.
+- [x] Define and validate the template-tooling migration. The root Go module, private `web/` package, explicit CI jobs, read-only Husky hooks, and clean-checkout checks exist; root npm publishing/configuration is removed. Generated OpenAPI contracts remain a later application-stage requirement.
 - [x] Test Collector-to-ClickHouse ingestion with sample traces and logs; verify attribute preservation and trace lookup. Real HTTP/gRPC export, native-driver queries, correlation, scalar string-conversion behavior, nanosecond timestamps, reserved-project spoof rejection, retry recovery, and volume persistence passed. Exact column types and TTL are asserted by `tests/integration/`.
 - [x] Specify user authentication and recovery flows; verify the design against the authentication acceptance criteria above. `docs/authentication.md` maps password, session, WebAuthn, TOTP, recovery, and Pocket ID flows to positive/negative application tests. Only Pocket ID discovery/JWKS feasibility ran; no application authentication test or complete OIDC login is claimed passed.
 - [x] Specify ingestion authentication, project isolation, retention, and retry behavior for the selected target. `docs/stack.md` distinguishes the verified single-project proof from the proposed dynamic project-authentication path and defines its failure tests and data-loss limits.
 - [x] Draft the implementation sequence with tests for ingestion, querying, and the first browser workflow. `docs/implementation.md` has dependency-ordered stages with finite evidence, release, and recovery gates. All application-stage acceptance items remain pending.
 
-## Execution Evidence
+## Current Revalidation
+
+The current execution rechecks the initial stack-selection scope, not the full application sequence. Evidence is recorded in [the dated validation record](../validation.md#stack-plan-revalidation-2026-10-22).
+
+The initial security scan found standard-library vulnerability GO-2026-6809 in Go 1.27.2. Go 1.26.10 is the fixed version on the existing Go 1.26 line; the API builder and all Go CI jobs now use that release. The pinned scanner reports no vulnerabilities with the patched toolchain. CI also runs this scan so a future advisory cannot be hidden by an old evidence statement. The module language version and public API remain unchanged.
+
+PR #1 merged the feasibility work but explicitly retained the final acceptance gate. Its reviews contain no explicit user acceptance of the remaining recommendations. Automated review and the separate UI-preview approval are not substituted for that acceptance. Preserve the unchecked completion item below.
+
+## Historical Execution Evidence
 
 - Base: `origin/main` at `af0a893`; the initial working tree was clean. No scoped repository `AGENTS.md` was present.
 - Real-service proof: `GOTOOLCHAIN=go1.26.9 go test -tags=integration -count=1 -timeout=8m -v ./tests/integration/...` passed in 35.60 seconds, including minimum-tool-version tests. Required missing credentials fail configuration; test resources are random, loopback-only, and project-owned.
@@ -215,6 +223,12 @@ Proposed supporting choices:
 - This change does not migrate production data, modify an existing identity provider/tunnel, publish a package, or deploy the application.
 - The proof removes only its random project's disposable resources. Forced-kill recovery instructions are in `docs/validation.md`; do not prune unrelated Docker resources or delete operator volumes.
 - Application migration, release compatibility, partial ClickHouse DDL recovery, and separate encryption-key backup/restore are required in `docs/implementation.md` before deployment.
+
+## External Handoff
+
+The user reviews the remaining recommendations listed in [stack decisions: pending acceptance](../stack.md#pending-acceptance). The prerequisite is the revalidated evidence in this PR. The action is to accept the supporting libraries, proposed authentication policies, and numeric operating targets, or state specific replacements. Record the resulting PR review/comment here before closing the final completion item. Previously confirmed target/core choices remain confirmed and do not need approval again.
+
+Until that record exists, this plan remains open and must not be deleted or represented as complete. Public authentication, production migrations, capacity, identity-provider login, hostname/tunnel configuration, and backup/restore remain downstream release gates rather than tests silently waived by this revalidation.
 
 ## Completion Checklist
 

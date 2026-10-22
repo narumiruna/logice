@@ -4,6 +4,43 @@
 
 Validate the local trace/log workflow, Go API, frontend tooling, selected storage, Collector, native Go drivers, and migration behavior with disposable data. This is not a production deployment. Authentication, multi-project authorization, load targets, and public Cloudflare routing remain separate acceptance gates. Historical foundation evidence below applies to its recorded revision.
 
+## Stack plan revalidation: 2026-10-22
+
+Base: `origin/main` at `b665784`; branch: `narumi/fix/revalidate-stack`. The working tree was clean and no repository or ancestor `AGENTS.md` was present. Open preview PR #4 was not used as the base or included in this work.
+
+This execution covers the initial plan's stack-selection, feasibility, design, and tooling requirements. It does not execute the full application sequence. The source already implements local query/UI/container/example work; the old statements that the template remained and no application images existed have been corrected without changing production requirements.
+
+### Security failure and repair
+
+The first `govulncheck` 1.9.0 source scan on Go 1.27.2 failed for [GO-2026-6809 / CVE-2026-111943](https://pkg.go.dev/vuln/GO-2026-6809): `crypto/x509.Certificate.Verify` did not reject certain compromised intermediate certificates. The reviewed advisory fixes the existing Go 1.26 line in **1.26.10** and the Go 1.27 line in **1.27.3**.
+
+All Go CI jobs and the digest-pinned API builder now use Go 1.26.10. CI runs the pinned source scanner with a finite deadline. The module's Go language version, dependency versions, public API, and database schemas are unchanged. A new API image was built, its executable was extracted without starting the container, and `go version` confirmed `go1.26.10`. Source and binary vulnerability scans on that toolchain both reported no vulnerabilities at validation time. This does not update already built operator binaries/images; rebuild them with a patched toolchain before deployment. No operator service was restarted here.
+
+### Revalidation results
+
+| Check | Actual result |
+| --- | --- |
+| `GOTOOLCHAIN=go1.26.10 go mod verify` and `sh scripts/check-go.sh` with that toolchain | Module verification, formatting, ordinary/tagged vet, unit tests, and independent build passed. |
+| `GOTOOLCHAIN=go1.26.10 go test -race -count=1 -timeout=2m ./internal/...` | HTTP lifecycle/query and storage race checks passed. |
+| `GOTOOLCHAIN=go1.26.10 go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 -test -tags=integration ./...` | No vulnerabilities found after the toolchain repair. The initial failing scan above is not hidden. |
+| API Docker build; `go version` and `govulncheck -mode=binary` on its extracted executable | Builder pin resolved; executable reports Go 1.26.10; no binary vulnerabilities found. Temporary container and image tag were removed. |
+| Pinned Goose CLI build with Go 1.26.10 | `-env=none -version` reports v3.29.0; executable metadata reports Go 1.26.10; its binary vulnerability scan passed. No deployment migration or operator environment was used. |
+| `npm --prefix web ci`, `npm --prefix web run ci`, and low-level npm audit | Install, Biome, TypeScript, 42 unit tests, and build passed; audit reported zero vulnerabilities. |
+| `./scripts/validate-web-layout.sh` | Locked React/Radix/TanStack fixture passed install, audit, typecheck, unit test, build, and Playwright collection using web-local dependencies. Existing dependency directive warnings remain visible. |
+| `GOTOOLCHAIN=go1.26.10 sh scripts/validate-checks.sh` | A clean clone of the committed base passed the Go-only PATH check and hook setup; eight injected formatting/test failures were rejected without source/index changes. Go source and hook scripts are unchanged by this repair. |
+| `sh scripts/validate-compose-web.sh` after the builder update | Four real-data Chromium workflows, static/API errors, loopback isolation, and proxy recovery after API IP replacement passed. |
+| Tagged real-service suite with Go 1.26.10 | All tests passed in 119.315 seconds, including migrations, partial-DDL recovery checks, HTTP/gRPC rejection, schema/attribute compatibility, queries, retry recovery, and persistence. |
+| Python example tests with the locked project | Four in-process OTLP receiver and HTTP/context tests passed without reading operator credentials. |
+| Actionlint, shell syntax, and `git diff --check` | Passed. |
+
+The initial functional integration run on Go 1.26.9 also passed in 120.535 seconds, but it is not a security acceptance result for that vulnerable toolchain. The patched run retained the suite's eight-minute deadline and a separate nine-minute outer allowance. Tests used disposable projects and generated credentials rather than operator data. Exact-project checks confirmed cleanup of all eight projects used by the initial and patched runs. No package, version tag, or release workflow was published or dispatched.
+
+The complete diff was reviewed for correctness, security, lifecycle safety, compatibility, regressions, and scope. Independent read-only review found one outdated runnable Goose example still selecting Go 1.27.2. It was corrected to Go 1.26.10 and verified with the CLI build, version, and binary scan above. Documentation-local link targets exist. Historical versioned evidence remains labeled as historical.
+
+### Remaining acceptance condition
+
+[PR #1](https://github.com/narumiruna/logice/pull/1) explicitly retained final acceptance of the recommended libraries, policies, and operating targets. Its merged state and automated review do not supply an explicit user acceptance record. The current request authorizes execution, not a fabricated policy decision. The [remaining recommendations](stack.md#pending-acceptance) are handed to the user for PR review; the tracked plan remains present with its final acceptance checkbox open. No end-to-end plan-completion or production-readiness claim is made.
+
 ## Local web/API containers
 
 The root Compose file now includes local web/API images. Nginx serves the built React application on `127.0.0.1:5173` and proxies `/api` to an unpublished Go container. Go retains its loopback default outside Compose; the API container explicitly uses `-listen 0.0.0.0:8080`. Docker DNS resolution follows API address changes. The API reads ClickHouse for the fixed `validation` project. These images do not implement authentication, multi-project access, PostgreSQL application data, production migrations, or production deployment hardening.
@@ -27,7 +64,7 @@ The first browser attempts exposed test-selector mismatches and fixture re-seedi
 
 ## Reproduce
 
-Use a local Docker Engine 28 or later with Compose 2.24 or later, Go 1.26 or later, and sufficient image/module download space. Local verification used Docker 29.7.2, Compose 5.5.1, Go 1.27.1, Node 26.11.1, and npm 11.20.0.
+Use a local Docker Engine 28 or later with Compose 2.24 or later, Go 1.26.10 or a patched later release, and sufficient image/module download space. Initial verification used Docker 29.7.2, Compose 5.5.1, Go 1.27.1, Node 26.11.1, and npm 11.20.0. Current revalidation uses patched Go 1.26.10.
 
 From the repository root:
 
@@ -39,6 +76,7 @@ npm --prefix web audit --audit-level=low
 sh scripts/validate-checks.sh
 go mod verify
 sh scripts/check-go.sh
+go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 -test -tags=integration ./...
 npm --prefix web exec -- playwright install --with-deps chromium
 sh scripts/validate-compose-web.sh
 go test -tags=integration -count=1 -timeout=8m -v ./tests/integration/...
@@ -103,10 +141,10 @@ Source/build research also built the Goose 3.29.0 CLI with PostgreSQL and ClickH
 
 ```sh
 # TOOLS must be a new operator-selected temporary directory.
-GOTOOLCHAIN=go1.27.2 GOBIN="$TOOLS/bin" go install \
+GOTOOLCHAIN=go1.26.10 GOBIN="$TOOLS/bin" go install \
   -tags='no_mysql no_sqlite3 no_ydb no_libsql no_mssql no_vertica no_azuresql' \
   github.com/pressly/goose/v3/cmd/goose@v3.29.0
-"$TOOLS/bin/goose" -version
+"$TOOLS/bin/goose" -env=none -version
 ```
 
 The application build design will include this pinned runner as `/app/goose` and separate SQL directories under `/app/migrations/`. [implementation.md](implementation.md) specifies its per-database `status` and `up` commands. Those future production-image commands have not run. The local API image does not include Goose or production schemas.
