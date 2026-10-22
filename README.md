@@ -8,6 +8,10 @@ A self-hosted observability platform under development, with a Go backend, React
 
 See [local trace and log views](docs/local-telemetry.md) for filters, detail pages, OTLP setup, API routes, and limits. Use the [Python examples](examples/python/README.md) to send sample traces and correlated logs.
 
+## Live design preview
+
+Open [the live explorer preview](http://127.0.0.1:5173/preview) after building the web service. It shows an animated event hierarchy, live simulation, and a right-side inspector using sample data only. The existing Traces and Logs pages still show real telemetry. See [the design notes](docs/design/live-explorer.md).
+
 ## Design
 
 - [Stack decisions and operating targets](docs/stack.md)

@@ -111,6 +111,9 @@ export function App() {
           >
             <span aria-hidden="true">≡</span>Logs
           </a>
+          <a href="/preview" className="nav-link">
+            <span aria-hidden="true">◇</span>Live design preview
+          </a>
         </nav>
         <div className="project-card">
           <span className="project-icon" aria-hidden="true">
