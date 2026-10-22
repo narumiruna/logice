@@ -1,6 +1,7 @@
 import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
 import { App } from "./app"
+import { LivePreview } from "./preview/live-preview"
 
 const root = document.getElementById("root")
 if (!root) {
@@ -9,6 +10,6 @@ if (!root) {
 
 createRoot(root).render(
   <StrictMode>
-    <App />
+    {window.location.pathname.replace(/\/$/, "") === "/preview" ? <LivePreview /> : <App />}
   </StrictMode>,
 )

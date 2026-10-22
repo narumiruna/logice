@@ -2,7 +2,7 @@
 
 ## Goal
 
-Select a small initial stack for a Logfire-like observability platform built on ClickHouse.
+Select a small initial stack for a trace and log observability platform built on ClickHouse.
 
 ## Context
 
@@ -185,7 +185,7 @@ Proposed supporting choices:
 - Restrict direct origin access, trust forwarded headers only from the tunnel proxy, and configure the external URL explicitly for secure cookies, WebAuthn origins/RP ID, and OIDC redirects. These checks remain required even when TLS terminates at Cloudflare.
 - What backup and restore process covers PostgreSQL, ClickHouse, and the separate TOTP encryption key?
 - What event rate, retention period, and deployment budget must the first version support?
-- Which Logfire workflows are essential for the first version?
+- Which telemetry workflows are essential for the first version?
 
 ## Plan
 
