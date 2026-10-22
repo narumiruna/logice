@@ -43,6 +43,17 @@ The complete diff was reviewed for correctness, security, lifecycle safety, comp
 
 The local acceptance evidence for `docs/plans/2026-10-23_live-page-plan.md` is retained here. Hosted follow-up for the focus correction is recorded on [PR #8](https://github.com/narumiruna/logice/pull/8), not inferred from local success. The execution plan is removed only after its required verification is complete; usage, recovery, visual-review handoff, and release restrictions remain in `live-telemetry.md`. The separate initial stack plan and its existing acceptance condition are unchanged. This work is not production acceptance.
 
+### PR #8 review corrections
+
+Review comments [4351999106](https://github.com/narumiruna/logice/pull/8#discussion_r4351999106) and [4351999119](https://github.com/narumiruna/logice/pull/8#discussion_r4351999119) identify two valid Live-page defects.
+
+- Interrupted fixed-window loads and paused Refresh requests now resume once after visibility/connectivity recovery. The controller retains only unfinished work for the current query. It still rejects stale responses, waits for an ignored-abort request to settle, and keeps completed paused views free of polling. Initially unavailable fixed URLs and explicit offline Refresh also recover; query changes and cleanup clear old intent.
+- Histogram buttons now use the fixed 60 slot identities instead of rolling start times. Keyboard focus stays at the same position. Arrow navigation and Enter selection use the new response's bounds.
+
+Before the fixes, three focused controller cases failed because only one request ran instead of two. A browser run with the old timestamp keys also lost the focused histogram position. After the fixes, Biome, TypeScript, all 202 unit tests, and the production build pass. The complete built-image suite passes all 41 browser tests in 35.0 seconds. Its three new cases cover hidden/offline interruption and keyboard histogram focus across an exact nanosecond rolling-window change. No timing tolerance or existing check was weakened.
+
+The Go implementation, Collector, schemas, dependencies, and existing query APIs are unchanged. Their prior evidence remains applicable. Current publication, CI results, and thread outcomes are recorded on PR #8.
+
 ### Failures found and corrected
 
 - The initial browser run passed 29/32 tests. It exposed desktop focus restoration timing, mobile native-dialog focus leaving the document at the tab boundary, and an ambiguous empty-state test selector. Explicit focus restoration/modal Tab wrapping and scoped assertions fixed those cases.

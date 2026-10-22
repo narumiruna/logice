@@ -3,6 +3,9 @@ import type { TimeWindow } from "../api"
 import type { LiveBucket } from "./api"
 import { selectInterval } from "./route"
 
+// The 60 positions stay fixed while rolling-window timestamps change.
+const bucketSlots = Array.from({ length: 60 }, (_, slot) => slot)
+
 export function Histogram({
   buckets,
   window,
@@ -52,14 +55,15 @@ export function Histogram({
           start.current = null
         }}
       >
-        {buckets.map((bucket, index) => {
+        {bucketSlots.map((index) => {
+          const bucket = buckets[index]
           const count = BigInt(bucket.spans) + BigInt(bucket.logs)
           const errors = BigInt(bucket.errorSpans) + BigInt(bucket.errorLogs)
           const height = Number((count * 1000n) / maximum) / 10
           const errorHeight = Number((errors * 1000n) / maximum) / 10
           return (
             <button
-              key={bucket.from}
+              key={index}
               type="button"
               aria-label={`Select bucket ${index + 1}: ${bucket.from}, ${count} stored rows`}
               title={`${bucket.from} — ${bucket.to}\n${bucket.spans} spans · ${bucket.logs} logs · ${errors} errors`}

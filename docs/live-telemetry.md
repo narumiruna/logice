@@ -30,6 +30,8 @@ A visible, online Live page sends one snapshot request at a time. It schedules t
 - **Refresh** while paused reads that fixed interval once. Before the first result, it resolves the chosen rolling range once, then pins the returned bounds.
 - **Resume** immediately reads a rolling interval and restarts polling. Time spent hidden or offline is not replayed.
 - Hidden/offline state suspends a requested Live mode, aborts its request, and removes its polling timer. Visibility/connectivity recovery causes at most one immediate refresh.
+  - An unfinished fixed-window request or paused Refresh also resumes once after recovery. It keeps the same query and absolute bounds. A completed paused view does not refresh automatically.
+  - A paused URL without a resolved window stays idle unless Refresh was requested. Query changes and page cleanup cancel any older interrupted request.
 - Transient failures retain the last response as stale and retry after 2, 4, 8, 16, then at most 30 seconds. Manual retry is available. Invalid queries, oversized responses, malformed API data, and unsupported endpoints stop automatic retries.
 - A future 401/403 response clears retained telemetry and stops updates. This behavior is not an authentication implementation.
 

@@ -35,6 +35,7 @@ interface ActiveRequest {
   controller: AbortController
   generation: number
   deadline: ReturnType<typeof setTimeout> | null
+  oneOff: boolean
 }
 function sameWindow(left: TimeWindow | null, right: TimeWindow | null): boolean {
   return (
@@ -76,6 +77,7 @@ export class LiveController {
   private active: ActiveRequest | null = null
   private pending: { generation: number; oneOff: boolean } | null = null
   private frozenWindow: TimeWindow | null = null
+  private interruptedOneOff = false
 
   constructor(route: LiveRoute, options: LiveControllerOptions = {}) {
     this.route = { ...route }
@@ -103,6 +105,7 @@ export class LiveController {
     this.generation += 1
     this.clearTimer()
     this.pending = null
+    this.interruptedOneOff = false
     if (this.active) {
       if (this.active.deadline !== null) clearTimeout(this.active.deadline)
       this.active.deadline = null
@@ -127,7 +130,8 @@ export class LiveController {
     this.running = true
     if (!this.validRoute()) return
     if (!this.ready()) {
-      this.update({ status: "suspended" })
+      this.interruptedOneOff = !this.route.live && routeWindow(this.route) !== null
+      this.update({ status: this.route.live || this.interruptedOneOff ? "suspended" : "paused" })
       return
     }
     if (this.route.live || routeWindow(this.route)) this.begin(!this.route.live)
@@ -175,21 +179,23 @@ export class LiveController {
       status: route.live ? "loading" : "paused",
       ...(pausedMismatch ? { snapshot: null, lastSuccess: null } : {}),
     })
+    const requestOneOff =
+      !route.live &&
+      Boolean(
+        (!previous.live &&
+          (requestedWindow ||
+            this.frozenWindow ||
+            (unresolvedRangeChanged && this.state.snapshot))) ||
+          (previous.live &&
+            requestedWindow &&
+            !sameWindow(requestedWindow, this.state.snapshot?.window ?? null)),
+      )
     if (!this.ready()) {
-      if (this.running && route.live) this.update({ status: "suspended" })
+      this.interruptedOneOff = this.running && requestOneOff
+      if (this.running && (route.live || requestOneOff)) this.update({ status: "suspended" })
       return
     }
-    if (route.live) this.begin(false)
-    else if (
-      (!previous.live &&
-        (requestedWindow ||
-          this.frozenWindow ||
-          (unresolvedRangeChanged && this.state.snapshot))) ||
-      (previous.live &&
-        requestedWindow &&
-        !sameWindow(requestedWindow, this.state.snapshot?.window ?? null))
-    )
-      this.begin(true)
+    if (route.live || requestOneOff) this.begin(requestOneOff)
   }
   setEnvironment(visible: boolean, online: boolean): void {
     const wasAvailable = this.visible && this.online
@@ -198,16 +204,30 @@ export class LiveController {
     this.online = online
     if (wasAvailable === available || !this.running) return
     if (!available) {
+      // Preserve only unfinished work for the current query. A completed paused
+      // response must not become a new request when visibility returns.
+      const oneOff =
+        !this.route.live &&
+        ((this.active?.generation === this.generation && this.active.oneOff) ||
+          (this.pending?.generation === this.generation && this.pending.oneOff))
       this.invalidate()
-      if (this.route.live) this.update({ status: "suspended" })
-    } else if (this.route.live && !this.blocked) this.begin(false)
+      this.interruptedOneOff = Boolean(oneOff)
+      if (this.route.live || oneOff) this.update({ status: "suspended" })
+    } else if (!this.blocked && (this.route.live || this.interruptedOneOff)) {
+      this.begin(!this.route.live)
+    }
   }
   refresh = (): void => {
     if (!this.running) return
     this.invalidate()
     this.blocked = false
     this.failures = 0
-    if (this.validRoute() && this.ready()) this.begin(!this.route.live)
+    if (!this.validRoute()) return
+    if (this.ready()) this.begin(!this.route.live)
+    else {
+      this.interruptedOneOff = !this.route.live
+      this.update({ status: "suspended" })
+    }
   }
   pause(): void {
     this.setRoute(
@@ -264,13 +284,19 @@ export class LiveController {
   }
   private begin(oneOff: boolean): void {
     if (!this.ready() || this.blocked || (!this.route.live && !oneOff)) return
+    this.interruptedOneOff = false
     if (this.active) {
       this.pending = { generation: this.generation, oneOff }
       return
     }
     this.clearTimer()
     const generation = this.generation
-    const active: ActiveRequest = { controller: new AbortController(), generation, deadline: null }
+    const active: ActiveRequest = {
+      controller: new AbortController(),
+      generation,
+      deadline: null,
+      oneOff,
+    }
     this.active = active
     const query =
       !this.route.live && this.frozenWindow
@@ -311,6 +337,7 @@ export class LiveController {
       })
       .then(
         (snapshot) => {
+          active.oneOff = false
           if (generation !== this.generation || !this.running) return
           if (!this.route.live) this.frozenWindow = snapshot.window
           this.failures = 0
@@ -333,6 +360,7 @@ export class LiveController {
           if (generation === this.generation && !oneOff) this.schedule(2000)
         },
         (error) => {
+          active.oneOff = false
           if (generation === this.generation && this.running) this.failure(error, oneOff)
         },
       )
