@@ -2,13 +2,17 @@
 
 A self-hosted observability platform under development, with a Go backend, React/TypeScript frontend, PostgreSQL application data, and ClickHouse telemetry.
 
-**Current status:** local trace/log lists, structured filters, span and log details, ClickHouse query APIs, web/API container images, and real-service validation. Authentication, multi-project access, and production deployment are not implemented.
+**Current status:** a real-data Live explorer, local trace/log lists, structured filters, span and log details, ClickHouse query APIs, web/API container images, and real-service validation. Authentication, multi-project access, and production deployment are not implemented.
 
 ## Usage
 
 See [local trace and log views](docs/local-telemetry.md) for filters, detail pages, OTLP setup, API routes, and limits. Use the [Python examples](examples/python/README.md) to send sample traces and correlated logs.
 
-## Live design preview
+## Live explorer
+
+Open **http://127.0.0.1:5173/live** after building the web/API services. It combines actual exported spans and logs with bounded automatic polling, a server-counted histogram, an expandable hierarchy, and an inspector. Pause freezes the current window. See [Live usage, identity rules, and limits](docs/live-telemetry.md). This remains a local, fixed-project feature; it does not provide authentication or running-span streaming.
+
+### Design preview
 
 Open [the live explorer preview](http://127.0.0.1:5173/preview) after building the web service. It shows an animated event hierarchy, live simulation, and a right-side inspector using sample data only. The existing Traces and Logs pages still show real telemetry. See [the design notes](docs/design/live-explorer.md).
 
@@ -49,7 +53,7 @@ docker compose --project-name logice-validation up --build --detach --wait --wai
 docker compose --project-name logice-validation port collector 4318
 ```
 
-Open **http://127.0.0.1:5173**. Select **Traces** or **Logs**, apply filters, and open a record for details. Views are empty until your applications send matching telemetry. Nginx serves the built frontend and forwards `/api` to the Go container. The API has no published host port. Check liveness with `curl http://127.0.0.1:5173/api/healthz`. The API reads the fixed `validation` project from ClickHouse; it does not use PostgreSQL yet. Stop Vite first if it already uses port `5173`.
+Open **http://127.0.0.1:5173**. Select **Live**, **Traces**, or **Logs**, apply filters, and open a record for details. Views are empty until your applications send matching telemetry. Nginx serves the built frontend and forwards `/api` to the Go container. The API has no published host port. Check liveness with `curl http://127.0.0.1:5173/api/healthz`. The API reads the fixed `validation` project from ClickHouse; it does not use PostgreSQL yet. Stop Vite first if it already uses port `5173`.
 
 Use the displayed Collector address as the OTLP/HTTP endpoint and send `Authorization: Bearer <OTLP_TOKEN>`. Use `/v1/traces` and `/v1/logs`. Query port `4317` for the local gRPC endpoint or `13133` for the Collector health endpoint. The test harness waits for Collector HTTP readiness separately; Compose's `--wait` alone does not establish Collector readiness.
 

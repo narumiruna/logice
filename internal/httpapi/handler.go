@@ -18,6 +18,7 @@ func newHandler(readers ...telemetry.Reader) http.Handler {
 	if len(readers) > 0 {
 		reader = readers[0]
 	}
+	live := newLiveHandler(reader)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Context().Err() != nil {
 			return
@@ -33,6 +34,11 @@ func newHandler(readers ...telemetry.Reader) http.Handler {
 				return
 			}
 			writeJSON(w, http.StatusOK, `{"status":"ok"}`)
+			return
+		}
+
+		if r.URL.Path == "/api/live" {
+			live.ServeHTTP(w, r)
 			return
 		}
 

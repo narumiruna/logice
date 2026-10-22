@@ -4,6 +4,48 @@
 
 Validate the local trace/log workflow, Go API, frontend tooling, selected storage, Collector, native Go drivers, and migration behavior with disposable data. This is not a production deployment. Authentication, multi-project authorization, load targets, and public Cloudflare routing remain separate acceptance gates. Historical foundation evidence below applies to its recorded revision.
 
+## Real-data Live page: 2026-10-23
+
+Execution base: `origin/main` at `a6e4b98`; branch: `narumi/feat/live-page`. The supplied Live plan was the only untracked input. No repository or ancestor `AGENTS.md` was present. Scope is the [local real-data Live page](live-telemetry.md), not authentication, public deployment, or the full application sequence.
+
+### Implementation and limits
+
+`/live` reads the additive `/api/live` endpoint. The API uses canonical full stored payloads for identity, groups before row caps, returns matching and bounded ancestor records, and counts 60 histogram buckets over matching stored rows. Logs with identical stored content have occurrence counts; those counts cannot distinguish independent emissions from retries. Conflicting span exports use a deterministic matching representative and explicit parent ambiguity. Trace completeness remains unknown. Separate ClickHouse reads are not a transaction.
+
+Polling replaces bounded responses, waits two seconds after completion, and stops or suspends safely on pause, navigation, hidden/offline state, and unmount. Generation guards reject ignored-abort completions. The UI preserves drafts, logical focus, scroll anchors, and selected records across late parents and eviction. It never substitutes sample data or infers Running spans. Virtualization uses the reviewed React-compatible `@tanstack/react-virtual` 3.14.21 pin; no Router/Query migration or schema/Collector change was made.
+
+The API retains fixed project/time predicates, readonly settings, 128 MiB query memory, 8 MiB native results, a shared five-second cancellation budget, two admission slots, and a 4 MiB encoded response cap. The browser validates the response while enforcing an eight-second request timeout and 4 MiB streaming byte cap. Malformed content-identified spans are non-linkable and do not consume context trace-group slots; logs with valid trace IDs do.
+
+### Verification
+
+Tools: Go 1.26.10, Node.js 26.11.1, npm 11.20.0, Docker 29.7.2, Compose 5.5.1, and pinned ClickHouse 26.8.30.8. The existing PostgreSQL/Collector image pins are unchanged.
+
+| Check | Actual result |
+| --- | --- |
+| `GOTOOLCHAIN=go1.26.10 go mod verify`, `sh scripts/check-go.sh`, and `go test -race -count=1 -timeout=2m ./internal/...` | Module verification, formatting, ordinary/tagged vet, unit tests, independent build, and race checks passed. |
+| Focused `go test -tags=integration -run '^TestLive' -count=1 -timeout=5m -v ./tests/integration/...` | Passed in 68.511 seconds, including native identity, grouping, schema, caps, exact boundaries, effective settings, cancellation, memory failure, and outage/recovery cases. |
+| Full `go test -tags=integration -count=1 -timeout=8m -v ./tests/integration/...` | Passed in 180.080 seconds with the nine-minute outer deadline. Existing migration, HTTP/gRPC ingestion, query, spoof rejection, retry, and persistence tests remain enabled. |
+| `npm --prefix web ci`, `npm --prefix web run ci`, and `npm --prefix web audit --audit-level=low` | Installation, Biome, TypeScript, 192 unit tests, build, and zero audit vulnerabilities. |
+| `sh scripts/validate-compose-web.sh` | 36 Chromium tests passed in 28.8 seconds: 28 new Live tests plus all eight existing preview/list/detail workflows. Static/API checks, API-IP replacement recovery, and cleanup also passed. |
+| 15-minute virtual-time controller test | 450 rotating 1,500-record responses; one physical request, one at-rest poll timer, and zero timers after stop. This is bounded-state evidence, not a heap-leak or production capacity claim. |
+| Browser bounds and interaction checks | At most 120 mounted event rows at desktop/mobile sizes; less than 3 CSS pixels of surviving-anchor drift; focused orphan reparenting, offscreen navigation, retained/evicted selection, modal focus containment, URL/history, filters, minimum-width histogram selection, and reduced motion passed. |
+| Real browser ingestion | Records sent after page open appeared automatically within the bounded storage/UI waits. Pause/resume, late healthy ancestor context, conflicting exports, identical logs, error filtering, a four-stored-row histogram, and escaped script-like log text passed. |
+| `./scripts/validate-web-layout.sh` | Locked isolated dependency fixture passed. Existing dependency `use client` warnings remain visible. |
+| Python example tests, Actionlint, shell syntax, and diff checks | Four example tests and repository configuration checks passed. |
+
+The full-suite local performance fixture contained exactly 5,000 spans and 5,000 logs, including deep/wide traces, 200 trace groups, and uncorrelated logs. After two warm-up requests, 30 sequential HTTP snapshots measured p50 **152.516 ms**, p95 **162.629 ms**, and maximum **165.246 ms**, with 785,014–785,015 response bytes. The host was Linux amd64, AMD Ryzen 9 7950X3D, 32 logical CPUs, and approximately 31.34 GiB RAM. This meets the plan's local two-second p95 target on this recorded host; it is not a production throughput/latency promise.
+
+Desktop, real-Collector, and mobile screenshots were inspected under ignored `web/test-results/`. Browser traces and source/native logs remain ignored artifacts, not committed telemetry or binary files. The user can use those captures and local `/live` for subjective visual review. Public authentication, deployment, capacity/loss budgets, and recovery remain external release restrictions in `live-telemetry.md`.
+
+### Failures found and corrected
+
+- The initial browser run passed 29/32 tests. It exposed desktop focus restoration timing, mobile native-dialog focus leaving the document at the tab boundary, and an ambiguous empty-state test selector. Explicit focus restoration/modal Tab wrapping and scoped assertions fixed those cases.
+- The next run passed 35/36. Its focused orphan test exposed a virtualized row moving out of the old virtual range during late-parent reparenting. Synchronous expansion, logical focus ownership, and bounded focus-frame restoration fixed it without relaxing the less-than-3-pixel anchor requirement. Fixed UTC draft overwrite, pending-filter pause mismatch, and empty-feed focus fallback were also covered by regression tests.
+- Review found that `json.Encoder` allocates the complete encoded value before writing. An exact encoded-size preflight now scans escaping, raw JSON, and context cancellation before encoding. The 8 MiB escaped-content regression uses six allocations/504 bytes rather than allocating an oversized encoded copy; the final output writer independently enforces the cap.
+- Epoch zero was incorrectly used as an unset ranking value. The sentinel fallback was removed and native/unit epoch-boundary tests now preserve the newest trace. Real uppercase/lowercase ID and parent comparisons are also tested.
+- The pinned ClickHouse driver increases `max_execution_time` when it sees a Go Deadline. SQL-level overrides were rejected under readonly mode. Live alone now hides that advertised deadline from the driver while preserving the shared context's Done, Err, and Value. Native query-log checks verify all five actual reads use readonly 1, execution limit 5, memory 134,217,728, result bytes 8,388,608, and throwing overflow behavior. Actual Live cancellation and a 500,000-row Live grouping memory failure are tested, not inferred from unrelated queries.
+- Final review found a client/server disagreement over malformed-span trace-group eligibility. The validator now uses the same eligibility rule and accepts 101 distinct malformed content records while still rejecting 101 eligible trace groups. Polling does not stop on this backend-valid input.
+
 ## Stack plan handoff: 2026-10-23
 
 Base: `origin/main` at `ca036fb`; branch: `narumi/docs/stack-plan-handoff`. The working tree was clean. No repository or ancestor `AGENTS.md` was present. PRs #4–#6 are now merged, including the live preview and Docker-compatible API replacement check. This execution changes documentation only; the initial plan does not authorize the full application sequence.

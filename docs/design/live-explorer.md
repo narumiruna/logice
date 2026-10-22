@@ -95,7 +95,7 @@ These checks are not full accessibility conformance or a production live-query b
 
 The user reviews `/preview` for density, colors, hierarchy, animation, and inspector placement. This is a subjective design review, not an incomplete coding task. No final design approval is implied by the checks.
 
-Real-data live integration is a separate change after this review. It needs bounded query polling, trace/span/log reconciliation, late-parent handling, stable log identity, cancellation, and performance validation against actual telemetry. This preview's timer and fixture IDs are not a production streaming protocol.
+The separate [real-data Live page](../live-telemetry.md) at `/live` implements bounded snapshot polling, stable record identity, partial hierarchy handling, virtualization, cancellation, and stored-record inspection. It has its own model and lifecycle; it does not use this preview's sample session or running-span simulation. The preview remains isolated from telemetry APIs. Neither page supplies a production streaming protocol or closes authentication/public-deployment gates.
 
 ## Recovery
 
