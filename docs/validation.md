@@ -37,6 +37,14 @@ The initial functional integration run on Go 1.26.9 also passed in 120.535 secon
 
 The complete diff was reviewed for correctness, security, lifecycle safety, compatibility, regressions, and scope. Independent read-only review found one outdated runnable Goose example still selecting Go 1.27.2. It was corrected to Go 1.26.10 and verified with the CLI build, version, and binary scan above. Documentation-local link targets exist. Historical versioned evidence remains labeled as historical.
 
+### Hosted CI network compatibility repair
+
+[Run 39808072755](https://github.com/narumiruna/logice/actions/runs/39808072755) passed all four browser workflows but failed the later API-IP replacement check. The CI Docker daemon rejected `--ip` on a network with an automatically allocated subnet: user-specified addresses require a user-configured subnet. Local success on a different daemon did not prove this path portable.
+
+The smoke script now starts a replacement API with the `api` network alias while the original still owns its address. It asserts both addresses are nonempty and different, then removes the original API and requires successful proxied liveness through Nginx. Allocation remains dynamic: no static IP, fixed subnet, daemon setting, skipped assertion, or operator network change is needed. The replacement is removed by the existing bounded cleanup trap before its project network and images are deleted.
+
+After replaying the repair onto merged `main` at `d2ccb18`, all 64 unit tests and all eight Chromium workflows passed, including the four real-data browser tests. The complete script also passed the changed-IP assertion, proxied recovery, and project cleanup. The retry window is unchanged. Hosted verification is reported on the follow-up PR rather than inferred from the local run.
+
 ### Remaining acceptance condition
 
 [PR #1](https://github.com/narumiruna/logice/pull/1) explicitly retained final acceptance of the recommended libraries, policies, and operating targets. Its merged state and automated review do not supply an explicit user acceptance record. The current request authorizes execution, not a fabricated policy decision. The [remaining recommendations](stack.md#pending-acceptance) are handed to the user for PR review; the tracked plan remains present with its final acceptance checkbox open. No end-to-end plan-completion or production-readiness claim is made.
