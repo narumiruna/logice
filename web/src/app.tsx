@@ -4,9 +4,9 @@ import { ApiError, fetchList, fetchTrace } from "./api"
 import { Notice, WindowLabel } from "./components"
 import { FilterForm } from "./filters"
 import { LogList, TraceList } from "./lists"
+import { AppShell } from "./shell"
 import { listHref, parseRoute, routeHref } from "./telemetry"
 import { TraceDetail } from "./trace-detail"
-import "./styles.css"
 
 type Result =
   | { kind: "loading" }
@@ -82,154 +82,97 @@ export function App() {
         ? "Page not found"
         : "Traces"
   return (
-    <div className="app-shell">
-      <a href="#main" className="skip-link">
-        Skip to content
-      </a>
-      <aside className="sidebar" aria-label="Application navigation">
-        <a className="brand" href={listHref("traces", route.filters)}>
-          <span className="brand-mark" aria-hidden="true">
-            L
-          </span>
-          <span>
-            Logice<span className="brand-caption">Telemetry explorer</span>
-          </span>
-        </a>
-        <div className="nav-label">Explore</div>
-        <nav>
-          <a
-            href={listHref("traces", route.filters)}
-            className={!logs && route.page !== "not-found" ? "nav-link active" : "nav-link"}
-            aria-current={!logs && route.page !== "not-found" ? "page" : undefined}
-          >
-            <span aria-hidden="true">≋</span>Traces
+    <AppShell
+      page={route.page === "not-found" ? undefined : logs ? "logs" : "traces"}
+      tracesHref={listHref("traces", route.filters)}
+      logsHref={listHref("logs", route.filters)}
+    >
+      <main id="main" tabIndex={-1}>
+        {detail && (
+          <a className="back-link" href={listHref("traces", route.filters)}>
+            ← Back to traces
           </a>
-          <a
-            href={listHref("logs", route.filters)}
-            className={logs ? "nav-link active" : "nav-link"}
-            aria-current={logs ? "page" : undefined}
-          >
-            <span aria-hidden="true">≡</span>Logs
-          </a>
-          <a href="/live" className="nav-link">
-            <span aria-hidden="true">◉</span>Live
-          </a>
-          <a href="/preview" className="nav-link">
-            <span aria-hidden="true">◇</span>Live design preview
-          </a>
-        </nav>
-        <div className="project-card">
-          <span className="project-icon" aria-hidden="true">
-            ⌂
-          </span>
+        )}
+        <div className="page-heading">
           <div>
-            <strong>Local validation</strong>
-            <span className="project-caption">Single project</span>
+            <span className="eyebrow">Telemetry explorer</span>
+            <h1>{title}</h1>
+            <p>
+              {detail
+                ? "Inspect span relationships and correlated log records."
+                : logs
+                  ? "Search application logs and inspect the records behind each message."
+                  : "Find requests, inspect errors, and follow work across services."}
+            </p>
           </div>
-          <span className="local-tag">LOCAL</span>
-        </div>
-        <div className="sidebar-footer">
-          Local trace and log inspection
-          <br />
-          OpenTelemetry data via Collector
-        </div>
-      </aside>
-      <div className="workspace">
-        <header className="topbar">
-          <span>
-            Workspace <span aria-hidden="true">/</span> <strong>Local validation</strong>
-          </span>
-          <span className="environment-label">Validation project only</span>
-        </header>
-        <main id="main" tabIndex={-1}>
-          {detail && (
-            <a className="back-link" href={listHref("traces", route.filters)}>
-              ← Back to traces
-            </a>
+          {valid && (
+            <button
+              className="button button-secondary refresh-button"
+              type="button"
+              onClick={refresh}
+            >
+              <span aria-hidden="true">↻</span> Refresh
+            </button>
           )}
-          <div className="page-heading">
-            <div>
-              <span className="eyebrow">Telemetry explorer</span>
-              <h1>{title}</h1>
-              <p>
-                {detail
-                  ? "Inspect span relationships and correlated log records."
-                  : logs
-                    ? "Search application logs and inspect the records behind each message."
-                    : "Find requests, inspect errors, and follow work across services."}
-              </p>
-            </div>
-            {valid && (
-              <button
-                className="button button-secondary refresh-button"
-                type="button"
-                onClick={refresh}
-              >
-                <span aria-hidden="true">↻</span> Refresh
-              </button>
+        </div>
+        {route.page === "not-found" ? (
+          <Notice title="This page does not exist" tone="error">
+            <a href={listHref("traces", route.filters)}>Open traces</a> or{" "}
+            <a href={listHref("logs", route.filters)}>open logs</a>.
+          </Notice>
+        ) : route.error ? (
+          <Notice title="Invalid query" tone="error">
+            <p>{route.error}</p>
+            <a href={logs ? "/logs" : "/traces"}>Reset to the last hour</a>
+          </Notice>
+        ) : (
+          <>
+            {!detail && <FilterForm route={route} />}
+            <WindowLabel window={route.filters} />
+            {state.kind === "loading" && (
+              <div className="loading-state" role="status" aria-live="polite">
+                <span className="loading-dot" aria-hidden="true" />
+                <strong>Loading {detail ? "trace detail" : logs ? "logs" : "traces"}…</strong>
+                <span>Reading the selected time window.</span>
+              </div>
             )}
-          </div>
-          {route.page === "not-found" ? (
-            <Notice title="This page does not exist" tone="error">
-              <a href={listHref("traces", route.filters)}>Open traces</a> or{" "}
-              <a href={listHref("logs", route.filters)}>open logs</a>.
-            </Notice>
-          ) : route.error ? (
-            <Notice title="Invalid query" tone="error">
-              <p>{route.error}</p>
-              <a href={logs ? "/logs" : "/traces"}>Reset to the last hour</a>
-            </Notice>
-          ) : (
-            <>
-              {!detail && <FilterForm route={route} />}
-              <WindowLabel window={route.filters} />
-              {state.kind === "loading" && (
-                <div className="loading-state" role="status" aria-live="polite">
-                  <span className="loading-dot" aria-hidden="true" />
-                  <strong>Loading {detail ? "trace detail" : logs ? "logs" : "traces"}…</strong>
-                  <span>Reading the selected time window.</span>
-                </div>
-              )}
-              {state.kind === "error" && (
-                <Notice
-                  title={
-                    state.error instanceof ApiError && state.error.status === 404
-                      ? "Trace not found in this window"
-                      : "Telemetry could not be loaded"
-                  }
-                  tone="error"
-                >
+            {state.kind === "error" && (
+              <Notice
+                title={
+                  state.error instanceof ApiError && state.error.status === 404
+                    ? "Trace not found in this window"
+                    : "Telemetry could not be loaded"
+                }
+                tone="error"
+              >
+                <p>
+                  {state.error instanceof ApiError
+                    ? state.error.message
+                    : "Cannot reach the API. Check the local API and Collector services, then try again."}
+                </p>
+                {state.error instanceof ApiError && state.error.status === 404 && (
                   <p>
-                    {state.error instanceof ApiError
-                      ? state.error.message
-                      : "Cannot reach the API. Check the local API and Collector services, then try again."}
+                    No spans or correlated logs were found. This trace can exist outside the
+                    selected window.
                   </p>
-                  {state.error instanceof ApiError && state.error.status === 404 && (
-                    <p>
-                      No spans or correlated logs were found. This trace can exist outside the
-                      selected window.
-                    </p>
-                  )}
-                  <button className="button button-secondary" type="button" onClick={refresh}>
-                    Try again
-                  </button>
-                </Notice>
-              )}
-              {state.kind === "traces" && (
-                <TraceList result={state.result} window={route.filters} />
-              )}
-              {state.kind === "logs" && <LogList result={state.result} window={route.filters} />}
-              {state.kind === "detail" && (
-                <TraceDetail detail={state.result} window={route.filters} />
-              )}
-            </>
-          )}
-          <footer className="page-footer">
-            <span>Local validation project</span>
-            <span>UTC timestamps · No automatic refresh</span>
-          </footer>
-        </main>
-      </div>
-    </div>
+                )}
+                <button className="button button-secondary" type="button" onClick={refresh}>
+                  Try again
+                </button>
+              </Notice>
+            )}
+            {state.kind === "traces" && <TraceList result={state.result} window={route.filters} />}
+            {state.kind === "logs" && <LogList result={state.result} window={route.filters} />}
+            {state.kind === "detail" && (
+              <TraceDetail detail={state.result} window={route.filters} />
+            )}
+          </>
+        )}
+        <footer className="page-footer">
+          <span>Local validation project</span>
+          <span>UTC timestamps · No automatic refresh</span>
+        </footer>
+      </main>
+    </AppShell>
   )
 }

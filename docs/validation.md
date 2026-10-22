@@ -4,6 +4,30 @@
 
 Validate the local trace/log workflow, Go API, frontend tooling, selected storage, Collector, native Go drivers, and migration behavior with disposable data. This is not a production deployment. Authentication, multi-project authorization, load targets, and public Cloudflare routing remain separate acceptance gates. Historical foundation evidence below applies to its recorded revision.
 
+## Theme switching: 2026-10-23
+
+All pages now share navigation and a **Theme** selector. Classic retains the blue style and wider spacing. Studio retains the lavender style and compact spacing. The browser stores the selection as `logice.theme`; invalid or unavailable storage defaults to Classic. Storage write failures do not prevent switching on the current page. No telemetry API, dependency, schema, or polling logic changed.
+
+### Verification
+
+| Check | Actual result |
+| --- | --- |
+| `npm --prefix web run ci` | Biome, TypeScript, 233 unit tests, and the production build passed. The 31 theme tests cover preference validation, initialization, server rendering, and 20 text-color pairs at 4.5:1 or higher. |
+| `sh scripts/validate-compose-web.sh` | All 52 Chromium tests passed in 42.9 seconds, including 11 theme tests and all existing Live, Preview, list, and detail workflows. Static/API checks, API-IP replacement recovery, and disposable-project cleanup passed. |
+| Theme browser checks | Both themes passed at 1440px and 390px on Traces, Logs, trace detail, Live, and Preview. Checks cover keyboard selection, reload/navigation persistence, denied storage, failed storage writes, invalid routes, API errors, and retained filters, expanded records, pause state, selection, and inspector tabs. |
+| Review and `git diff --check` | No whitespace errors. Review found low-contrast Studio success and info text. Added contrast tests also found the worker label. All three text colors were corrected before the final checks. |
+| `GOTOOLCHAIN=go1.26.10 sh scripts/check-go.sh` | Go formatting, ordinary/tagged vet, unit tests, and build passed with the CI toolchain. |
+
+The initial commit hook used host Go 1.27.1 and failed the unchanged `TestLivePreflightExactSizeAndAllocation` test. The focused test and complete Go checks passed with the repository's Go 1.26.10 toolchain. No Go source or checks were changed or bypassed.
+
+Screenshots are local, ignored artifacts under `web/test-results/themes-*-chromium/`. Each theme has desktop and narrow captures for all five views and both inspectors. Initial Traces and Preview captures are under `web/test-results/theme-before/`. Browser tests replace these artifacts on the next run; no images are committed. The existing service on port 5173 and its data were not changed.
+
+### External review
+
+Product owner: after the frontend is rebuilt or the captures are available, compare Classic and Studio on the desktop and narrow views. Confirm that both retained styles meet the preferred visual design. Automated checks do not establish subjective visual acceptance or physical-device behavior. This UI work does not authorize public deployment; the existing authentication, authorization, capacity, and recovery release restrictions remain unchanged.
+
+The completed agent plan was `docs/plans/2026-10-23_theme-switching-plan.md`. Theme usage remains in `README.md`; this section retains the verification evidence and visual-review handoff.
+
 ## Real-data Live page: 2026-10-23
 
 Execution base: `origin/main` at `a6e4b98`; branch: `narumi/feat/live-page`. The supplied Live plan was the only untracked input. No repository or ancestor `AGENTS.md` was present. Scope is the [local real-data Live page](live-telemetry.md), not authentication, public deployment, or the full application sequence.

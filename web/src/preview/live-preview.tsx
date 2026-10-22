@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { AppShell } from "../shell"
 import { Glyph } from "./icons"
 import { formatDuration, PreviewInspector } from "./inspector"
 import {
@@ -58,8 +59,8 @@ function Overview({
         aria-label="Histogram of simulated events in the selected time window"
       >
         <title>Sample event volume</title>
-        <rect x="880" y="0" width="80" height="43" fill="#f4eaff" />
-        <line x1="0" x2="960" y1="42" y2="42" stroke="#e7e9ef" />
+        <rect x="880" y="0" width="80" height="43" fill="var(--chart-highlight)" />
+        <line x1="0" x2="960" y1="42" y2="42" stroke="var(--color-border)" />
         {buckets.map((bucket) => (
           <g key={bucket.slot}>
             <rect
@@ -68,7 +69,7 @@ function Overview({
               width="10"
               height={(bucket.count / max) * 34}
               rx="1.5"
-              fill={bucket.slot > 54 ? "#a78bfa" : "#9abaff"}
+              fill={bucket.slot > 54 ? "var(--chart-accent)" : "var(--chart-primary)"}
             />
             <rect
               x={bucket.slot * 16 + 3}
@@ -76,11 +77,11 @@ function Overview({
               width="10"
               height={(bucket.errors / max) * 34}
               rx="1.5"
-              fill="#e99aab"
+              fill="var(--chart-error)"
             />
           </g>
         ))}
-        <line x1="958" x2="958" y1="1" y2="43" stroke="#9e7de8" strokeDasharray="2 3" />
+        <line x1="958" x2="958" y1="1" y2="43" stroke="var(--chart-accent)" strokeDasharray="2 3" />
       </svg>
       <div className="lp-time-axis">
         {[0, 0.25, 0.5, 0.75, 1].map((fraction) => (
@@ -227,71 +228,10 @@ export function LivePreview() {
     setAutoExpand(true)
   }
   return (
-    <div className="lp-root" data-live={live}>
-      <a href="#lp-content" className="lp-skip">
-        Skip to live events
-      </a>
-      <header className="lp-topbar">
-        <a className="lp-brand" href="/traces">
-          <span className="lp-brand-symbol">L</span>Logice
-          <span className="lp-brand-divider" />
-        </a>
-        <span className="lp-workspace-name">
-          <span className="lp-workspace-avatar">N</span>Local workspace{" "}
-          <Glyph name="chevron" size={12} />
-        </span>
-        <span className="lp-topbar-spacer" />
-        <span className="lp-preview-badge">DESIGN PREVIEW</span>
-        <a className="lp-back-to-app" href="/traces">
-          <Glyph name="arrow-left" size={14} /> Back to application
-        </a>
-      </header>
-      <div className="lp-shell">
-        <aside className="lp-sidebar" aria-label="Preview navigation">
-          <div className="lp-project-selector">
-            <span className="lp-project-icon">
-              <Glyph name="box" size={20} />
-            </span>
-            <div>
-              <span className="lp-section-label">PROJECT</span>
-              <strong>Local validation</strong>
-              <span className="lp-environment">
-                Development <span />
-              </span>
-            </div>
-          </div>
-          <div className="lp-nav-section">EXPLORE</div>
-          <nav>
-            <a href="/preview" className="lp-nav-item lp-nav-active" aria-current="page">
-              <Glyph name="activity" /> Live
-              <span className="lp-nav-live-dot" />
-            </a>
-            <a href="/traces" className="lp-nav-item">
-              <Glyph name="layers" /> Traces
-              <Glyph name="chevron" size={12} />
-            </a>
-            <a href="/logs" className="lp-nav-item">
-              <Glyph name="code" /> Logs
-              <Glyph name="chevron" size={12} />
-            </a>
-          </nav>
-          <div className="lp-sidebar-note">
-            <span className="lp-note-icon">✧</span>
-            <strong>See the whole story.</strong>
-            <p>
-              Requests, spans, and logs.
-              <br />
-              One connected timeline.
-            </p>
-          </div>
-          <div className="lp-sidebar-bottom">
-            <span className="lp-demo-indicator" /> Simulated data
-            <p>This preview does not read or write your telemetry.</p>
-            <span className="lp-version">INTERACTION STUDY / 01</span>
-          </div>
-        </aside>
+    <AppShell page="preview" contentId="lp-content">
+      <div className="lp-root" data-live={live}>
         <div className={currentSelection ? "lp-main-layout lp-with-inspector" : "lp-main-layout"}>
-          <main className="lp-main" id="lp-content">
+          <main className="lp-main" id="lp-content" tabIndex={-1}>
             <div className="lp-page-title">
               <div>
                 <span className="lp-breadcrumb">
@@ -641,6 +581,6 @@ export function LivePreview() {
           )}
         </div>
       </div>
-    </div>
+    </AppShell>
   )
 }

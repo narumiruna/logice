@@ -8,6 +8,15 @@ A self-hosted observability platform under development, with a Go backend, React
 
 See [local trace and log views](docs/local-telemetry.md) for filters, detail pages, OTLP setup, API routes, and limits. Use the [Python examples](examples/python/README.md) to send sample traces and correlated logs.
 
+### Themes
+
+Use **Theme** in the top-right header to select a style for all pages:
+
+1. **Classic**: blue accents and wider spacing, based on the original Traces and Logs pages.
+2. **Studio**: lavender accents and compact spacing, based on the original Live and Preview pages.
+
+The choice persists in this browser across navigation and reloads. Switching does not reset filters, expanded records, the inspector, or paused updates. Classic is the default. If browser storage is unavailable, switching still works until the next page load.
+
 ## Live explorer
 
 Open **http://127.0.0.1:5173/live** after building the web/API services. It combines actual exported spans and logs with bounded automatic polling, a server-counted histogram, an expandable hierarchy, and an inspector. Pause freezes the current window. See [Live usage, identity rules, and limits](docs/live-telemetry.md). This remains a local, fixed-project feature; it does not provide authentication or running-span streaming.
