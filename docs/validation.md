@@ -18,7 +18,7 @@ The API retains fixed project/time predicates, readonly settings, 128 MiB query 
 
 ### Verification
 
-Tools: Go 1.26.10, Node.js 26.11.1, npm 11.20.0, Docker 29.7.2, Compose 5.5.1, and pinned ClickHouse 26.8.30.8. The existing PostgreSQL/Collector image pins are unchanged.
+Implementation revision: `44c8443`. Tools: Go 1.26.10, Node.js 26.11.1, npm 11.20.0, Docker 29.7.2, Compose 5.5.1, and pinned ClickHouse 26.8.30.8. The existing PostgreSQL/Collector image pins are unchanged.
 
 | Check | Actual result |
 | --- | --- |
@@ -26,16 +26,22 @@ Tools: Go 1.26.10, Node.js 26.11.1, npm 11.20.0, Docker 29.7.2, Compose 5.5.1, a
 | Focused `go test -tags=integration -run '^TestLive' -count=1 -timeout=5m -v ./tests/integration/...` | Passed in 68.511 seconds, including native identity, grouping, schema, caps, exact boundaries, effective settings, cancellation, memory failure, and outage/recovery cases. |
 | Full `go test -tags=integration -count=1 -timeout=8m -v ./tests/integration/...` | Passed in 180.080 seconds with the nine-minute outer deadline. Existing migration, HTTP/gRPC ingestion, query, spoof rejection, retry, and persistence tests remain enabled. |
 | `npm --prefix web ci`, `npm --prefix web run ci`, and `npm --prefix web audit --audit-level=low` | Installation, Biome, TypeScript, 192 unit tests, build, and zero audit vulnerabilities. |
-| `sh scripts/validate-compose-web.sh` | 36 Chromium tests passed in 28.8 seconds: 28 new Live tests plus all eight existing preview/list/detail workflows. Static/API checks, API-IP replacement recovery, and cleanup also passed. |
+| `sh scripts/validate-compose-web.sh` on the committed implementation | 36 Chromium tests passed in 30.0 seconds: 28 new Live tests plus all eight existing preview/list/detail workflows. Static/API checks, API-IP replacement recovery, and cleanup also passed. |
 | 15-minute virtual-time controller test | 450 rotating 1,500-record responses; one physical request, one at-rest poll timer, and zero timers after stop. This is bounded-state evidence, not a heap-leak or production capacity claim. |
 | Browser bounds and interaction checks | At most 120 mounted event rows at desktop/mobile sizes; less than 3 CSS pixels of surviving-anchor drift; focused orphan reparenting, offscreen navigation, retained/evicted selection, modal focus containment, URL/history, filters, minimum-width histogram selection, and reduced motion passed. |
 | Real browser ingestion | Records sent after page open appeared automatically within the bounded storage/UI waits. Pause/resume, late healthy ancestor context, conflicting exports, identical logs, error filtering, a four-stored-row histogram, and escaped script-like log text passed. |
 | `./scripts/validate-web-layout.sh` | Locked isolated dependency fixture passed. Existing dependency `use client` warnings remain visible. |
-| Python example tests, Actionlint, shell syntax, and diff checks | Four example tests and repository configuration checks passed. |
+| `GOTOOLCHAIN=go1.26.10 go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 -test -tags=integration ./...` | No vulnerabilities found with the final Go source and pinned scanner. |
+| `GOTOOLCHAIN=go1.26.10 sh scripts/validate-checks.sh` | A clean clone of `44c8443` passed independent Go checks without Node, hook installation, and all eight injected formatting/test failures without source/index changes. |
+| Python example tests, Actionlint, shell syntax, local Markdown links, and diff checks | Four example tests and repository configuration/documentation checks passed. |
 
 The full-suite local performance fixture contained exactly 5,000 spans and 5,000 logs, including deep/wide traces, 200 trace groups, and uncorrelated logs. After two warm-up requests, 30 sequential HTTP snapshots measured p50 **152.516 ms**, p95 **162.629 ms**, and maximum **165.246 ms**, with 785,014–785,015 response bytes. The host was Linux amd64, AMD Ryzen 9 7950X3D, 32 logical CPUs, and approximately 31.34 GiB RAM. This meets the plan's local two-second p95 target on this recorded host; it is not a production throughput/latency promise.
 
 Desktop, real-Collector, and mobile screenshots were inspected under ignored `web/test-results/`. Browser traces and source/native logs remain ignored artifacts, not committed telemetry or binary files. The user can use those captures and local `/live` for subjective visual review. Public authentication, deployment, capacity/loss budgets, and recovery remain external release restrictions in `live-telemetry.md`.
+
+The complete diff was reviewed for correctness, security, lifecycle safety, compatibility, regressions, and scope. Independent review findings below were fixed and verified; targeted follow-up review confirmed the final eligibility predicate matches the backend. Exact-project Docker queries confirmed removal of all 30 disposable projects used during this execution, including replacement containers and project image tags. The five existing `logice` containers remain running; operator credentials, data, identity provider, and tunnel were not changed. No packages, version tags, or release workflows were published or dispatched.
+
+All tasks and completion criteria of `docs/plans/2026-10-23_live-page-plan.md` have local evidence. The completed Live execution plan is removed after retaining usage, recovery, visual-review handoff, and release restrictions in `live-telemetry.md`. The separate initial stack plan and its existing acceptance condition are unchanged. This closure is not production acceptance.
 
 ### Failures found and corrected
 
