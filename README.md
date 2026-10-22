@@ -22,7 +22,7 @@ Open [the live explorer preview](http://127.0.0.1:5173/preview) after building t
 
 ## Verify the stack
 
-Requirements: a local Docker Engine 28 or later with Compose 2.24 or later, Go 1.26 or later, and network access to pull the pinned images/modules. Local verification used Docker 29.7.2, Compose 5.5.1, and Go 1.27.1. Allow at least 4 GiB free RAM for the proof and additional space for image/module caches.
+Requirements: a local Docker Engine 28 or later with Compose 2.24 or later, Go 1.26.10 or a patched later release, and network access to pull the pinned images/modules. Initial verification used Docker 29.7.2, Compose 5.5.1, and Go 1.27.1; the current Go revalidation uses 1.26.10. Allow at least 4 GiB free RAM for the proof and additional space for image/module caches.
 
 ```sh
 go test -tags=integration -count=1 -timeout=8m -v ./tests/integration/...
@@ -63,7 +63,9 @@ Do not expose this proof through Cloudflare Tunnel. Never commit `.env`, tunnel 
 
 ## Local development
 
-Use Go 1.26 or later and Node.js 26.11.1 with npm 11.20.0. Install the private frontend package once:
+Go 1.26.10 and 1.27.3 include the certificate-distrust fix for [GO-2026-6809](https://pkg.go.dev/vuln/GO-2026-6809). CI and the API image use Go 1.26.10. The module's language version remains Go 1.26.
+
+Use Go 1.26.10 or a patched later release and Node.js 26.11.1 with npm 11.20.0. Install the private frontend package once:
 
 ```sh
 npm --prefix web ci
@@ -83,6 +85,7 @@ Go defaults to `127.0.0.1:8080`; Compose explicitly uses `-listen 0.0.0.0:8080` 
 ```sh
 go mod verify
 sh scripts/check-go.sh
+go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 -test -tags=integration ./...
 npm --prefix web ci
 npm --prefix web run ci
 npm --prefix web audit --audit-level=low
