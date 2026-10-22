@@ -1,0 +1,501 @@
+{
+  "window": {
+    "from": "2026-10-23T00:00:00Z",
+    "to": "2026-10-23T00:01:00Z"
+  },
+  "queriedAt": "2026-10-23T00:01:00Z",
+  "filters": {
+    "service": "",
+    "search": "",
+    "errorsOnly": false,
+    "minSeverity": 0
+  },
+  "spans": [],
+  "logs": [],
+  "context": [],
+  "histogram": [
+    {
+      "from": "2026-10-23T00:00:00Z",
+      "to": "2026-10-23T00:00:01Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:01Z",
+      "to": "2026-10-23T00:00:02Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:02Z",
+      "to": "2026-10-23T00:00:03Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:03Z",
+      "to": "2026-10-23T00:00:04Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:04Z",
+      "to": "2026-10-23T00:00:05Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:05Z",
+      "to": "2026-10-23T00:00:06Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:06Z",
+      "to": "2026-10-23T00:00:07Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:07Z",
+      "to": "2026-10-23T00:00:08Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:08Z",
+      "to": "2026-10-23T00:00:09Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:09Z",
+      "to": "2026-10-23T00:00:10Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:10Z",
+      "to": "2026-10-23T00:00:11Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:11Z",
+      "to": "2026-10-23T00:00:12Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:12Z",
+      "to": "2026-10-23T00:00:13Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:13Z",
+      "to": "2026-10-23T00:00:14Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:14Z",
+      "to": "2026-10-23T00:00:15Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:15Z",
+      "to": "2026-10-23T00:00:16Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:16Z",
+      "to": "2026-10-23T00:00:17Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:17Z",
+      "to": "2026-10-23T00:00:18Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:18Z",
+      "to": "2026-10-23T00:00:19Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:19Z",
+      "to": "2026-10-23T00:00:20Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:20Z",
+      "to": "2026-10-23T00:00:21Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:21Z",
+      "to": "2026-10-23T00:00:22Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:22Z",
+      "to": "2026-10-23T00:00:23Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:23Z",
+      "to": "2026-10-23T00:00:24Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:24Z",
+      "to": "2026-10-23T00:00:25Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:25Z",
+      "to": "2026-10-23T00:00:26Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:26Z",
+      "to": "2026-10-23T00:00:27Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:27Z",
+      "to": "2026-10-23T00:00:28Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:28Z",
+      "to": "2026-10-23T00:00:29Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:29Z",
+      "to": "2026-10-23T00:00:30Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:30Z",
+      "to": "2026-10-23T00:00:31Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:31Z",
+      "to": "2026-10-23T00:00:32Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:32Z",
+      "to": "2026-10-23T00:00:33Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:33Z",
+      "to": "2026-10-23T00:00:34Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:34Z",
+      "to": "2026-10-23T00:00:35Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:35Z",
+      "to": "2026-10-23T00:00:36Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:36Z",
+      "to": "2026-10-23T00:00:37Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:37Z",
+      "to": "2026-10-23T00:00:38Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:38Z",
+      "to": "2026-10-23T00:00:39Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:39Z",
+      "to": "2026-10-23T00:00:40Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:40Z",
+      "to": "2026-10-23T00:00:41Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:41Z",
+      "to": "2026-10-23T00:00:42Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:42Z",
+      "to": "2026-10-23T00:00:43Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:43Z",
+      "to": "2026-10-23T00:00:44Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:44Z",
+      "to": "2026-10-23T00:00:45Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:45Z",
+      "to": "2026-10-23T00:00:46Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:46Z",
+      "to": "2026-10-23T00:00:47Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:47Z",
+      "to": "2026-10-23T00:00:48Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:48Z",
+      "to": "2026-10-23T00:00:49Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:49Z",
+      "to": "2026-10-23T00:00:50Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:50Z",
+      "to": "2026-10-23T00:00:51Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:51Z",
+      "to": "2026-10-23T00:00:52Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:52Z",
+      "to": "2026-10-23T00:00:53Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:53Z",
+      "to": "2026-10-23T00:00:54Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:54Z",
+      "to": "2026-10-23T00:00:55Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:55Z",
+      "to": "2026-10-23T00:00:56Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:56Z",
+      "to": "2026-10-23T00:00:57Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:57Z",
+      "to": "2026-10-23T00:00:58Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    },
+    {
+      "from": "2026-10-23T00:00:58Z",
+      "to": "2026-10-23T00:00:59Z",
+      "spans": "0",
+      "logs": "0",
+      "errorSpans": "0",
+      "errorLogs": "0"
+    }
+  ],
+  "spansTruncated": false,
+  "logsTruncated": false,
+  "contextTruncated": false,
+  "traceGroupsTruncated": false,
+  "limits": {
+    "spans": 500,
+    "logs": 500,
+    "context": 500,
+    "traceGroups": 100
+  },
+  "completeness": "unknown"
+}

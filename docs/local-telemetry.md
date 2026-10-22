@@ -14,6 +14,8 @@ The application reads only the fixed `validation` project. Authentication and mu
 
 ## Use the views
 
+This document describes the manual-refresh Traces and Logs pages. Use [Live](live-telemetry.md) for the separate real-data polling page, unified hierarchy, and server-counted histogram. The limits and search rules below remain unchanged for Traces and Logs.
+
 1. Open **Traces** or **Logs**.
 2. Select a time range. Optionally enter an exact service name and a text search.
    - Trace search matches span names or trace IDs.
