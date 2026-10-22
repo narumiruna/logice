@@ -212,6 +212,9 @@ test("Live retains only a bounded snapshot plus one outside selection through fi
 test("Live preserves the orphan anchor itself and its keyboard focus when a late parent reparents it", async ({
   page,
 }) => {
+  // A slower renderer must not make focus depend on a fixed number of frames.
+  const cdp = await page.context().newCDPSession(page)
+  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 6 })
   const rows = Array.from({ length: 180 }, (_, index) => record(index))
   const child = rows[90]
   const parent = record(900, {
@@ -251,6 +254,61 @@ test("Live preserves the orphan anchor itself and its keyboard focus when a late
   expect(Math.abs((await offset()) - before)).toBeLessThan(3)
   await expect(anchor).toBeFocused()
   await expect(page.getByLabel("Follow latest", { exact: true })).not.toBeChecked()
+  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 1 })
+})
+
+test("Live Home transfers focus from a still-mounted previous row to an offscreen first row", async ({
+  page,
+}) => {
+  await control(page, snapshot(Array.from({ length: 180 }, (_, index) => record(index))))
+  await page.goto("/live")
+  await expect(page.getByRole("treegrid")).toHaveAttribute("aria-rowcount", "181")
+  const pane = page.locator(".lv-scroll")
+  await pane.evaluate((element) => {
+    element.dispatchEvent(new WheelEvent("wheel", { deltaY: -100 }))
+    element.scrollTop = 10 * 34 + 7
+    element.dispatchEvent(new Event("scroll"))
+  })
+  await page.clock.runFor(50)
+  const previous = page.locator('[data-event-id][aria-rowindex="12"]')
+  const first = page.locator('[data-event-id][aria-rowindex="2"]')
+  await previous.evaluate((element) => (element as HTMLElement).focus({ preventScroll: true }))
+  await expect(first).toHaveCount(0)
+  await page.keyboard.press("Home")
+  await page.clock.runFor(50)
+  await expect(previous).toHaveCount(1)
+  await expect(first).toBeFocused()
+  await expect(page.getByLabel("Follow latest", { exact: true })).not.toBeChecked()
+})
+
+test("Live outside focus cancels pending restoration after a focused row was virtualized away", async ({
+  page,
+}) => {
+  await control(page, snapshot(Array.from({ length: 180 }, (_, index) => record(index))))
+  await page.goto("/live")
+  await expect(page.getByRole("treegrid")).toHaveAttribute("aria-rowcount", "181")
+  const pane = page.locator(".lv-scroll")
+  const move = async (index: number) => {
+    await pane.evaluate((element, position) => {
+      element.dispatchEvent(new WheelEvent("wheel", { deltaY: -100 }))
+      element.scrollTop = position * 34 + 7
+      element.dispatchEvent(new Event("scroll"))
+    }, index)
+    await page.clock.runFor(50)
+  }
+  await move(10)
+  const previous = page.locator('[data-event-id][aria-rowindex="12"]')
+  await previous.evaluate((element) => (element as HTMLElement).focus({ preventScroll: true }))
+  await move(120)
+  await expect(previous).toHaveCount(0)
+  const search = page.getByLabel("Search live events", { exact: true })
+  await search.focus()
+  await expect(search).toBeFocused()
+  await search.evaluate((element) => (element as HTMLElement).blur())
+  expect(await page.evaluate(() => document.activeElement === document.body)).toBe(true)
+  await move(10)
+  await expect(previous).toHaveCount(1)
+  expect(await page.evaluate(() => document.activeElement === document.body)).toBe(true)
 })
 
 test("Live Pause during an uncommitted search freezes the displayed snapshot's query and window", async ({

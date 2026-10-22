@@ -45,6 +45,7 @@ export const LiveTree = forwardRef<
   const focusFrame = useRef(0)
   const programmatic = useRef(false)
   const ownedFocus = useRef<string | null>(null)
+  const pendingFocus = useRef<string | null>(null)
   const virtual = useVirtualizer({
     count: rows.length,
     getScrollElement: () => scroll.current,
@@ -62,21 +63,33 @@ export const LiveTree = forwardRef<
       offset: index * height - element.scrollTop,
     }
   }, [rows])
+  const restoreMountedFocus = useCallback((id: string, element: HTMLDivElement) => {
+    if (ownedFocus.current !== id || pendingFocus.current !== id) return
+    const current = document.activeElement
+    if (element.contains(current)) pendingFocus.current = null
+    else if (current === document.body || grid.current?.contains(current)) {
+      element.focus({ preventScroll: true })
+      pendingFocus.current = null
+    }
+  }, [])
   function focusRecord(id: string) {
     const index = rows.findIndex((row) => row.record.id === id)
     if (index < 0) {
+      ownedFocus.current = null
+      pendingFocus.current = null
       grid.current?.focus({ preventScroll: true })
       return
     }
     setActive(id)
+    ownedFocus.current = id
+    pendingFocus.current = id
     programmatic.current = true
     virtual.scrollToIndex(index, { align: "auto" })
     elements.current.get(id)?.focus({ preventScroll: true })
     cancelAnimationFrame(focusFrame.current)
     focusFrame.current = requestAnimationFrame(() => {
       const element = elements.current.get(id)
-      if (element) element.focus({ preventScroll: true })
-      else grid.current?.focus({ preventScroll: true })
+      if (element) restoreMountedFocus(id, element)
       programmatic.current = false
       remember()
       const pane = scroll.current
@@ -84,13 +97,35 @@ export const LiveTree = forwardRef<
     })
   }
   useImperativeHandle(ref, () => ({ focusRecord }))
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    const cancelIntent = () => {
+      ownedFocus.current = null
+      pendingFocus.current = null
+    }
+    const outsideFocus = (event: FocusEvent) => {
+      if (
+        event.target instanceof Node &&
+        event.target !== document.body &&
+        event.target !== document.documentElement &&
+        !grid.current?.contains(event.target)
+      )
+        cancelIntent()
+    }
+    const outsidePointer = (event: PointerEvent) => {
+      if (event.target instanceof Node && !grid.current?.contains(event.target)) cancelIntent()
+    }
+    // A virtualized row can already be gone when outside focus arrives, so a
+    // grid-local blur listener alone cannot cancel its pending restoration.
+    document.addEventListener("focusin", outsideFocus, true)
+    document.addEventListener("pointerdown", outsidePointer, true)
+    return () => {
+      document.removeEventListener("focusin", outsideFocus, true)
+      document.removeEventListener("pointerdown", outsidePointer, true)
+      cancelIntent()
       cancelAnimationFrame(frame.current)
       cancelAnimationFrame(focusFrame.current)
-    },
-    [],
-  )
+    }
+  }, [])
   useLayoutEffect(() => {
     const element = scroll.current
     if (!element) return
@@ -122,31 +157,26 @@ export const LiveTree = forwardRef<
     }
     previousRows.current = rows
     remember()
-    // Reparenting can move a keyed row outside the old virtual range before
-    // the anchor scroll takes effect. Restore its logical focus after mounting.
+    // Reparenting can temporarily unmount a focused virtual row. Keep its
+    // logical owner until that exact row mounts; frame counts are not a render
+    // completion signal on a slower browser or under a controlled test clock.
     const lostFocus = ownedFocus.current
     if (lostFocus && document.activeElement === document.body) {
       if (!rows.some((row) => row.record.id === lostFocus)) {
         ownedFocus.current = null
+        pendingFocus.current = null
         grid.current?.focus({ preventScroll: true })
       } else {
-        cancelAnimationFrame(focusFrame.current)
-        let attempts = 0
-        const restore = () => {
-          if (ownedFocus.current !== lostFocus || document.activeElement !== document.body) return
-          const element = elements.current.get(lostFocus)
-          if (element) element.focus({ preventScroll: true })
-          else if (++attempts < 3) focusFrame.current = requestAnimationFrame(restore)
-          else grid.current?.focus({ preventScroll: true })
-        }
-        focusFrame.current = requestAnimationFrame(restore)
+        pendingFocus.current = lostFocus
+        const target = elements.current.get(lostFocus)
+        if (target) restoreMountedFocus(lostFocus, target)
       }
     }
     cancelAnimationFrame(frame.current)
     frame.current = requestAnimationFrame(() => {
       programmatic.current = false
     })
-  }, [rows, follow, remember])
+  }, [rows, follow, remember, restoreMountedFocus])
   const forcedOpen = useMemo(() => {
     const result = new Set<string>()
     if (!forced) return result
@@ -185,10 +215,18 @@ export const LiveTree = forwardRef<
               ? event.target.closest<HTMLElement>("[data-event-id]")
               : null
           ownedFocus.current = target?.dataset.eventId ?? null
+          pendingFocus.current = null
         }}
         onBlurCapture={(event) => {
-          if (event.relatedTarget instanceof Node && !grid.current?.contains(event.relatedTarget))
+          if (
+            event.relatedTarget instanceof Node &&
+            event.relatedTarget !== document.body &&
+            event.relatedTarget !== document.documentElement &&
+            !grid.current?.contains(event.relatedTarget)
+          ) {
             ownedFocus.current = null
+            pendingFocus.current = null
+          }
         }}
         tabIndex={0}
         onKeyDown={(event) => {
@@ -279,8 +317,13 @@ export const LiveTree = forwardRef<
                 <div
                   key={record.id}
                   ref={(element) => {
-                    if (element) elements.current.set(record.id, element)
-                    else elements.current.delete(record.id)
+                    if (element) {
+                      elements.current.set(record.id, element)
+                      restoreMountedFocus(record.id, element)
+                    } else {
+                      if (ownedFocus.current === record.id) pendingFocus.current = record.id
+                      elements.current.delete(record.id)
+                    }
                   }}
                   role="row"
                   aria-rowindex={item.index + 2}
