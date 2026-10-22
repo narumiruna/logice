@@ -4,6 +4,45 @@
 
 Validate the local trace/log workflow, Go API, frontend tooling, selected storage, Collector, native Go drivers, and migration behavior with disposable data. This is not a production deployment. Authentication, multi-project authorization, load targets, and public Cloudflare routing remain separate acceptance gates. Historical foundation evidence below applies to its recorded revision.
 
+## Stack plan handoff: 2026-10-23
+
+Base: `origin/main` at `ca036fb`; branch: `narumi/docs/stack-plan-handoff`. The working tree was clean. No repository or ancestor `AGENTS.md` was present. PRs #4–#6 are now merged, including the live preview and Docker-compatible API replacement check. This execution changes documentation only; the initial plan does not authorize the full application sequence.
+
+### Current verification
+
+Local versions: Go 1.26.10 selected with `GOTOOLCHAIN`, Node.js 26.11.1, npm 11.20.0, Docker 29.7.2, and Compose 5.5.1. The host default Go 1.27.1 was not used for verification. Service and image pins are unchanged from the base.
+
+| Command | Actual result |
+| --- | --- |
+| `GOTOOLCHAIN=go1.26.10 go mod verify` | All modules verified. |
+| `GOTOOLCHAIN=go1.26.10 sh scripts/check-go.sh` | Formatting, ordinary/tagged vet, unit tests, and independent build passed. |
+| `GOTOOLCHAIN=go1.26.10 go test -race -count=1 -timeout=2m ./internal/...` | HTTP and storage race checks passed. |
+| `GOTOOLCHAIN=go1.26.10 go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 -test -tags=integration ./...` | No vulnerabilities found; 240-second outer deadline. |
+| `npm --prefix web ci`, `npm --prefix web run ci`, `npm --prefix web audit --audit-level=low` | Install, Biome, TypeScript, 64 unit tests, and build passed; zero audit vulnerabilities. |
+| `./scripts/validate-web-layout.sh` | Isolated install, audit, typecheck, unit test, build, and Playwright collection passed. Existing dependency `use client` warnings remain visible. |
+| `GOTOOLCHAIN=go1.26.10 sh scripts/validate-checks.sh` | Clean clone of `ca036fb` passed Go-only checks and hook setup. All eight injected failures were rejected without source/index changes. |
+| `sh scripts/validate-compose-web.sh` | Eight Chromium workflows passed, including four real-telemetry flows. Static/API checks, changed-IP proxy recovery, and cleanup passed; 420-second outer deadline with a 60-second termination allowance. |
+| `GOTOOLCHAIN=go1.26.10 go test -tags=integration -count=1 -timeout=8m -v ./tests/integration/...` | All real-service tests passed in 110.190 seconds; 540-second outer deadline preserves the suite's cleanup reserve. |
+| `uv run --project examples/python --locked python -m unittest discover -s examples/python -v` | Four tests passed without operator credentials. |
+| `actionlint .github/workflows/ci.yml`, shell syntax, local Markdown link checks, and `git diff --check` | Passed. |
+
+Exact-project checks found no remaining containers, networks, volumes, replacement containers, or project image tags for:
+
+- `logice-validation-e2f9e262e04de4e2`
+- `logice-validation-f42198ba0db1c963`
+- `logice-validation-5e44f0a4a0c72361`
+- `logice-web-check-015a6c4173cafa83`
+
+The five pre-existing `logice` service containers remain running. No operator credentials, databases, identity provider, or tunnel were changed. No package, version tag, or release workflow was published or dispatched.
+
+[PR #6's hosted run 39811819512](https://github.com/narumiruna/logice/actions/runs/39811819512) passed all six CI jobs on `4be2d8b`. That result verifies the Docker compatibility repair; it is not inferred from local success or represented as CI for this documentation branch.
+
+### Completion limit
+
+Read-only review found no missing initial-plan implementation task. Authentication, dynamic project authorization, production packaging/migrations, complete Pocket ID login, public Tunnel transport, load/loss budgets, and restore remain downstream release gates. The complete documentation diff was reviewed for correctness, security, lifecycle safety, compatibility, regressions, and scope.
+
+PRs [#1](https://github.com/narumiruna/logice/pull/1) and [#5](https://github.com/narumiruna/logice/pull/5) have no user reviews and only automated comments. PR #6's additional CI-success comment does not accept the stack recommendations. The remaining action is the user's explicit acceptance or replacement of the [supporting libraries, authentication policies, and operating targets](stack.md#pending-acceptance). Previously confirmed choices do not need approval again. Preserve the initial plan and its unchecked acceptance item. This handoff does not claim end-to-end plan completion or production readiness.
+
 ## Stack plan revalidation: 2026-10-22
 
 Base: `origin/main` at `b665784`; branch: `narumi/fix/revalidate-stack`. The working tree was clean and no repository or ancestor `AGENTS.md` was present. Open preview PR #4 was not used as the base or included in this work.
