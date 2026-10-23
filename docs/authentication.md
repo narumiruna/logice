@@ -22,7 +22,7 @@ See [Passkey operations](passkey-operations.md) for configuration, migration, bo
 - `AUTH_ORIGIN` is always required. Production uses exactly `https://logice.narumi.dev`, with no path or trailing slash. HTTP is allowed only for localhost development; Compose uses `http://localhost:5173`.
   - The RP ID comes from the configured hostname, not Host or forwarded headers. The browser must use the exact configured origin.
   - Changing the hostname requires an explicit credential enrollment migration. Do not change it during a routine deployment.
-- `AUTH_ENCRYPTION_KEY` is always required: exactly 64 hexadecimal characters, decoded to 32 bytes for AES-256-GCM. Missing, malformed, or incorrectly sized keys must stop startup.
+- `ENCRYPTION_KEY` is always required: exactly 64 hexadecimal characters, decoded to 32 bytes for AES-256-GCM. Missing, malformed, or incorrectly sized keys must stop startup.
   - Keep it outside Git and Helm values. Back it up separately from PostgreSQL.
 - PostgreSQL is required. Supply `DATABASE_URL`, or libpq settings `PGHOST`, `PGPORT`, `PGUSER`, `PGDATABASE`, and `PGPASSWORD`. Compose and Helm use the latter to avoid URL escaping of passwords.
 - Store credential public keys, identifiers, user handles, counters, transports, and backup flags in PostgreSQL. Private keys remain with authenticators.

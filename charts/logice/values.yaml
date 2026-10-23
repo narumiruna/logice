@@ -35,7 +35,7 @@ imagePullSecrets: []
 
 # Pre-create this Secret in the release namespace. No credentials are generated.
 # Required keys: CLICKHOUSE_PASSWORD, OTLP_TOKEN, POSTGRES_PASSWORD,
-# AUTH_ENCRYPTION_KEY (exactly 64 hex characters).
+# ENCRYPTION_KEY (exactly 64 hex characters).
 existingSecret: logice-secrets
 
 postgres:

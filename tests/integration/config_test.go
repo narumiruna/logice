@@ -13,7 +13,7 @@ import (
 func (s *stack) checkConfig() {
 	s.t.Helper()
 	s.t.Log("verify required credentials and isolated random loopback bindings")
-	for _, key := range []string{"POSTGRES_PASSWORD", "CLICKHOUSE_PASSWORD", "OTLP_TOKEN", "AUTH_ENCRYPTION_KEY"} {
+	for _, key := range []string{"POSTGRES_PASSWORD", "CLICKHOUSE_PASSWORD", "OTLP_TOKEN", "ENCRYPTION_KEY"} {
 		var env []string
 		for _, entry := range s.env {
 			if !strings.HasPrefix(entry, key+"=") {

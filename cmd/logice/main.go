@@ -37,7 +37,7 @@ func run(address string) error {
 	defer stop()
 
 	// Validate trusted configuration before opening any listener or using storage.
-	authConfig := auth.Config{Origin: os.Getenv("AUTH_ORIGIN"), EncryptionKey: os.Getenv("AUTH_ENCRYPTION_KEY")}
+	authConfig := auth.Config{Origin: os.Getenv("AUTH_ORIGIN"), EncryptionKey: os.Getenv("ENCRYPTION_KEY")}
 	if _, err := auth.New(authConfig, nil); err != nil {
 		return err
 	}

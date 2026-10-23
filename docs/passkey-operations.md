@@ -6,7 +6,7 @@ This is an operator runbook, not authorization to deploy. No live cluster change
 
 1. Wait for API and web images from the same authentication-capable commit and for authentication tests to pass. The chart still defaults to `latest`; older images do not implement these commands or enforce authentication. Pin both tags to the same full commit SHA before deployment.
 2. Back up PostgreSQL and ClickHouse before schema upgrades. Back up the encryption key separately. Test restoration with disposable data.
-3. Pre-create the new `AUTH_ENCRYPTION_KEY` and `POSTGRES_PASSWORD` keys in the namespace-local `logice-secrets` Secret. Preserve its existing `CLICKHOUSE_PASSWORD` and `OTLP_TOKEN` values. Do not replace the Secret with an object that omits those keys.
+3. Pre-create the new `ENCRYPTION_KEY` and `POSTGRES_PASSWORD` keys in the namespace-local `logice-secrets` Secret. Preserve its existing `CLICKHOUSE_PASSWORD` and `OTLP_TOKEN` values. Do not replace the Secret with an object that omits those keys.
 4. Keep Cloudflare Access and private routing enabled. During the initial transition, stop or isolate the old unauthenticated API before permitting traffic to the new release. Do not rely on a rolling update to remove that exposure.
 5. Obtain separate operator approval before syncing or restarting live workloads. Validate with disposable accounts before real enrollment.
 
@@ -15,8 +15,10 @@ This is an operator runbook, not authorization to deploy. No live cluster change
 | Setting | Requirement |
 | --- | --- |
 | `AUTH_ORIGIN` | Always required; exactly `https://logice.narumi.dev` in deployment. Compose defaults to `http://localhost:5173`. No path or trailing slash. |
-| `AUTH_ENCRYPTION_KEY` | Exactly 64 hex characters; decoded as 32-byte AES-256-GCM key. Secret-backed in Helm. |
+| `ENCRYPTION_KEY` | Exactly 64 hex characters; decoded as 32-byte AES-256-GCM key. Secret-backed in Helm. |
 | PostgreSQL | `DATABASE_URL`, or `PGHOST`, `PGPORT`, `PGUSER`, `PGDATABASE`, `PGPASSWORD`. Do not set conflicting sources. |
+
+The required key setting is now `ENCRYPTION_KEY`, not `AUTH_ENCRYPTION_KEY`. For an existing installation, copy the same value to the new Secret key and update the image and chart together. Do not generate a replacement key during the rename. The old environment variable no longer satisfies startup validation. Remove the old Secret key only after all workloads use the new setting.
 
 Helm sets `PGHOST=<release>-logice-postgres`, `PGPORT=5432`, `PGUSER=logice`, and `PGDATABASE=logice`; `PGPASSWORD` references the Secret's `POSTGRES_PASSWORD`. Compose uses host `postgres` and the same port/user/database. The CLI and API use the same configuration and database. Do not run bootstrap against a different environment by mistake.
 
@@ -102,7 +104,7 @@ Sessions expire after 24 hours idle or seven days absolute. Logout revokes this 
 The private PostgreSQL instance stores users, public credentials, hashed sessions/invitations, and encrypted ceremony state. Authenticator private keys are not stored by Logice. The PostgreSQL PVC is retained on Helm uninstall and Argo CD deletion/prune. Retention is not a backup; node or disk loss can still destroy it.
 
 1. Schedule encrypted, access-controlled PostgreSQL backups and verify restore tests. Set retention and off-cluster storage through the operator's existing backup system.
-2. Back up `AUTH_ENCRYPTION_KEY` separately from database dumps. Preserve the version that matches the database backup. Protect Secret exports as credentials.
+2. Back up `ENCRYPTION_KEY` separately from database dumps. Preserve the version that matches the database backup. Protect Secret exports as credentials.
 3. For a manual logical backup, use the pinned PostgreSQL tools. For example, after approval:
 
    ```sh

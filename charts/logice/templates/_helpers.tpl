@@ -12,11 +12,11 @@
       key: CLICKHOUSE_PASSWORD
 - name: AUTH_ORIGIN
   value: {{ .Values.api.authOrigin | quote }}
-- name: AUTH_ENCRYPTION_KEY
+- name: ENCRYPTION_KEY
   valueFrom:
     secretKeyRef:
       name: {{ .Values.existingSecret | quote }}
-      key: AUTH_ENCRYPTION_KEY
+      key: ENCRYPTION_KEY
 - name: PGHOST
   value: {{ include "logice.name" . }}-postgres
 - name: PGPORT

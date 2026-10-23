@@ -37,7 +37,7 @@ func configure(c Config) (*settings, error) {
 	}
 	key, err := hex.DecodeString(c.EncryptionKey)
 	if err != nil || len(c.EncryptionKey) != 64 || len(key) != 32 {
-		return nil, errors.New("AUTH_ENCRYPTION_KEY must contain exactly 64 hexadecimal characters")
+		return nil, errors.New("ENCRYPTION_KEY must contain exactly 64 hexadecimal characters")
 	}
 	block, err := aes.NewCipher(key)
 	if err != nil {

@@ -23,7 +23,7 @@ func accountCommand(command string, args []string) error {
 		return errors.New("usage: logice migrate | bootstrap -name NAME | recover -user UUID | users")
 	}
 	// Validate the same key/origin used by the server before any database mutation.
-	if _, err := auth.New(auth.Config{Origin: os.Getenv("AUTH_ORIGIN"), EncryptionKey: os.Getenv("AUTH_ENCRYPTION_KEY")}, nil); err != nil {
+	if _, err := auth.New(auth.Config{Origin: os.Getenv("AUTH_ORIGIN"), EncryptionKey: os.Getenv("ENCRYPTION_KEY")}, nil); err != nil {
 		return err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)

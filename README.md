@@ -53,7 +53,7 @@ In a new checkout, create a protected `.env` once. This command refuses to overw
 ```sh
 test ! -e .env && (
   umask 077
-  printf 'POSTGRES_PASSWORD=%s\nCLICKHOUSE_PASSWORD=%s\nOTLP_TOKEN=%s\nAUTH_ENCRYPTION_KEY=%s\nAUTH_ORIGIN=http://localhost:5173\n' \
+  printf 'POSTGRES_PASSWORD=%s\nCLICKHOUSE_PASSWORD=%s\nOTLP_TOKEN=%s\nENCRYPTION_KEY=%s\nAUTH_ORIGIN=http://localhost:5173\n' \
     "$(openssl rand -hex 32)" \
     "$(openssl rand -hex 32)" \
     "$(openssl rand -hex 32)" \
@@ -86,7 +86,7 @@ Do not expose this proof through Cloudflare Tunnel. Never commit `.env`, tunnel 
 
 ## Private Kubernetes deployment
 
-See the [Helm chart](charts/logice/README.md), [Argo CD Application example](charts/argocd-application.example.yaml), and [Passkey operations](docs/passkey-operations.md). Do not deploy until matching authentication-capable images are published and `logice-secrets` contains the new `AUTH_ENCRYPTION_KEY` and `POSTGRES_PASSWORD` keys. The chart still defaults to `latest`; pin both application images to the same tested commit. No live deployment is authorized by these instructions.
+See the [Helm chart](charts/logice/README.md), [Argo CD Application example](charts/argocd-application.example.yaml), and [Passkey operations](docs/passkey-operations.md). Do not deploy until matching authentication-capable images are published and `logice-secrets` contains the new `ENCRYPTION_KEY` and `POSTGRES_PASSWORD` keys. The chart still defaults to `latest`; pin both application images to the same tested commit. No live deployment is authorized by these instructions.
 
 Keep Cloudflare Access enabled. The web Service defaults to NodePort `30173`, which can bypass Access through direct node connections. Restrict node access or select ClusterIP with private routing. PostgreSQL, API, ClickHouse, and Collector Services are ClusterIP.
 
@@ -100,7 +100,7 @@ Use Go 1.26.10 or a patched later release and Node.js 26.11.1 with npm 11.20.0. 
 npm --prefix web ci
 ```
 
-Export `AUTH_ORIGIN=http://localhost:5173`, a valid 64-hex-character `AUTH_ENCRYPTION_KEY`, and `DATABASE_URL` for your local PostgreSQL instance (or the equivalent libpq `PG*` variables). A protected `.env` used by Compose is not automatically loaded by `go run`. Run migrations and bootstrap with the same configuration before starting the server:
+Export `AUTH_ORIGIN=http://localhost:5173`, a valid 64-hex-character `ENCRYPTION_KEY`, and `DATABASE_URL` for your local PostgreSQL instance (or the equivalent libpq `PG*` variables). A protected `.env` used by Compose is not automatically loaded by `go run`. Run migrations and bootstrap with the same configuration before starting the server:
 
 ```sh
 go run ./cmd/logice migrate
