@@ -22,7 +22,7 @@ docker push registry.example.com/private/logice-api:COMMIT_SHA
 docker push registry.example.com/private/logice-web:COMMIT_SHA
 ```
 
-The [Docker workflow](../../.github/workflows/docker.yml) publishes both images to GitHub Container Registry on pushes to `main` and manual runs. It builds `linux/amd64` and `linux/arm64` images and tags them with the full Git commit SHA:
+The [Docker workflow](../../.github/workflows/docker.yml) publishes both images to GitHub Container Registry on pushes to `main` and manual runs. It builds `linux/amd64` and `linux/arm64` images and tags them with the full Git commit SHA. Runs on `main` also publish the `latest` tag:
 
 - `ghcr.io/narumiruna/logice-api:COMMIT_SHA`
 - `ghcr.io/narumiruna/logice-web:COMMIT_SHA`
@@ -46,15 +46,22 @@ Copy and edit [the Application example](../argocd-application.example.yaml) in y
 
 The example uses manual sync and a pinned Git commit. Create the namespace and Secrets before the first sync, then sync the Application. No cluster resources are installed by the chart itself; Argo CD can create the destination namespace through `CreateNamespace=true`.
 
-The chart renders without Helm overrides, so Argo CD can create an Application directly from `charts/logice`. Rendering does not provision credentials or publish images. Before the first sync, configure these values:
+The chart uses GHCR images with the `latest` tag without Helm overrides, so Argo CD can create an Application directly from `charts/logice`. Wait for both publish jobs on `main` to succeed before syncing. Rendering does not provision credentials or publish images. Before the first sync, check these values:
 
 | Value | Default | Deployment requirement |
 | --- | --- | --- |
 | `existingSecret` | `logice-secrets` | Pre-create this Secret with `CLICKHOUSE_PASSWORD` and `OTLP_TOKEN` |
-| `api.image.repository`, `api.image.tag` | `logice-api:local` | Override with your published API image |
-| `web.image.repository`, `web.image.tag` | `logice-web:local` | Override with your published web image |
+| `api.image.repository` | `ghcr.io/narumiruna/logice-api` | Confirm cluster access to this package |
+| `web.image.repository` | `ghcr.io/narumiruna/logice-web` | Confirm cluster access to this package |
+| `api.image.tag`, `web.image.tag` | `latest` | Wait for both publish jobs on `main` to succeed |
 
-The local image defaults are not published registry images. Use them only when you have built and loaded those images into every eligible cluster node. For a private registry, also set `imagePullSecrets`.
+For private GHCR packages, set `imagePullSecrets` to a namespace-local registry Secret. The default `pullPolicy: Always` checks the registry when a container starts; it does not restart running Pods. Argo CD does not detect image changes behind the same tag. After both publish jobs succeed, restart the application deployments:
+
+```sh
+kubectl -n logice rollout restart deployment/logice-logice-api deployment/logice-logice-web
+```
+
+The two `latest` tags are published separately and can temporarily refer to different revisions. For repeatable deployments and rollbacks, override both tags with the same full commit SHA.
 
 See [values.yaml](values.yaml) for resource limits, storage, telemetry TTL, and optional Ingress. Explicitly empty image or Secret names are rejected. The Secret must exist at deployment time; offline rendering cannot check its contents.
 

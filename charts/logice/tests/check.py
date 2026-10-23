@@ -115,7 +115,8 @@ def main():
             component = item["metadata"]["labels"]["app.kubernetes.io/component"]
             if component in {"api", "web"}:
                 container = item["spec"]["template"]["spec"]["containers"][0]
-                assert container["image"] == f"logice-{component}:local"
+                assert container["image"] == f"ghcr.io/narumiruna/logice-{component}:latest"
+                assert container["imagePullPolicy"] == "Always"
     helm("lint", str(CHART), "--strict")
     output, documents = render()
     assert output == render()[0], "Rendering must be deterministic"

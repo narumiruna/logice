@@ -1,12 +1,11 @@
-# Local image names let Argo CD render without overrides.
-# Before syncing, supply published, immutable API/web images or load these images
-# into every eligible node. CI publishes GHCR images with full commit SHA tags;
-# it does not publish these default local image names.
+# Use the latest images published from main.
+# Restart API/web deployments after publishing to pull updated images.
+# Private packages require a namespace-local imagePullSecret.
 api:
   image:
-    repository: logice-api
-    tag: local
-    pullPolicy: IfNotPresent
+    repository: ghcr.io/narumiruna/logice-api
+    tag: latest
+    pullPolicy: Always
   resources:
     requests:
       cpu: 100m
@@ -16,9 +15,9 @@ api:
 
 web:
   image:
-    repository: logice-web
-    tag: local
-    pullPolicy: IfNotPresent
+    repository: ghcr.io/narumiruna/logice-web
+    tag: latest
+    pullPolicy: Always
   resources:
     requests:
       cpu: 50m
