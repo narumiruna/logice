@@ -1,6 +1,7 @@
 # Local image names let Argo CD render without overrides.
 # Before syncing, supply published, immutable API/web images or load these images
-# into every eligible node. The default local images are not published by CI.
+# into every eligible node. CI publishes GHCR images with full commit SHA tags;
+# it does not publish these default local image names.
 api:
   image:
     repository: logice-api

@@ -22,7 +22,12 @@ docker push registry.example.com/private/logice-api:COMMIT_SHA
 docker push registry.example.com/private/logice-web:COMMIT_SHA
 ```
 
-No application images are published by this repository's CI. Use immutable tags and do not reuse them.
+The [Docker workflow](../../.github/workflows/docker.yml) publishes both images to GitHub Container Registry on pushes to `main` and manual runs. It builds `linux/amd64` and `linux/arm64` images and tags them with the full Git commit SHA:
+
+- `ghcr.io/narumiruna/logice-api:COMMIT_SHA`
+- `ghcr.io/narumiruna/logice-web:COMMIT_SHA`
+
+Wait for both publish jobs to succeed, then set `api.image.repository` and `web.image.repository` to these repository names and both image tags to that commit SHA. The workflow uses `GITHUB_TOKEN`; no additional publishing secret is required. For private packages, provision a namespace-local registry Secret with credentials that have `read:packages` access and reference it in `imagePullSecrets`. Publishing does not update or sync the Argo CD Application. Use immutable tags and do not reuse them.
 
 Provision Secrets with your existing secret manager. For manual provisioning, use two protected files that contain only the respective secret value, without a trailing newline:
 
