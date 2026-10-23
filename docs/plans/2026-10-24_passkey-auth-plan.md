@@ -36,7 +36,7 @@ Add invitation-only Passkey accounts to Logice. Protect the web application and 
 
 ## Completion Checklist
 
-- [x] Unit, integration, browser, dependency, workflow, and Helm checks pass; record exact commands and remaining gaps. Final disposable Compose rerun: 81/81 browser tests, anonymous query rejection and persisted authenticated queries after API IP replacement. Clean committed checkout hook/CI validation passed all eight injected-failure checks.
+- [ ] Unit, integration, browser, dependency, workflow, and Helm checks pass; record exact commands and remaining gaps. Local checks passed: 81/81 browser tests, anonymous query rejection, persisted authenticated queries after API IP replacement, and all eight injected-failure checks from a committed clone. GitHub CI follow-up is pending after the fixes recorded below.
 - [x] Unauthenticated queries fail closed; enrollment requires an operator-issued invitation; OTLP still requires its separate token. Disposable Compose browser and telemetry integration tests passed.
 - [ ] BLOCKED: the operator must verify a real Passkey login on `https://logice.narumi.dev` after an explicitly approved deployment. Virtual-authenticator tests do not complete this check. No live account, Secret, or deployment was changed.
 - [x] Deployment instructions specify key generation with `openssl rand -hex 32`, a namespace-local Secret, database persistence, bootstrap, and recovery. See `docs/passkey-operations.md` and `charts/logice/README.md`.
@@ -44,7 +44,7 @@ Add invitation-only Passkey accounts to Logice. Protect the web application and 
 
 ## Verification evidence
 
-- Validation source: implementation commit `f27cb44` and hook-validation fix `51d6712`; later changes only record evidence in this plan. Selected Go toolchain: 1.26.10, matching CI and the API image. `scripts/check-go.sh` passed with `GOTOOLCHAIN=go1.26.10`.
+- Validation source: implementation commit `f27cb44`, hook-validation fix `51d6712`, and CI follow-up fixes described below. Selected Go toolchain: 1.26.10, matching CI and the API image. `scripts/check-go.sh` passed with `GOTOOLCHAIN=go1.26.10`.
 - `GOTOOLCHAIN=go1.26.10 go test -race -tags=integration -count=1 -timeout=8m ./tests/integration/...` passed in 202 seconds. This includes actual OTLP authentication, ClickHouse queries, persistence, and bounded outage checks.
 - PostgreSQL auth unit/race/integration checks passed, including bootstrap races, recovery, expiry, CSRF, database failures, and deterministic database-lock observation for logout/session ordering.
 - `npm --prefix web run ci` passed: Biome, TypeScript, 262 unit tests, production build.
@@ -52,4 +52,5 @@ Add invitation-only Passkey accounts to Logice. Protect the web application and 
 - `scripts/validate-web-layout.sh`, `uv run charts/logice/tests/check.py`, `actionlint`, and `git diff --check` passed. `scripts/validate-checks.sh` passed from a committed clone, including no-Node Go checks, hook setup, read-only worktree/index snapshots, and eight injected failures. A POSIX-shell PATH leak found by that check was fixed with subshell isolation. Host tooling used a temporary extracted GNU timeout binary and a `sha256sum` adapter to macOS `shasum -a 256`; the bottle's checksum binary had a local dynamic-link error. No system utility was installed or repository checksum check weakened.
 - `go mod verify` and `npm --prefix web audit --audit-level=low` passed. `govulncheck` found zero reachable or imported-package vulnerabilities. It reports module-only GO-2026-5932 for unused `golang.org/x/crypto/openpgp` (no fixed version; that package is not imported).
 - Initial host Go 1.27.2 run failed the unchanged Live preflight exact-size test (8793 vs 8775 bytes). The selected 1.26.10 checks pass; no unrelated Live serialization change was made. An initial telemetry run with a four-minute suite deadline exhausted its cleanup reserve; the documented eight-minute command passed.
+- GitHub run `39999924230` passed Go, web, compatibility-layout, and injected-failure jobs, but failed two jobs because the `setup-uv@v10` alias does not exist. Both new setup actions now use verified release commit SHAs. The auth integration cold-start also exposed a fixture bug: Docker image-pull stderr was mixed into the returned container ID. The helper now reads only stdout for successful IDs and keeps stderr for failure diagnostics. The telemetry integration portion passed on Ubuntu. A new full CI result is required before closing the automated-check item.
 - Two source-only diff reviews identified and drove fixes for logout races, shared-proxy throttling, lookup outage responses, and migration retry safety. Runtime, replica/storage, backup/restore, and real-device HTTPS checks remain operator deployment gates.

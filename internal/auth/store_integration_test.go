@@ -3,6 +3,7 @@
 package auth
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -31,9 +32,14 @@ func disposablePostgres(t *testing.T) (*pgxpool.Pool, context.Context) {
 		t.Helper()
 		commandCtx, stop := context.WithTimeout(context.Background(), 45*time.Second)
 		defer stop()
-		output, err := exec.CommandContext(commandCtx, "docker", args...).CombinedOutput()
+		command := exec.CommandContext(commandCtx, "docker", args...)
+		command.WaitDelay = 5 * time.Second
+		var stderr bytes.Buffer
+		command.Stderr = &stderr
+		// Image-pull progress is stderr even on success; only stdout is the ID.
+		output, err := command.Output()
 		if err != nil {
-			t.Fatalf("docker %s: %v: %s", strings.Join(args, " "), err, output)
+			t.Fatalf("docker %s: %v: %s %s", strings.Join(args, " "), err, output, stderr.String())
 		}
 		return strings.TrimSpace(string(output))
 	}
