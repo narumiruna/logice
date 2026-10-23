@@ -40,7 +40,7 @@ Add invitation-only Passkey accounts to Logice. Protect the web application and 
 - [x] Unauthenticated queries fail closed; enrollment requires an operator-issued invitation; OTLP still requires its separate token. Disposable Compose browser and telemetry integration tests passed.
 - [ ] BLOCKED: the operator must verify a real Passkey login on `https://logice.narumi.dev` after an explicitly approved deployment. Virtual-authenticator tests do not complete this check. No live account, Secret, or deployment was changed.
 - [x] Deployment instructions specify key generation with `openssl rand -hex 32`, a namespace-local Secret, database persistence, bootstrap, and recovery. See `docs/passkey-operations.md` and `charts/logice/README.md`.
-- [ ] Report changed files, test evidence, and any deployment actions still required. Remove this plan only after all checks are complete.
+- [x] Report changed files, test evidence, and any deployment actions still required. Draft PR: https://github.com/narumiruna/logice/pull/14, branch `narumi/feat/passkey-accounts`. Main changes are `internal/auth/`, `cmd/logice/`, `web/src/auth*`, `web/e2e/`, Compose, Helm, CI, and the operator runbook. The real-device HTTPS check above remains blocked; this plan is retained and the PR must not be treated as deployment approval. No production deployment, Secret update, image publication, or release workflow dispatch was performed.
 
 ## Verification evidence
 
