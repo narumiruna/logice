@@ -53,4 +53,3 @@ Add invitation-only Passkey accounts to Logice. Protect the web application and 
 - `go mod verify` and `npm --prefix web audit --audit-level=low` passed. `govulncheck` found zero reachable or imported-package vulnerabilities. It reports module-only GO-2026-5932 for unused `golang.org/x/crypto/openpgp` (no fixed version; that package is not imported).
 - Initial host Go 1.27.2 run failed the unchanged Live preflight exact-size test (8793 vs 8775 bytes). The selected 1.26.10 checks pass; no unrelated Live serialization change was made. An initial telemetry run with a four-minute suite deadline exhausted its cleanup reserve; the documented eight-minute command passed.
 - Two source-only diff reviews identified and drove fixes for logout races, shared-proxy throttling, lookup outage responses, and migration retry safety. Runtime, replica/storage, backup/restore, and real-device HTTPS checks remain operator deployment gates.
-
