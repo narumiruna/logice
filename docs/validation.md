@@ -4,6 +4,21 @@
 
 Validate the local trace/log workflow, Go API, frontend tooling, selected storage, Collector, native Go drivers, and migration behavior with disposable data. This is not a production deployment. Authentication, multi-project authorization, load targets, and public Cloudflare routing remain separate acceptance gates. Historical foundation evidence below applies to its recorded revision.
 
+## Live preview parity: 2026-10-23
+
+The real-data Live page now uses the preview's compact query row, service chips, connected hierarchy, direct-child counts, error cues, aligned timing grid, feed header/footer, and inspector layout. Added controls include Columns, Reset view, service suggestions, attribute filtering, field copy, and visible cancellable histogram selection. Existing explicit filter submission, URL history, bounded polling, retained selections, and stored-record semantics remain in use. No API, schema, dependency, or ingestion settings changed.
+
+| Check | Actual result |
+| --- | --- |
+| `npm --prefix web run ci` | Biome, TypeScript, 239 unit tests, and production build passed. New checks cover exact timing-scale values and histogram output. |
+| `sh scripts/validate-compose-web.sh` | All 67 Chromium workflows passed in 47.5 seconds. Static/API checks, changed-IP proxy recovery, and disposable resource cleanup passed. |
+| New browser coverage | Hierarchy guides/counts, stable service colors, error/warning timing markers, Columns, Reset view, explicit filter submission, service suggestions, arrival positions, paused resize/follow behavior, exact drag bounds and cancellation, attribute filtering/copy, bounded JSON preview, and mobile layout passed. Existing real Collector, lifecycle, focus, virtualization, and theme checks also passed. |
+| Local stack | Rebuilt only web at `127.0.0.1:5173`. API, Collector, PostgreSQL, and ClickHouse container IDs stayed unchanged. A fresh Python example produced 11 logical rows: four spans and seven logs, including two Error spans and one ERROR log. Desktop/mobile inspection, both themes, and modal behavior passed without browser page errors. |
+
+Review found two UI-specific regressions before completion. Preview arrival keyframes animate transforms, which must not override virtual row positions; Live now uses background-only arrival feedback. Follow latest now observes feed viewport size, so paused column toggles, inspector layout changes, and viewport resizing keep the last row visible. New browser checks cover both cases. Existing scroll tests measure rendered row height instead of assuming the old 34px density; their focus and three-pixel anchor tolerances remain unchanged.
+
+Captures are ignored artifacts under `web/test-results/live-layout-*/`, `themes-*-chromium/`, and `live-local-*.png`. Browser runs replace prior artifacts. No images are committed. Usage and remaining visual-review limits are in [Live telemetry](live-telemetry.md). The product owner can compare local `/live` with `/preview`; these checks do not establish subjective design acceptance, physical-device behavior, or full accessibility conformance. Public-deployment restrictions remain unchanged.
+
 ## Theme switching: 2026-10-23
 
 All pages now share navigation and a **Theme** selector. Classic retains the blue style and wider spacing. Studio retains the lavender style and compact spacing. The browser stores the selection as `logice.theme`; invalid or unavailable storage defaults to Classic. Storage write failures do not prevent switching on the current page. No telemetry API, dependency, schema, or polling logic changed.

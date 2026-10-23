@@ -230,7 +230,8 @@ test("Live preserves the orphan anchor itself and its keyboard focus when a late
   const pane = page.locator(".lv-scroll")
   await pane.evaluate((element) => {
     element.dispatchEvent(new WheelEvent("wheel", { deltaY: -100 }))
-    element.scrollTop = 90 * 34 + 7
+    const height = element.querySelector(".lv-event-row")?.getBoundingClientRect().height ?? 0
+    element.scrollTop = 90 * height + 7
     element.dispatchEvent(new Event("scroll"))
   })
   await page.clock.runFor(50)
@@ -246,7 +247,7 @@ test("Live preserves the orphan anchor itself and its keyboard focus when a late
     )
   const before = await offset()
   expect(before).toBeLessThan(0)
-  expect(before).toBeGreaterThan(-34)
+  expect(before).toBeGreaterThan(-((await anchor.boundingBox())?.height ?? 0))
   state.data = snapshot([parent, ...rows])
   await advance(page, state)
   await expect(anchor).toHaveAttribute("aria-level", "2")
@@ -266,7 +267,8 @@ test("Live Home transfers focus from a still-mounted previous row to an offscree
   const pane = page.locator(".lv-scroll")
   await pane.evaluate((element) => {
     element.dispatchEvent(new WheelEvent("wheel", { deltaY: -100 }))
-    element.scrollTop = 10 * 34 + 7
+    const height = element.querySelector(".lv-event-row")?.getBoundingClientRect().height ?? 0
+    element.scrollTop = 10 * height + 7
     element.dispatchEvent(new Event("scroll"))
   })
   await page.clock.runFor(50)
@@ -291,7 +293,8 @@ test("Live outside focus cancels pending restoration after a focused row was vir
   const move = async (index: number) => {
     await pane.evaluate((element, position) => {
       element.dispatchEvent(new WheelEvent("wheel", { deltaY: -100 }))
-      element.scrollTop = position * 34 + 7
+      const height = element.querySelector(".lv-event-row")?.getBoundingClientRect().height ?? 0
+      element.scrollTop = position * height + 7
       element.dispatchEvent(new Event("scroll"))
     }, index)
     await page.clock.runFor(50)

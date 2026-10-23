@@ -290,7 +290,8 @@ test("Live scroll anchor drifts less than 3px after late-parent and earlier-row 
   await page.clock.runFor(50)
   await pane.evaluate((element) => {
     element.dispatchEvent(new WheelEvent("wheel", { deltaY: -100 }))
-    element.scrollTop = 90 * 34 + 7
+    const height = element.querySelector(".lv-event-row")?.getBoundingClientRect().height ?? 0
+    element.scrollTop = 90 * height + 7
     element.dispatchEvent(new Event("scroll"))
   })
   await page.clock.runFor(50)
@@ -298,8 +299,7 @@ test("Live scroll anchor drifts less than 3px after late-parent and earlier-row 
   const anchor = await pane.evaluate((element) => {
     const top = element.getBoundingClientRect().top
     const candidate = [...element.querySelectorAll<HTMLElement>("[data-event-id]")].find(
-      (item) =>
-        item.getBoundingClientRect().bottom > top && item.getBoundingClientRect().top < top + 34,
+      (item) => item.getBoundingClientRect().bottom > top && item.getBoundingClientRect().top < top,
     )
     if (!candidate) throw new Error("No visible anchor")
     return {

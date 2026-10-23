@@ -6,7 +6,7 @@ import { LiveApiError, type LiveRecord, type LiveSnapshot } from "./api"
 import { Histogram } from "./histogram"
 import { Inspector } from "./inspector"
 import { allRecordIds, buildTree, countNewRecords, flatten } from "./model"
-import { type LiveRoute, liveHref, parseLiveRoute } from "./route"
+import { DEFAULT_LIVE_ROUTE, type LiveRoute, liveHref, parseLiveRoute } from "./route"
 import { LiveTree, type TreeHandle } from "./tree"
 import { useLive } from "./use-live"
 import "../preview/preview.css"
@@ -66,6 +66,8 @@ function LiveWorkspace({
   const [expanded, setExpanded] = useState(new Set<string>())
   const [autoExpand, setAutoExpand] = useState(true)
   const [follow, setFollow] = useState(true)
+  const [headers, setHeaders] = useState(true)
+  const [arrivals, setArrivals] = useState(new Set<string>())
   const [pending, setPending] = useState(0)
   const [selected, setSelected] = useState<LiveRecord | null>(null)
   const selectionWindow = useRef<TimeWindow | null>(null)
@@ -84,6 +86,13 @@ function LiveWorkspace({
   const records = useMemo(
     () => (snapshot ? [...snapshot.spans, ...snapshot.logs, ...snapshot.context] : []),
     [snapshot],
+  )
+  const services = useMemo(
+    () =>
+      [...new Set([route.service, ...records.map((record) => record.serviceName)])]
+        .filter(Boolean)
+        .sort(),
+    [records, route.service],
   )
   const model = useMemo(() => (snapshot ? buildTree(snapshot) : null), [snapshot])
   const forced = Boolean(route.service || route.search || route.errorsOnly || route.minSeverity)
@@ -111,8 +120,11 @@ function LiveWorkspace({
     const ids = allRecordIds(snapshot)
     const before = previous.current
     const old = before ? allRecordIds(before) : new Set<string>()
-    if (!follow && before)
-      setPending((value) => Math.min(9999, value + countNewRecords(before, snapshot)))
+    if (before !== snapshot) {
+      setArrivals(new Set(before ? [...ids].filter((id) => !old.has(id)) : []))
+      if (!follow && before)
+        setPending((value) => Math.min(9999, value + countNewRecords(before, snapshot)))
+    }
     setExpanded((value) => {
       const next = new Set([...value].filter((id) => ids.has(id)))
       if (autoExpand)
@@ -122,6 +134,11 @@ function LiveWorkspace({
     })
     previous.current = snapshot
   }, [snapshot, follow, autoExpand])
+  useEffect(() => {
+    if (!arrivals.size) return
+    const timer = window.setTimeout(() => setArrivals(new Set()), 1200)
+    return () => window.clearTimeout(timer)
+  }, [arrivals])
   useEffect(() => {
     if (snapshot && !fixedDirty.current) {
       setFixedFrom(snapshot.window.from)
@@ -198,6 +215,25 @@ function LiveWorkspace({
     setSelected(null)
     if (id) treeHandle.current?.focusRecord(id)
   }
+  function resetView() {
+    setExpanded(
+      new Set(records.filter((record) => record.kind === "span").map((record) => record.id)),
+    )
+    setAutoExpand(true)
+    setFollow(true)
+    setHeaders(true)
+    setPending(0)
+    setSelected(null)
+    fixedDirty.current = false
+    apply({ ...DEFAULT_LIVE_ROUTE })
+  }
+  const queryDirty =
+    draft.search !== route.search ||
+    draft.service !== route.service ||
+    draft.range !== route.range ||
+    draft.minSeverity !== route.minSeverity ||
+    draft.errorsOnly !== route.errorsOnly
+  const receiving = route.live && (state.status === "live" || state.status === "empty")
   const truncated =
     snapshot &&
     (snapshot.spansTruncated ||
@@ -221,28 +257,36 @@ function LiveWorkspace({
                 ? "Live · polling after each response"
                 : "Updates stopped"
   return (
-    <div className="lv-workspace">
+    <div
+      className={selected ? "lv-workspace lv-with-inspector" : "lv-workspace"}
+      data-live={receiving}
+    >
       <main id="live-content" className="lp-main lv-main" tabIndex={-1}>
         <div className="lp-page-title">
           <div>
-            <span className="lp-breadcrumb">Explore / Live</span>
+            <span className="lp-breadcrumb">
+              Explore <span>/</span> Live
+            </span>
             <h1>
-              Live <span className="lp-heading-caption">Traces and logs. In context.</span>
+              Live <span className="lp-heading-caption">Every event. In context.</span>
             </h1>
           </div>
-          <button
-            type="button"
-            className={route.live ? "lp-live-button active" : "lp-live-button"}
-            aria-label={route.live ? "Pause live updates" : "Resume live updates"}
-            aria-pressed={route.live}
-            onClick={toggleLive}
+          <div
+            className="lp-live-meta lv-status"
+            role="status"
+            title={
+              state.lastSuccess
+                ? `Last successful update ${new Date(state.lastSuccess).toISOString()}`
+                : "No successful response yet"
+            }
           >
-            <Glyph name={route.live ? "pause" : "play"} />
-            {route.live ? "Live" : "Paused"}
-          </button>
+            <strong>{statusText}</strong>
+            <span className={receiving ? "lp-connection-dot" : "lp-connection-dot paused"} />
+          </div>
         </div>
         <form
-          className="lv-query"
+          id="live-query"
+          className="lv-query lp-querybar"
           onSubmit={(event) => {
             event.preventDefault()
             const rangeChanged = draft.range !== route.range
@@ -253,27 +297,42 @@ function LiveWorkspace({
             })
           }}
         >
-          <label className="lv-search">
+          <label className="lv-search lp-search">
             <Glyph name="search" />
             <input
               ref={search}
               aria-label="Search live events"
-              placeholder="Messages, trace or span IDs…"
+              placeholder="Search messages, trace or span IDs…"
               value={draft.search}
               onChange={(event) => setDraft({ ...draft, search: event.target.value })}
             />
+            <kbd>/</kbd>
+            <button
+              type="submit"
+              className={queryDirty ? "lv-apply dirty" : "lv-apply"}
+              aria-label="Apply filters"
+              title="Apply filters (Enter)"
+            >
+              Apply
+            </button>
           </label>
-          <label>
-            Service
+          <label className="lv-service-control">
             <input
               aria-label="Service filter"
-              placeholder="Exact service name"
+              placeholder="All services"
+              list="live-services"
               value={draft.service}
               onChange={(event) => setDraft({ ...draft, service: event.target.value })}
+              title="Exact service name. Suggestions come from the current results."
             />
+            <datalist id="live-services">
+              {services.map((service) => (
+                <option key={service} value={service} />
+              ))}
+            </datalist>
           </label>
-          <label>
-            Window
+          <div className="lp-time-control">
+            <Glyph name="clock" size={14} />
             <select
               aria-label="Time window"
               value={draft.range}
@@ -285,35 +344,17 @@ function LiveWorkspace({
               <option value="5m">Last 5 minutes</option>
               <option value="15m">Last 15 minutes</option>
             </select>
-          </label>
-          <label>
-            Log severity
-            <select
-              aria-label="Minimum log severity"
-              value={draft.minSeverity}
-              onChange={(event) => setDraft({ ...draft, minSeverity: Number(event.target.value) })}
-            >
-              <option value={0}>All severities</option>
-              <option value={5}>Debug+</option>
-              <option value={9}>Info+</option>
-              <option value={13}>Warn+</option>
-              <option value={17}>Error+</option>
-              <option value={21}>Fatal+</option>
-            </select>
-          </label>
-          <label className="lv-checkbox">
-            <input
-              type="checkbox"
-              checked={draft.errorsOnly}
-              onChange={(event) => setDraft({ ...draft, errorsOnly: event.target.checked })}
-            />
-            Errors only
-          </label>
-          <button type="submit" className="lv-apply">
-            Apply filters
-          </button>
-          <button type="button" onClick={state.refresh}>
-            Refresh
+          </div>
+          <button
+            type="button"
+            className={receiving ? "lp-live-button active" : "lp-live-button"}
+            aria-label={route.live ? "Pause live updates" : "Resume live updates"}
+            aria-pressed={route.live}
+            onClick={toggleLive}
+          >
+            <Glyph name={route.live ? "pause" : "play"} size={13} />
+            <span className="lp-live-dot" />
+            {route.live ? "Live" : "Paused"}
           </button>
         </form>
         <details className="lv-fixed">
@@ -356,14 +397,6 @@ function LiveWorkspace({
             {formError}
           </p>
         )}
-        <div className="lv-status" role="status">
-          <strong>{statusText}</strong>
-          <span>
-            {state.lastSuccess
-              ? `Last successful update ${new Date(state.lastSuccess).toISOString()}`
-              : "No successful response yet"}
-          </span>
-        </div>
         {snapshot && state.status === "loading" && (
           <p className="lv-warning">
             Updating query · showing the previous response until the new request succeeds.
@@ -379,7 +412,12 @@ function LiveWorkspace({
           </div>
         )}
         {snapshot && (
-          <Histogram buckets={snapshot.histogram} window={snapshot.window} onSelect={interval} />
+          <Histogram
+            buckets={snapshot.histogram}
+            window={snapshot.window}
+            onSelect={interval}
+            live={receiving}
+          />
         )}
         {truncated && (
           <p className="lv-warning" role="status">
@@ -400,10 +438,11 @@ function LiveWorkspace({
                 setAutoExpand(false)
               }}
             >
-              Collapse all
+              <Glyph name="collapse" size={14} /> Collapse all
             </button>
             <button
               type="button"
+              disabled={forced}
               onClick={() =>
                 setExpanded(
                   new Set(
@@ -412,15 +451,41 @@ function LiveWorkspace({
                 )
               }
             >
-              Expand all
+              <Glyph name="expand" size={14} /> Expand all
             </button>
-            {forced && <span>Filters keep matching paths open</span>}
+            <span className="lp-toolbar-divider" />
+            <label>
+              <input
+                type="checkbox"
+                checked={draft.errorsOnly}
+                onChange={(event) => setDraft({ ...draft, errorsOnly: event.target.checked })}
+              />
+              <span className="lp-error-dot" /> Errors only
+            </label>
+            <select
+              aria-label="Minimum log severity"
+              className="lv-severity"
+              value={draft.minSeverity}
+              onChange={(event) => setDraft({ ...draft, minSeverity: Number(event.target.value) })}
+            >
+              <option value={0}>All severities</option>
+              <option value={1}>Trace+</option>
+              <option value={5}>Debug+</option>
+              <option value={9}>Info+</option>
+              <option value={13}>Warn+</option>
+              <option value={17}>Error+</option>
+              <option value={21}>Fatal+</option>
+              {![0, 1, 5, 9, 13, 17, 21].includes(draft.minSeverity) && (
+                <option value={draft.minSeverity}>Severity {draft.minSeverity}+</option>
+              )}
+            </select>
           </div>
           <div className="lp-feed-options">
             <label>
               <input
                 type="checkbox"
                 checked={autoExpand}
+                disabled={forced}
                 onChange={(event) => setAutoExpand(event.target.checked)}
               />
               Auto-expand
@@ -428,21 +493,35 @@ function LiveWorkspace({
             <label>
               <input
                 type="checkbox"
-                checked={follow}
-                onChange={(event) => {
-                  setFollow(event.target.checked)
-                  if (event.target.checked) setPending(0)
-                }}
+                checked={headers}
+                onChange={(event) => setHeaders(event.target.checked)}
               />
-              Follow latest
+              Columns
             </label>
+            <button
+              type="button"
+              className="lp-icon-button"
+              aria-label="Refresh"
+              title="Refresh stored events"
+              onClick={state.refresh}
+            >
+              <Glyph name="reset" size={14} />
+            </button>
+            <button
+              type="button"
+              className="lp-icon-button"
+              aria-label="Reset view"
+              title="Reset filters and view. Stored telemetry is not deleted."
+              onClick={resetView}
+            >
+              <Glyph name="layers" size={14} />
+            </button>
           </div>
         </div>
-        {snapshot && rows.length === 0 && (
-          <div className="lp-empty">
-            <strong>No matching events</strong>
-            <p>Change the filters or send telemetry through your Collector.</p>
-          </div>
+        {forced && (
+          <p className="lv-filter-context">
+            Filters keep matching paths open. Context ancestors do not count as matches.
+          </p>
         )}
         <LiveTree
           ref={treeHandle}
@@ -451,6 +530,83 @@ function LiveWorkspace({
           expanded={effectiveExpanded}
           forced={forced}
           follow={follow}
+          headers={headers}
+          window={snapshot?.window ?? null}
+          scaleNs={model?.scaleNs ?? 0n}
+          arrivals={arrivals}
+          empty={
+            <div className="lp-empty">
+              <Glyph name={state.status === "loading" ? "activity" : "search"} size={24} />
+              <strong>
+                {snapshot
+                  ? "No matching events"
+                  : state.status === "loading"
+                    ? "Loading stored events"
+                    : "No stored results yet"}
+              </strong>
+              <p>
+                {snapshot
+                  ? "Change the filters or send telemetry through your Collector."
+                  : "Refresh or resume Live to read stored telemetry."}
+              </p>
+              {snapshot && forced && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    apply({ ...route, search: "", service: "", errorsOnly: false, minSeverity: 0 })
+                  }
+                >
+                  Reset filters
+                </button>
+              )}
+            </div>
+          }
+          footer={
+            <div className="lv-feed-footer lp-feed-footer">
+              <span
+                title={
+                  state.lastSuccess
+                    ? `Last successful update ${new Date(state.lastSuccess).toISOString()}`
+                    : "No successful response yet"
+                }
+              >
+                <span className={receiving ? "lp-footer-dot" : "lp-footer-dot paused"} />
+                {receiving
+                  ? "Polling stored events"
+                  : !route.live
+                    ? "Updates paused"
+                    : state.status === "suspended"
+                      ? "Updates suspended"
+                      : state.status === "retrying"
+                        ? "Retry scheduled"
+                        : state.status === "loading"
+                          ? "Reading stored events"
+                          : "Updates stopped"}
+                {state.lastSuccess && (
+                  <>
+                    <span className="lp-footer-separator">·</span>
+                    <time className="lp-mono" dateTime={new Date(state.lastSuccess).toISOString()}>
+                      {new Date(state.lastSuccess).toISOString().slice(11, 19)} UTC
+                    </time>
+                  </>
+                )}
+              </span>
+              <span>
+                {rows.length} rows shown <span className="lp-footer-separator">·</span>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={follow}
+                    onChange={(event) => {
+                      setFollow(event.target.checked)
+                      if (event.target.checked) setPending(0)
+                    }}
+                  />
+                  Follow latest
+                </label>
+              </span>
+            </div>
+          }
           onFollow={(value) => {
             setFollow(value)
             if (value) setPending(0)
@@ -470,13 +626,18 @@ function LiveWorkspace({
               setPending(0)
             }}
           >
-            {pending}
+            <Glyph name="arrow-down" size={14} /> {pending}
             {pending === 9999 ? "+" : ""} newly visible records · Jump to latest
           </button>
         )}
-        <footer className="lv-note">
-          Bounded window polling · Identical stored content is grouped · No delivery/completeness
-          guarantee
+        <footer className="lv-note lp-bottom-note">
+          <span className="lp-keyboard-hint">
+            <kbd>/</kbd> search <span>·</span> <kbd>esc</kbd> close details <span>·</span> ↑ ↓
+            navigate
+          </span>
+          <span title="Bounded window polling. Identical stored content is grouped. No delivery or trace completeness guarantee.">
+            Real telemetry <span>·</span> Stored records <span>·</span> Completeness unknown
+          </span>
         </footer>
       </main>
       {selected && snapshot && (

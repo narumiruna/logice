@@ -2,6 +2,7 @@
 import { useVirtualizer } from "@tanstack/react-virtual"
 import {
   forwardRef,
+  type ReactNode,
   useCallback,
   useEffect,
   useImperativeHandle,
@@ -10,11 +11,19 @@ import {
   useRef,
   useState,
 } from "react"
-import { formatDuration, severity, spanStatus } from "../telemetry"
+import type { TimeWindow } from "../api"
+import { Glyph } from "../preview/icons"
+import { formatDuration, isTraceId, severity, spanStatus } from "../telemetry"
 import type { LiveRecord } from "./api"
 import type { LiveRow } from "./model"
 
-const height = 34
+const height = 31
+// The service color must not change when a response is reordered or filtered.
+function serviceClass(name: string): string {
+  let hash = 0
+  for (const character of name) hash = (hash * 31 + (character.codePointAt(0) ?? 0)) >>> 0
+  return ["", "lp-service-worker", "lp-service-postgres", "lp-service-openai"][hash % 4]
+}
 export interface TreeHandle {
   focusRecord: (id: string) => void
 }
@@ -26,12 +35,33 @@ export const LiveTree = forwardRef<
     expanded: ReadonlySet<string>
     forced: boolean
     follow: boolean
+    headers: boolean
+    window: TimeWindow | null
+    scaleNs: bigint
+    arrivals: ReadonlySet<string>
+    footer: ReactNode
+    empty: ReactNode
     onFollow: (follow: boolean) => void
     onToggle: (id: string) => void
     onSelect: (record: LiveRecord) => void
   }
 >(function LiveTree(
-  { rows, selected, expanded, forced, follow, onFollow, onToggle, onSelect },
+  {
+    rows,
+    selected,
+    expanded,
+    forced,
+    follow,
+    headers,
+    window,
+    scaleNs,
+    arrivals,
+    footer,
+    empty,
+    onFollow,
+    onToggle,
+    onSelect,
+  },
   ref,
 ) {
   const scroll = useRef<HTMLDivElement>(null)
@@ -39,6 +69,7 @@ export const LiveTree = forwardRef<
   const elements = useRef(new Map<string, HTMLDivElement>())
   const [active, setActive] = useState<string | null>(null)
   const [notice, setNotice] = useState("")
+  const [viewportHeight, setViewportHeight] = useState(0)
   const anchor = useRef<{ id: string; index: number; offset: number } | null>(null)
   const previousRows = useRef(rows)
   const frame = useRef(0)
@@ -53,6 +84,15 @@ export const LiveTree = forwardRef<
     getItemKey: (index) => rows[index].record.id,
     overscan: 8,
   })
+  useLayoutEffect(() => {
+    const element = scroll.current
+    if (!element) return
+    const measure = () => setViewportHeight(element.clientHeight)
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
   const remember = useCallback(() => {
     const element = scroll.current
     if (!element || !rows.length) return
@@ -130,7 +170,7 @@ export const LiveTree = forwardRef<
     const element = scroll.current
     if (!element) return
     programmatic.current = true
-    if (follow) element.scrollTop = Math.max(0, rows.length * height - element.clientHeight)
+    if (follow) element.scrollTop = Math.max(0, rows.length * height - viewportHeight)
     else if (anchor.current) {
       const old = anchor.current
       let index = rows.findIndex((row) => row.record.id === old.id)
@@ -176,7 +216,7 @@ export const LiveTree = forwardRef<
     frame.current = requestAnimationFrame(() => {
       programmatic.current = false
     })
-  }, [rows, follow, remember, restoreMountedFocus])
+  }, [rows, follow, viewportHeight, remember, restoreMountedFocus])
   const forcedOpen = useMemo(() => {
     const result = new Set<string>()
     if (!forced) return result
@@ -193,7 +233,15 @@ export const LiveTree = forwardRef<
   }, [rows, forced])
   const effectiveActive = rows.some((row) => row.record.id === active) ? active : rows[0]?.record.id
   return (
-    <section className="lv-feed" aria-label="Unified live event tree">
+    <section className="lv-feed lp-feed" aria-label="Unified live event tree">
+      <div className="lp-day-divider">
+        <span>Recent events</span>
+        <span>{window ? `${window.from.slice(0, 10)} UTC` : "UTC"}</span>
+        <span className="lp-day-rule" />
+        <span className="lp-retained-count">
+          {new Set(rows.map((row) => row.record.traceId).filter(isTraceId)).size} traces in window
+        </span>
+      </div>
       {notice && (
         <p className="lv-anchor-notice" role="status">
           {notice}{" "}
@@ -207,7 +255,7 @@ export const LiveTree = forwardRef<
         className="lv-grid"
         role="treegrid"
         aria-label="Live telemetry events"
-        aria-rowcount={rows.length + 1}
+        aria-rowcount={rows.length + (headers ? 1 : 0)}
         aria-colcount={5}
         onFocusCapture={(event) => {
           const target =
@@ -273,23 +321,26 @@ export const LiveTree = forwardRef<
           }
         }}
       >
-        <div role="row" tabIndex={-1} className="lv-row lv-grid-header">
-          <span role="columnheader" tabIndex={-1}>
-            Time (UTC)
-          </span>
-          <span role="columnheader" tabIndex={-1}>
-            Service
-          </span>
-          <span role="columnheader" tabIndex={-1}>
-            Message / hierarchy
-          </span>
-          <span role="columnheader" tabIndex={-1}>
-            Relative timing
-          </span>
-          <span role="columnheader" tabIndex={-1}>
-            Duration
-          </span>
-        </div>
+        {headers && (
+          <div role="row" tabIndex={-1} className="lv-row lv-grid-header">
+            <span role="columnheader" tabIndex={-1}>
+              Time <span className="lv-heading-unit">UTC</span>
+            </span>
+            <span role="columnheader" tabIndex={-1}>
+              Service
+            </span>
+            <span role="columnheader" tabIndex={-1}>
+              Message
+            </span>
+            <span role="columnheader" tabIndex={-1}>
+              Relative timing{" "}
+              <span className="lv-heading-unit">0 — {formatDuration(String(scaleNs))}</span>
+            </span>
+            <span role="columnheader" tabIndex={-1}>
+              Duration
+            </span>
+          </div>
+        )}
         <div
           className="lv-scroll"
           ref={scroll}
@@ -307,6 +358,7 @@ export const LiveTree = forwardRef<
             remember()
           }}
         >
+          {rows.length === 0 && empty}
           <div className="lv-virtual-space" style={{ height: virtual.getTotalSize() }}>
             {virtual.getVirtualItems().map((item) => {
               const row = rows[item.index]
@@ -326,7 +378,7 @@ export const LiveTree = forwardRef<
                     }
                   }}
                   role="row"
-                  aria-rowindex={item.index + 2}
+                  aria-rowindex={item.index + (headers ? 2 : 1)}
                   aria-level={row.depth + 1}
                   aria-selected={selected === record.id}
                   aria-expanded={
@@ -337,13 +389,18 @@ export const LiveTree = forwardRef<
                   data-event-id={record.id}
                   data-event-kind={record.kind}
                   data-status={record.statusCode}
-                  className={`lv-row lv-event-row ${selected === record.id ? "lv-selected" : ""}`}
+                  className={[
+                    "lv-row lv-event-row",
+                    selected === record.id ? "lv-selected" : "",
+                    arrivals.has(record.id) ? "lv-arrival" : "",
+                    !row.parentId ? "lv-root-row" : "",
+                  ].join(" ")}
                   style={{ transform: `translateY(${item.start}px)`, height }}
                   tabIndex={-1}
                   onFocus={() => setActive(record.id)}
                 >
                   <div role="gridcell" tabIndex={-1} className="lv-time" title={record.startTime}>
-                    <time dateTime={record.startTime}>{record.startTime.slice(11, 23)}</time>
+                    <time dateTime={record.startTime}>{record.startTime.slice(11, 19)}</time>
                   </div>
                   <div
                     role="gridcell"
@@ -351,33 +408,56 @@ export const LiveTree = forwardRef<
                     className="lv-service"
                     title={record.serviceName}
                   >
-                    {record.serviceName || "Unknown service"}
+                    <span className={`lp-service-chip ${serviceClass(record.serviceName)}`}>
+                      <span aria-hidden="true" />
+                      <span className="lv-service-name">
+                        {record.serviceName || "Unknown service"}
+                      </span>
+                    </span>
                   </div>
                   <div
                     role="gridcell"
                     tabIndex={-1}
                     className="lv-message"
-                    style={{ paddingLeft: Math.min(16, row.depth) * 16 + 4 }}
+                    style={{ paddingLeft: Math.min(16, row.depth) * 20 }}
                   >
+                    {row.depth > 0 && (
+                      <span
+                        className="lp-tree-guides"
+                        aria-hidden="true"
+                        style={{ width: Math.min(16, row.depth) * 20 }}
+                      />
+                    )}
                     {row.hasChildren ? (
                       <button
                         type="button"
-                        className="lv-toggle"
+                        className={`lv-toggle lp-tree-toggle ${expanded.has(record.id) || forcedOpen.has(record.id) ? "expanded" : ""}`}
                         tabIndex={-1}
                         disabled={forcedOpen.has(record.id)}
                         aria-expanded={expanded.has(record.id) || forcedOpen.has(record.id)}
                         aria-label={`${expanded.has(record.id) || forcedOpen.has(record.id) ? "Collapse" : "Expand"} ${record.name || record.body}`}
+                        title={
+                          forcedOpen.has(record.id)
+                            ? "Filters keep matching paths expanded"
+                            : `${row.childCount} direct children`
+                        }
                         onClick={() => onToggle(record.id)}
                       >
-                        {expanded.has(record.id) || forcedOpen.has(record.id) ? "⌄" : "›"}
+                        <Glyph name="chevron" size={10} />
+                        <span>{row.childCount}</span>
                       </button>
                     ) : (
-                      <span className={`lv-marker ${status.tone}`} />
+                      <span
+                        className={`lv-marker lp-event-marker ${record.kind} ${status.tone}`}
+                        aria-hidden="true"
+                      />
                     )}
                     <button
                       type="button"
                       tabIndex={-1}
-                      className="lv-message-button"
+                      className={`lv-message-button lp-event-message ${record.kind} ${record.kind === "log" ? status.tone : ""}`}
+                      aria-pressed={selected === record.id}
+                      title={record.name || record.body || "Empty record"}
                       aria-label={`Inspect ${record.name || record.body || "empty record"}`}
                       onClick={() => onSelect(record)}
                     >
@@ -385,6 +465,10 @@ export const LiveTree = forwardRef<
                         ? record.name || "Unnamed span"
                         : record.body || "(Empty body)"}
                     </button>
+                    {status.tone === "error" && <span className="lp-row-error">error</span>}
+                    {record.kind === "log" && status.tone === "warning" && (
+                      <span className="lv-tag lv-warning-tag">{status.label}</span>
+                    )}
                     {record.contextOnly && <span className="lv-tag">Context</span>}
                     {record.conflict && <span className="lv-tag lv-error">Conflict</span>}
                     {BigInt(record.occurrences) > 1n && (
@@ -399,21 +483,28 @@ export const LiveTree = forwardRef<
                     )}
                   </div>
                   <div role="gridcell" tabIndex={-1} className="lv-timing">
-                    <span className="lv-track">
+                    <span
+                      className="lv-track lp-bar-track"
+                      title={
+                        record.kind === "span"
+                          ? `${record.durationNs} ns · ${status.label}`
+                          : `${record.startTime} · ${status.label}`
+                      }
+                    >
                       <span
-                        className={record.kind === "span" ? "lv-bar" : "lv-tick"}
+                        className={`${record.kind === "span" ? "lv-bar lp-duration-bar" : "lv-tick lp-log-tick"} ${status.tone}`}
                         style={{
-                          left: `${Math.max(0, row.offsetRatio) * 100}%`,
+                          left: `${Math.min(99.5, Math.max(0, row.offsetRatio) * 100)}%`,
                           width:
                             record.kind === "span"
-                              ? `${Math.max(0.3, row.durationRatio * 100)}%`
+                              ? `${Math.min(100 - Math.min(99.5, row.offsetRatio * 100), Math.max(0.5, row.durationRatio * 100))}%`
                               : undefined,
                         }}
                       />
                     </span>
                   </div>
                   <div role="gridcell" tabIndex={-1} className="lv-duration" title={status.label}>
-                    {record.kind === "span" ? formatDuration(record.durationNs) : status.label}
+                    {record.kind === "span" ? formatDuration(record.durationNs) : "—"}
                   </div>
                 </div>
               )
@@ -421,10 +512,7 @@ export const LiveTree = forwardRef<
           </div>
         </div>
       </div>
-      <div className="lv-feed-footer">
-        <span>{rows.length} logical rows · Trace completeness unknown</span>
-        <span>↑ ↓ navigate · ← → hierarchy · Enter inspect</span>
-      </div>
+      {footer}
     </section>
   )
 })

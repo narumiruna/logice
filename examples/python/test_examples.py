@@ -14,6 +14,7 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 import http_server
+import multi_service
 import send_telemetry
 from opentelemetry.proto.collector.logs.v1.logs_service_pb2 import (
     ExportLogsServiceRequest,
@@ -71,6 +72,8 @@ class ExampleTests(unittest.TestCase):
 
     def exported(self) -> tuple[list, list]:
         spans, logs = [], []
+        self.span_services = {}
+        self.log_services = set()
         while not self.requests.empty():
             path, headers, body = self.requests.get_nowait()
             self.assertEqual(headers["Authorization"], "Bearer unit-test-token")
@@ -84,11 +87,25 @@ class ExampleTests(unittest.TestCase):
                             for item in resource.resource.attributes
                         )
                     )
+                    service = next(
+                        item.value.string_value
+                        for item in resource.resource.attributes
+                        if item.key == "service.name"
+                    )
                     for scope in resource.scope_spans:
                         spans.extend(scope.spans)
+                        for span in scope.spans:
+                            self.span_services[(span.trace_id, span.span_id)] = service
             elif path == "/v1/logs":
                 request = ExportLogsServiceRequest.FromString(body)
                 for resource in request.resource_logs:
+                    self.log_services.add(
+                        next(
+                            item.value.string_value
+                            for item in resource.resource.attributes
+                            if item.key == "service.name"
+                        )
+                    )
                     for scope in resource.scope_logs:
                         logs.extend(scope.log_records)
             else:
@@ -124,6 +141,46 @@ class ExampleTests(unittest.TestCase):
                 if record.trace_id
             )
         )
+        self.assertNotIn("unit-test-token", output.getvalue())
+
+    def test_multiple_services_share_trace_context_and_correlated_logs(self) -> None:
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            multi_service.main()
+        result = json.loads(output.getvalue())
+        spans, logs = self.exported()
+        services = set(multi_service.SERVICE_NAMES)
+        self.assertEqual(set(result["services"]), services)
+        self.assertEqual(set(self.span_services.values()), services)
+        self.assertEqual(self.log_services, services)
+        self.assertEqual(len(spans), 20)
+        self.assertEqual(len(logs), 36)
+        self.assertEqual(len(result["traceIds"]), 4)
+        self.assertEqual(sum(span.status.code == 2 for span in spans), 6)
+        self.assertEqual(sum(record.severity_number == 17 for record in logs), 2)
+        self.assertEqual(sum(record.severity_number == 13 for record in logs), 2)
+        self.assertEqual(sum(not record.trace_id for record in logs), 4)
+        roots = [span for span in spans if not span.parent_span_id]
+        self.assertEqual(len(roots), 4)
+        for trace_id in result["traceIds"]:
+            trace_spans = [span for span in spans if span.trace_id.hex() == trace_id]
+            self.assertEqual(
+                {
+                    self.span_services[(span.trace_id, span.span_id)]
+                    for span in trace_spans
+                },
+                services,
+            )
+        for span in spans:
+            if span.parent_span_id:
+                self.assertIn((span.trace_id, span.parent_span_id), self.span_services)
+            else:
+                self.assertEqual(
+                    self.span_services[(span.trace_id, span.span_id)], "api"
+                )
+        for record in logs:
+            if record.trace_id:
+                self.assertIn((record.trace_id, record.span_id), self.span_services)
         self.assertNotIn("unit-test-token", output.getvalue())
 
     def test_http_routes_and_trace_context(self) -> None:
