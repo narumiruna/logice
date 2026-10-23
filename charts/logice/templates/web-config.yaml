@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "logice.name" . }}-web
+  labels:
+    {{- include "logice.labels" . | nindent 4 }}
+data:
+  default.conf: |
+    upstream logice_api {
+        zone logice_api 64k;
+        server {{ include "logice.name" . }}-api:8080;
+    }
+
+    server {
+        listen 8080;
+        server_name _;
+        root /usr/share/nginx/html;
+        index index.html;
+
+        location = /api {
+            proxy_pass http://logice_api;
+            proxy_set_header Host $host;
+        }
+
+        location /api/ {
+            proxy_pass http://logice_api;
+            proxy_set_header Host $host;
+        }
+
+        location /assets/ {
+            try_files $uri =404;
+        }
+
+        location / {
+            try_files $uri $uri/ /index.html;
+        }
+    }

@@ -1,0 +1,63 @@
+# Supply immutable API/web images built from this repository.
+api:
+  image:
+    repository: ""
+    tag: ""
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 100m
+      memory: 64Mi
+    limits:
+      memory: 128Mi
+
+web:
+  image:
+    repository: ""
+    tag: ""
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 50m
+      memory: 32Mi
+    limits:
+      memory: 128Mi
+
+imagePullSecrets: []
+# - name: registry-credentials
+
+# Pre-create this Secret in the release namespace. No credentials are generated.
+# Required keys: CLICKHOUSE_PASSWORD and OTLP_TOKEN.
+existingSecret: ""
+
+clickhouse:
+  image: clickhouse/clickhouse-server:26.8.30.8@sha256:4c520c82c14c817f40107fbe90547a43200bf293fe2a99ce7d7d89e528004f92
+  persistence:
+    size: 20Gi
+    # null uses the cluster default; "" requests no storage class.
+    storageClass: null
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      memory: 2Gi
+
+collector:
+  image: otel/opentelemetry-collector-contrib:0.163.1@sha256:1175b03003053962012f5a231f5567f66a3e8fdb960c7835c0e48f7aa1555806
+  # Exporter-managed tables; telemetry expires after 24 hours.
+  ttl: 24h
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+
+# No public endpoints by default. Restrict access before enabling Ingress.
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  host: ""
+  tls: []

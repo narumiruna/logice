@@ -1,0 +1,36 @@
+# Replace the project, revision, registry, Secret, and destination for your cluster.
+# Argo CD must already have read access to this private repository.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: logice
+  namespace: argocd
+spec:
+  # Use an existing AppProject restricted to this repo and destination.
+  project: private
+  source:
+    repoURL: git@github.com:narumiruna/logice.git
+    targetRevision: REPLACE_WITH_COMMIT_SHA
+    path: charts/logice
+    helm:
+      releaseName: logice
+      valuesObject:
+        existingSecret: logice-secrets
+        imagePullSecrets:
+          - name: registry-credentials
+        api:
+          image:
+            repository: registry.example.com/private/logice-api
+            tag: REPLACE_WITH_IMAGE_TAG
+        web:
+          image:
+            repository: registry.example.com/private/logice-web
+            tag: REPLACE_WITH_IMAGE_TAG
+        # Ingress is off. Add private routing only after access controls exist.
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: logice
+  syncPolicy:
+    # Manual sync by default. Enable automated sync only after validation.
+    syncOptions:
+      - CreateNamespace=true

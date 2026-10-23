@@ -1,0 +1,5 @@
+{{- $_ := required "existingSecret must name a pre-created Secret" .Values.existingSecret -}}
+{{- $_ := required "api.image.repository is required" .Values.api.image.repository -}}
+{{- $_ := required "api.image.tag is required" .Values.api.image.tag -}}
+{{- $_ := required "web.image.repository is required" .Values.web.image.repository -}}
+{{- $_ := required "web.image.tag is required" .Values.web.image.tag -}}
