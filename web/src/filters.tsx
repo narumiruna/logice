@@ -1,11 +1,19 @@
 import type { FormEvent } from "react"
 import { useState } from "react"
-import { type Range, type Route, ranges, relativeWindow, routeHref } from "./telemetry"
+import {
+  filterResetHref,
+  type Range,
+  type Route,
+  ranges,
+  relativeWindow,
+  routeHref,
+} from "./telemetry"
 
 export function FilterForm({ route }: { route: Route }) {
   const [range, setRange] = useState<Range>(route.range)
   const logs = route.page === "logs"
   const filters = route.filters
+  const resetHref = filterResetHref(route)
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const data = new FormData(event.currentTarget)
@@ -27,6 +35,7 @@ export function FilterForm({ route }: { route: Route }) {
   return (
     <form
       className="filter-form"
+      aria-label={logs ? "Log filters" : "Trace filters"}
       action={logs ? "/logs" : "/traces"}
       method="get"
       onSubmit={submit}
@@ -118,8 +127,15 @@ export function FilterForm({ route }: { route: Route }) {
           />
         </label>
       )}
-      <div className="filter-note">
-        Filters keep the current window. Refresh moves a relative window forward. No live polling.
+      <div className="filter-footer">
+        <p className="filter-note">
+          Filters keep the current window. Refresh moves a relative window forward. No live polling.
+        </p>
+        {resetHref && (
+          <a className="filter-reset" href={resetHref}>
+            Reset filters
+          </a>
+        )}
       </div>
     </form>
   )

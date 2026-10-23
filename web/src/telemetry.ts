@@ -144,6 +144,26 @@ export function routeHref(route: Route, refresh = false, now = Date.now()): stri
   return `/${route.page === "logs" ? "logs" : "traces"}?${params}`
 }
 
+export function filterResetHref(route: Route): string | undefined {
+  const filters = route.filters
+  const filtered =
+    filters.service ||
+    filters.search ||
+    (route.page === "logs" ? filters.minSeverity || filters.traceId : filters.errorsOnly)
+  if (!filtered) return undefined
+  return routeHref({
+    ...route,
+    filters: {
+      ...filters,
+      service: "",
+      search: "",
+      errorsOnly: false,
+      minSeverity: 0,
+      traceId: "",
+    },
+  })
+}
+
 export function durationValue(value: string): bigint {
   return /^\d+$/.test(value) ? BigInt(value) : 0n
 }

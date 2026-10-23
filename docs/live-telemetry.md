@@ -12,6 +12,8 @@ This stack has no user authentication or dynamic project authorization. Keep it 
 2. Open **Live**. The server resolves the default five-minute rolling window. Select one, five, or fifteen minutes. Select **Apply** in the search box, or press Enter there, to submit changes.
 3. Apply an exact service name, literal text, Errors only, or minimum log severity.
    - These controls edit a draft until you select Apply. The Apply button changes color when the draft differs from the applied query.
+   - **Unapplied filter changes** shows when a draft differs. Select **Apply changes** to submit it or **Discard changes** to restore the applied values without a request.
+   - Select **Reset filters** below the toolbar to remove applied filters. This keeps the selected window and Live or paused mode.
    - Service suggestions come from the current bounded response. You can also type an exact name that is not in the suggestions.
    - Text matches span names, log bodies, and trace/span IDs, without case sensitivity. It does not search attributes or execute SQL.
    - Errors only matches Error spans and logs with severity at least 17. Minimum severity applies only to logs.

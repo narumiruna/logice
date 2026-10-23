@@ -5,7 +5,7 @@ import { Notice, WindowLabel } from "./components"
 import { FilterForm } from "./filters"
 import { LogList, TraceList } from "./lists"
 import { AppShell } from "./shell"
-import { listHref, parseRoute, routeHref } from "./telemetry"
+import { filterResetHref, listHref, parseRoute, routeHref } from "./telemetry"
 import { TraceDetail } from "./trace-detail"
 
 type Result =
@@ -25,6 +25,7 @@ export function App() {
   const logs = route.page === "logs"
   const valid = route.page !== "not-found" && !route.error
   const canonical = routeHref(route)
+  const resetHref = filterResetHref(route)
 
   useEffect(() => {
     if (!valid) return
@@ -161,8 +162,12 @@ export function App() {
                 </button>
               </Notice>
             )}
-            {state.kind === "traces" && <TraceList result={state.result} window={route.filters} />}
-            {state.kind === "logs" && <LogList result={state.result} window={route.filters} />}
+            {state.kind === "traces" && (
+              <TraceList result={state.result} window={route.filters} resetHref={resetHref} />
+            )}
+            {state.kind === "logs" && (
+              <LogList result={state.result} window={route.filters} resetHref={resetHref} />
+            )}
             {state.kind === "detail" && (
               <TraceDetail detail={state.result} window={route.filters} />
             )}

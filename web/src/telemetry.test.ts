@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import type { Span } from "./api"
 import {
+  filterResetHref,
   formatDuration,
   isTraceId,
   listHref,
@@ -77,6 +78,34 @@ describe("URL state", () => {
     const fixed = parseRoute(listHref("logs", { from, to }), now)
     expect(routeHref(fixed, true, now)).toBe(routeHref(fixed))
   })
+
+  it.each(["traces", "logs"])(
+    "resets %s filters without moving the window or changing limits",
+    (page) => {
+      for (const range of ["", "&range=6h"]) {
+        const route = parseRoute(
+          `/${page}?from=${from}&to=${to}&limit=100&service=api&search=error&errorsOnly=true&minSeverity=17&traceId=${traceId}${range}`,
+          now,
+        )
+        const href = filterResetHref(route)
+        expect(href).toBeDefined()
+        const reset = parseRoute(href ?? "", now + 60_000)
+        expect(reset.page).toBe(page)
+        expect(reset.range).toBe(route.range)
+        expect(reset.filters).toEqual({
+          from,
+          to,
+          limit: 100,
+          service: "",
+          search: "",
+          errorsOnly: false,
+          minSeverity: 0,
+          traceId: "",
+        })
+        expect(filterResetHref(reset)).toBeUndefined()
+      }
+    },
+  )
 
   it.each([
     "/traces?from=2026-10-22T10:00:00Z",

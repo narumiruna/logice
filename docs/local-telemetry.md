@@ -23,9 +23,12 @@ This document describes the manual-refresh Traces and Logs pages. Use [Live](liv
    - **Errors only** selects traces with an error among the matching spans.
    - **Minimum severity** selects logs at or above the selected OpenTelemetry severity number.
 3. Select **Apply filters**. Select **Refresh** to move a relative time window forward. There is no automatic polling.
+   - Select **Reset filters** below the controls or in an empty result to remove filters. This keeps the exact query window, time-range preset, and result limit.
 4. Select a trace name to see its spans and correlated logs. Expand a span or log to see its IDs and attributes.
    - A log with a valid trace ID links to that trace in the same time window.
    - A log without a trace ID still has a detail view. The exporter does not give logs a durable record ID.
+
+On narrow screens, trace and log rows use labeled fields. Log messages and expanded details use the full row width; no horizontal table scrolling is needed.
 
 Trace links retain absolute time bounds. Detail pages can be reloaded or bookmarked. An old link can become empty when telemetry passes the Collector's 24-hour retention period.
 
