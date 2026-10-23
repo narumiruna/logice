@@ -342,6 +342,9 @@ export async function fetchLive(
   if (!response.ok) {
     void response.body?.cancel().catch(() => {})
     const status = response.status
+    if (status === 401 && typeof window !== "undefined") {
+      window.dispatchEvent(new Event("logice:session-expired"))
+    }
     const code =
       status === 400
         ? "invalid_query"

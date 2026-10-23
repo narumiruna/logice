@@ -2,7 +2,7 @@
 
 A self-hosted observability platform under development, with a Go backend, React/TypeScript frontend, PostgreSQL application data, and ClickHouse telemetry.
 
-**Current status:** a real-data Live explorer, local trace/log lists, structured filters, span and log details, ClickHouse query APIs, web/API container images, and real-service validation. Authentication, multi-project access, and production deployment are not implemented.
+**Current status:** a real-data Live explorer, local trace/log lists, structured filters, span and log details, ClickHouse query APIs, web/API container images, and real-service validation. Invitation-only Passkey deployment wiring is included; release requires matching authentication-capable API/web images and operator validation. Multi-project access and production readiness remain out of scope.
 
 ## Usage
 
@@ -19,16 +19,17 @@ The choice persists in this browser across navigation and reloads. Switching doe
 
 ## Live explorer
 
-Open **http://127.0.0.1:5173/live** after building the web/API services. It combines actual exported spans and logs with bounded automatic polling, a server-counted histogram, an expandable hierarchy, and an inspector. Pause freezes the current window. See [Live usage, identity rules, and limits](docs/live-telemetry.md). This remains a local, fixed-project feature; it does not provide authentication or running-span streaming.
+Open **http://localhost:5173/live** after building the web/API services. It combines actual exported spans and logs with bounded automatic polling, a server-counted histogram, an expandable hierarchy, and an inspector. Pause freezes the current window. See [Live usage, identity rules, and limits](docs/live-telemetry.md). This remains a fixed-project feature without running-span streaming. The query API requires a signed-in session in the authentication release.
 
 ### Design preview
 
-Open [the live explorer preview](http://127.0.0.1:5173/preview) after building the web service. It shows an animated event hierarchy, live simulation, and a right-side inspector using sample data only. The existing Traces and Logs pages still show real telemetry. See [the design notes](docs/design/live-explorer.md).
+Open [the live explorer preview](http://localhost:5173/preview) after building the web service. It shows an animated event hierarchy, live simulation, and a right-side inspector using sample data only. The existing Traces and Logs pages still show real telemetry. See [the design notes](docs/design/live-explorer.md).
 
 ## Design
 
 - [Stack decisions and operating targets](docs/stack.md)
-- [Authentication and Pocket ID design](docs/authentication.md)
+- [Invitation-only Passkey authentication](docs/authentication.md)
+- [Passkey deployment, backup, and recovery](docs/passkey-operations.md)
 - [Dependency-ordered implementation sequence](docs/implementation.md)
 - [Validation commands, evidence, and limitations](docs/validation.md)
 - [Current tracked plan](docs/plans/2026-10-18_logice-stack-plan.md)
@@ -52,7 +53,8 @@ In a new checkout, create a protected `.env` once. This command refuses to overw
 ```sh
 test ! -e .env && (
   umask 077
-  printf 'POSTGRES_PASSWORD=%s\nCLICKHOUSE_PASSWORD=%s\nOTLP_TOKEN=%s\n' \
+  printf 'POSTGRES_PASSWORD=%s\nCLICKHOUSE_PASSWORD=%s\nOTLP_TOKEN=%s\nAUTH_ENCRYPTION_KEY=%s\nAUTH_ORIGIN=http://localhost:5173\n' \
+    "$(openssl rand -hex 32)" \
     "$(openssl rand -hex 32)" \
     "$(openssl rand -hex 32)" \
     "$(openssl rand -hex 32)" > .env
@@ -62,7 +64,15 @@ docker compose --project-name logice-validation up --build --detach --wait --wai
 docker compose --project-name logice-validation port collector 4318
 ```
 
-Open **http://127.0.0.1:5173**. Select **Live**, **Traces**, or **Logs**, apply filters, and open a record for details. Views are empty until your applications send matching telemetry. Nginx serves the built frontend and forwards `/api` to the Go container. The API has no published host port. Check liveness with `curl http://127.0.0.1:5173/api/healthz`. The API reads the fixed `validation` project from ClickHouse; it does not use PostgreSQL yet. Stop Vite first if it already uses port `5173`.
+Compose runs `logice migrate` before starting the API. Bootstrap the first administrator once:
+
+```sh
+docker compose --project-name logice-validation run --rm --no-deps api bootstrap -name 'Initial administrator'
+```
+
+This prints only a single-use enrollment invitation. Keep it out of logs and transfer it securely. Open **http://localhost:5173**, use invitation enrollment, and create a user-verified Passkey within one hour. Use this exact origin, not `127.0.0.1`. See [operations](docs/passkey-operations.md) for later invitations and lost-Passkey recovery.
+
+After login, select **Live**, **Traces**, or **Logs**, apply filters, and open a record for details. Views are empty until your applications send matching telemetry. Nginx serves static assets without requiring authentication and forwards `/api` to Go, which protects query routes. The API has no published host port. Check process liveness with `curl http://localhost:5173/api/healthz`. PostgreSQL stores authentication data; ClickHouse stores telemetry for the fixed `validation` project. Stop Vite first if it already uses port `5173`.
 
 Use the displayed Collector address as the OTLP/HTTP endpoint and send `Authorization: Bearer <OTLP_TOKEN>`. Use `/v1/traces` and `/v1/logs`. Query port `4317` for the local gRPC endpoint or `13133` for the Collector health endpoint. The test harness waits for Collector HTTP readiness separately; Compose's `--wait` alone does not establish Collector readiness.
 
@@ -76,7 +86,9 @@ Do not expose this proof through Cloudflare Tunnel. Never commit `.env`, tunnel 
 
 ## Private Kubernetes deployment
 
-See the [Helm chart](charts/logice/README.md) and [Argo CD Application example](charts/argocd-application.example.yaml). Supply published API/web images and an existing Secret. Services are internal by default. The application still has no authentication; restrict access separately.
+See the [Helm chart](charts/logice/README.md), [Argo CD Application example](charts/argocd-application.example.yaml), and [Passkey operations](docs/passkey-operations.md). Do not deploy until matching authentication-capable images are published and `logice-secrets` contains the new `AUTH_ENCRYPTION_KEY` and `POSTGRES_PASSWORD` keys. The chart still defaults to `latest`; pin both application images to the same tested commit. No live deployment is authorized by these instructions.
+
+Keep Cloudflare Access enabled. The web Service defaults to NodePort `30173`, which can bypass Access through direct node connections. Restrict node access or select ClusterIP with private routing. PostgreSQL, API, ClickHouse, and Collector Services are ClusterIP.
 
 ## Local development
 
@@ -88,6 +100,13 @@ Use Go 1.26.10 or a patched later release and Node.js 26.11.1 with npm 11.20.0. 
 npm --prefix web ci
 ```
 
+Export `AUTH_ORIGIN=http://localhost:5173`, a valid 64-hex-character `AUTH_ENCRYPTION_KEY`, and `DATABASE_URL` for your local PostgreSQL instance (or the equivalent libpq `PG*` variables). A protected `.env` used by Compose is not automatically loaded by `go run`. Run migrations and bootstrap with the same configuration before starting the server:
+
+```sh
+go run ./cmd/logice migrate
+go run ./cmd/logice bootstrap -name 'Initial administrator'
+```
+
 In separate terminals, run:
 
 ```sh
@@ -95,7 +114,7 @@ go run ./cmd/logice
 npm --prefix web run dev
 ```
 
-Go defaults to `127.0.0.1:8080`; Compose explicitly uses `-listen 0.0.0.0:8080` inside the API container. `GET /api/healthz` reports process liveness, not database or application readiness. Vite listens on `127.0.0.1:5173` and forwards `/api` to Go. A port conflict fails instead of selecting another port. Go does not yet serve frontend assets. Do not expose these development servers publicly.
+Go defaults to `127.0.0.1:8080`; Compose explicitly uses `-listen 0.0.0.0:8080` inside the API container. `GET /api/healthz` reports process liveness, not database or application readiness. Vite listens on `127.0.0.1:5173` and forwards `/api` to Go. Browse with `http://localhost:5173` to match `AUTH_ORIGIN`. A port conflict fails instead of selecting another port. Go does not yet serve frontend assets. Do not expose these development servers publicly.
 
 ## Repository checks
 

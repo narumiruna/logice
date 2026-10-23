@@ -218,7 +218,7 @@ export function testTarget(value: string | undefined): string {
   const url = new URL(value)
   if (
     url.protocol !== "http:" ||
-    url.hostname !== "127.0.0.1" ||
+    !["127.0.0.1", "localhost"].includes(url.hostname) ||
     !url.port ||
     url.port === "5173"
   ) {

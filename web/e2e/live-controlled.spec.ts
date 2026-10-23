@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test"
+import { expect, test } from "./auth-fixtures"
 import {
   advance,
   assertBuckets,
@@ -408,7 +408,12 @@ for (const status of [401, 403]) {
     await expect(page.getByRole("dialog", { name: "Event details" })).toBeVisible()
     state.status = status
     await advance(page, state)
-    await expect(page.getByRole("alert")).toContainText(String(status))
+    await expect(page.getByRole("alert")).toContainText(
+      status === 401 ? "session expired" : String(status),
+    )
+    if (status === 401) {
+      await expect(page.getByRole("heading", { name: "Sign in to Logice" })).toBeVisible()
+    }
     await expect(page.locator("[data-event-id]")).toHaveCount(0)
     await expect(page.getByRole("dialog", { name: "Event details" })).toHaveCount(0)
     const count = state.queries.length

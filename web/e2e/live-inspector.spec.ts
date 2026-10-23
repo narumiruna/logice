@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test"
+import { expect, test } from "./auth-fixtures"
 import { advance, control, record, row, snapshot, testTarget } from "./live-fixtures"
 
 test.beforeEach(async ({ page }) => {

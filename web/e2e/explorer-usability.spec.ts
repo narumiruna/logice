@@ -1,5 +1,6 @@
-import { expect, type Page, test } from "@playwright/test"
+import type { Page } from "@playwright/test"
 import type { Log, TraceSummary } from "../src/api"
+import { expect, test } from "./auth-fixtures"
 import { control, record, row, snapshot, testTarget } from "./live-fixtures"
 
 const window = {

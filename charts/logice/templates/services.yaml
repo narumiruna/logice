@@ -1,4 +1,4 @@
-{{- range $component, $ports := dict "api" (list (dict "name" "http" "port" 8080)) "web" (list (dict "name" "http" "port" 8080)) "clickhouse" (list (dict "name" "native" "port" 9000)) "collector" (list (dict "name" "otlp-grpc" "port" 4317) (dict "name" "otlp-http" "port" 4318)) }}
+{{- range $component, $ports := dict "postgres" (list (dict "name" "postgres" "port" 5432)) "api" (list (dict "name" "http" "port" 8080)) "web" (list (dict "name" "http" "port" 8080)) "clickhouse" (list (dict "name" "native" "port" 9000)) "collector" (list (dict "name" "otlp-grpc" "port" 4317) (dict "name" "otlp-http" "port" 4318)) }}
 ---
 apiVersion: v1
 kind: Service

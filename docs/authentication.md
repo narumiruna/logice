@@ -1,108 +1,54 @@
-# Authentication design
+# Invitation-only Passkey authentication
 
-## Status
+## Scope and release gate
 
-The required methods are password login, passkeys, authenticator-app TOTP as a second factor, and OIDC compatible with Pocket ID. This document specifies their implementation and acceptance tests; none of those application flows is implemented by the stack-validation proof.
+Logice uses invitation-only Passkey accounts and server-side sessions for its single shared telemetry project. Password login, TOTP, OIDC, and Pocket ID are not part of this authentication release. The [earlier multi-method design](design/authentication-methods.md) remains a deferred reference, not the release scope.
 
-The policies below are recommendations for pull-request review. In particular, invitation-only access, session lifetimes, and second-factor rules are not recorded as explicit user approvals.
+Deployment wiring alone does not prove that authentication is available. Do not deploy until matching API and web images contain the authentication implementation and its tests pass. Keep Cloudflare Access enabled. An operator must verify a real Passkey login on `https://logice.narumi.dev` before release approval. Do not use existing operator accounts for automated tests.
 
-## Libraries and maintenance
+See [Passkey operations](passkey-operations.md) for configuration, migration, bootstrap, backup, and recovery.
 
-| Responsibility | Validation selection | Evidence |
-| --- | --- | --- |
-| Password hashing and secret encryption | `golang.org/x/crypto` 0.58.0; Go AEAD APIs | Module release observed 2026-10-09. Use Argon2id for passwords, not reversible encryption. |
-| Passkeys | `go-webauthn/webauthn` 0.18.2 | Release observed 2026-09-19; supports current Go 1.26/1.27. |
-| OIDC verification | `coreos/go-oidc/v3` 3.21.0 | Release observed 2026-09-01. Nonce and authorized-party checks need explicit application logic. |
-| Authorization Code and PKCE | `golang.org/x/oauth2` 0.37.0 | Release observed 2026-08-25; use S256 and a confidential server client. |
-| TOTP | `pquerna/otp` 1.5.0 | Release observed 2025-05-16; includes a secret-randomness security fix. Low recent maintenance is a review risk. Its stateless validation is not replay protection. |
+## Authentication boundary
 
-The repositories were not archived when inspected. This is maintenance evidence, not a claim that all dependencies are free of vulnerabilities. Pin and scan the actual application lockfiles before adoption.
+- The Go API must require a valid session for actual telemetry query routes, including Live, trace, and log queries. A frontend redirect or proxy policy is not an authorization check.
+- Static frontend assets can be public. Health probes do not require a session. Authentication entry points permit only their defined login or invitation ceremony operations, not query access.
+- Enrollment requires an unexpired invitation. There is no public signup or unauthenticated server mode.
+- Only an authenticated administrator can create invitations through the application. The first administrator is created through the operator-only bootstrap CLI.
+- OTLP ingestion remains separate. The Collector requires `Authorization: Bearer <OTLP_TOKEN>`; a browser session does not authorize ingestion, and an ingestion token does not authorize queries.
+- All signed-in users access the current shared project. This does not implement multi-project authorization.
 
-## Identity, enrollment, and recovery
+## Configuration and storage
 
-- Start with invitation-only access. A provider login does not automatically grant organization or project membership.
-- Create the first administrator through an explicit local CLI operation, not the first public visitor. Use an atomic transaction to prevent concurrent bootstrap attempts. Refuse repeated initial bootstrap.
-- Use short-lived, single-use, high-entropy enrollment/invitation tokens. Store hashes, consume atomically, and transfer raw tokens through the operator's secure channel. Do not put secrets in URLs written to access logs.
-- Provide a separate audited local recovery command for the deployment operator. It must not be a remotely accessible authentication bypass.
-- Require recent appropriate authentication before adding, linking, removing, or resetting a login method. Preserve at least one usable login/recovery path.
-- Store users, identities, credentials, sessions, pending ceremonies, and project memberships in PostgreSQL. Enforce unique external identities by `(issuer, subject)`; never link by matching email alone.
+- `AUTH_ORIGIN` is always required. Production uses exactly `https://logice.narumi.dev`, with no path or trailing slash. HTTP is allowed only for localhost development; Compose uses `http://localhost:5173`.
+  - The RP ID comes from the configured hostname, not Host or forwarded headers. The browser must use the exact configured origin.
+  - Changing the hostname requires an explicit credential enrollment migration. Do not change it during a routine deployment.
+- `AUTH_ENCRYPTION_KEY` is always required: exactly 64 hexadecimal characters, decoded to 32 bytes for AES-256-GCM. Missing, malformed, or incorrectly sized keys must stop startup.
+  - Keep it outside Git and Helm values. Back it up separately from PostgreSQL.
+- PostgreSQL is required. Supply `DATABASE_URL`, or libpq settings `PGHOST`, `PGPORT`, `PGUSER`, `PGDATABASE`, and `PGPASSWORD`. Compose and Helm use the latter to avoid URL escaping of passwords.
+- Store credential public keys, identifiers, user handles, counters, transports, and backup flags in PostgreSQL. Private keys remain with authenticators.
+- Encrypt persisted ceremony state with authenticated encryption. Store only hashes of opaque session and invitation tokens. Do not log raw tokens, challenges, cookies, or encryption keys.
 
-## Password and TOTP
+## Enrollment and sessions
 
-- Hash passwords with Argon2id, a random per-password salt, and encoded parameters. Calibrate the cost on the deployment host; the OWASP minimum is a lower bound, not an application performance measurement.
-- Bound password length and concurrent expensive hashing. Use generic login errors and account/client-address throttles. Derive the client address only from a trusted proxy.
-- TOTP enrollment is optional initially. Once enrolled, require it for every password login; never let the caller omit it. Do not issue a full session before both factors succeed.
-- Hold a password-verified attempt in a short-lived pending-login record with limited operations. Expire and consume it atomically.
-- Require recent authentication to generate a pending TOTP secret. Enable it only after a valid verification code. AEAD-encrypt pending and enabled secrets with a versioned key stored outside PostgreSQL.
-- Use standard six-digit, 30-second TOTP with a narrowly bounded skew. Determine the accepted counter and atomically reject counters already used; concurrent requests must not both accept the same code. A boolean library validation result alone is insufficient.
-- Generate high-entropy single-use recovery codes. Store only hashes and consume them atomically. Recovery must not silently remove MFA or create unlimited sessions.
-- Audit factor changes, revoke affected sessions, and never emit QR values, shared secrets, passwords, or recovery codes in application logs or OpenTelemetry data.
+- Bootstrap must atomically refuse a second initial administrator. Record bootstrap and operator recovery actions in `auth_events` without tokens or credentials. Recovery is an explicit local operator action, not an HTTP bypass.
+- Invitations expire after one hour and are single-use. Ceremonies expire after five minutes and are single-use, with atomic consumption and browser binding.
+- Require user verification and discoverable Passkeys for registration and login. Verify the exact origin, RP ID, challenge, and ceremony type. Persist successful credential updates and use the library's synced-Passkey counter semantics. A counter warning on a device-bound credential denies login and requires operator recovery; a synced credential warning emits a generic log event without rejecting valid zero-counter behavior.
+- Sessions expire after 24 hours idle or seven days absolute, whichever comes first. Activity cannot extend absolute expiry. Expiry checks must not depend on background cleanup.
+- Rotate sessions after authentication. Logout revokes this browser's sessions and pending ceremonies. A database-backed browser generation serializes logout with concurrent challenge creation and session issuance. Operator recovery revokes the user's sessions and old credentials before issuing a new enrollment invitation.
+- HTTPS session cookies use Secure, HttpOnly, Path=/, no Domain, and SameSite=Lax, with the `__Host-` prefix. The HTTP localhost exception is development-only.
+- Protect state-changing operations with browser-bound CSRF checks and exact origin checks. Do not mutate state on GET or enable wildcard credentialed CORS. Limit authentication JSON bodies to 64 KiB. Apply 30 authentication POSTs per browser per minute and 300 per process per minute; logout is exempt. Do not use untrusted forwarded IP headers. Browser limits do not provide network-level abuse prevention: clients can clear cookies, and the process budget is shared. Keep edge access controls and edge rate limits in place.
+- Database failure must fail closed. Neither migration failure nor authentication failure can enable unauthenticated queries.
 
-Recommended second-factor policy: password plus enrolled TOTP; a user-verified passkey is an alternative login; OIDC uses the configured provider's authentication policy. Do not infer MFA from an unverified `amr`/`acr` value or require local TOTP after every passkey/OIDC login without a separate policy decision.
+## Network controls
 
-## Passkeys
+Keep Cloudflare Access in front of the application while authentication is validated. The chart's default web NodePort `30173` can bypass Cloudflare Access if a client can reach a node directly. Restrict node firewall rules or use `web.service.type: ClusterIP` with private tunnel routing. ClusterIP alone does not restrict other cluster workloads; apply cluster network policy where required.
 
-- Configure the stable external URL before enrollment. The RP ID is the hostname, without scheme or port; allowed origins include the exact scheme and port. Require HTTPS except for supported localhost development.
-- Require user verification for registration and login. Bind each expiring challenge to the user/session and ceremony, and consume it atomically once.
-- Persist credential IDs, public keys, user handles, sign counters, backup flags, and transports as required by the library. Save authentication updates after successful login.
-- Synced passkeys can have zero counters. Apply the library's counter/backup semantics rather than rejecting every non-increasing counter as a cloned key.
-- Do not derive RP IDs or origins from untrusted Host or forwarded headers. A later hostname change requires an explicit passkey migration/re-enrollment plan.
+Nginx forwards `/api` to the Go API; it need not require authentication for static files. TLS terminates at the trusted edge. Do not use proxy headers to override the configured WebAuthn origin or weaken cookie policy.
 
-## Pocket ID and OIDC
+## Required release evidence
 
-### Verified protocol feasibility
-
-A new disposable Pocket ID **2.18.0** container was started locally, its public discovery document and JWKS were fetched, and the container and temporary encryption key were removed. Observed metadata includes Authorization Code, PKCE S256, `client_secret_basic`, `client_secret_post`, public-client `none`, and RS256 ID tokens with RSA JWKS.
-
-No administrator, passkey, relying-party client, or login was created. **A complete Pocket ID login is unverified.** Discovery alone does not satisfy the application's Pocket ID compatibility acceptance test.
-
-### Client configuration
-
-- Use an administrator-configured exact issuer. Prefer the same external/internal issuer URL initially. Do not accept an issuer supplied by a login request.
-- Register Logice as a confidential client, with PKCE enabled and one exact redirect URI: configured external URL plus `/auth/oidc/callback`. Keep the client secret on the Go backend.
-- Select `oauth2.AuthStyleInHeader` explicitly for `client_secret_basic`; the libraries do not automatically map the discovery document's supported authentication methods into this setting.
-- Request `openid profile email`; do not request offline access or store provider tokens without a requirement. Use normal TLS certificate validation in deployment.
-- Require bounded HTTP timeouts, response sizes, redirects, and administrator-approved endpoint destinations for discovery/JWKS/token calls. The OIDC library does not supply complete SSRF protection by itself. Permit private identity-provider addresses only through explicit operator trust configuration.
-- A container's `localhost` is not the host's `localhost`. Solve routing with trusted network configuration, not disabled issuer, certificate, or signature validation.
-
-### Login and account linking
-
-- Generate independent state, nonce, and PKCE verifier values. Store an expiring browser-bound transaction server-side; use S256 and a GET callback compatible with SameSite=Lax correlation cookies.
-- Verify and atomically consume state before exchanging the code. Exchange with the original verifier and bind the callback to the selected provider. Check the authorization-response issuer when supported.
-- Verify signature, issuer, audience/client ID, expiry, nonempty subject, nonce, and applicable `azp` rules. `go-oidc` does not validate nonce or authorized party for the application. If UserInfo is used, its subject must match the validated ID token.
-- Identify the account by exact issuer and subject. Linking requires recent local authentication, a complete external login, a conflict check, and an atomic database write. An email match, including verified email, is not proof that accounts should be linked.
-- Local logout revokes the Logice session. It does not claim to end the Pocket ID session or implement provider back-channel logout.
-
-## Browser sessions and deployment
-
-- Use random 256-bit opaque session tokens. Store only SHA-256 token hashes, user identity, authentication strength, and timestamps in PostgreSQL.
-- Proposed limits: 24-hour idle expiry and 7-day absolute expiry, enforced server-side. Updating activity must not extend absolute expiry. Cleanup is storage maintenance, not the expiry check.
-- Rotate sessions after complete authentication and privilege changes. Revoke them on logout and relevant credential/recovery changes. PostgreSQL failure must fail authentication closed.
-- Use a `__Host-` cookie with Secure, HttpOnly, Path=/, no Domain, and an explicit SameSite=Lax policy for HTTPS deployment. Define any localhost-only development exception separately.
-- Protect state-changing requests, including login, logout, enrollment, and account linking, with browser-bound CSRF tokens and exact Origin checks as applicable. Do not mutate on GET or rely only on SameSite. Do not enable wildcard credentialed CORS.
-- Cloudflare Tunnel terminates public TLS. Keep the origin private and trust forwarded headers only from configured proxy addresses. Derive cookies, redirects, and WebAuthn configuration from the configured external URL.
-- Keep browser sessions separate from project ingestion tokens. Redact passwords, session values, OIDC secrets/codes/verifiers, TOTP secrets, invitations, and recovery tokens from application, proxy, audit, and telemetry output.
-
-## Required application acceptance tests
-
-All checks below remain pending until the authentication implementation exists:
-
-- Bootstrap races, repeated bootstrap, invitation expiry/replay, and unauthorized signup rejection.
-- Successful and failed password login, generic errors, account/address throttling, bounded hashing work, and session rotation only after all factors pass.
-- TOTP pending enrollment, wrong/out-of-window codes, same-code sequential and concurrent replay, factor removal/reset, and single-use recovery. Test external encryption-key recovery separately from database restore.
-- Passkey registration/login with user verification; reject missing verification, wrong RP/origin, and expired/reused challenges. Persist credential updates and test synced-passkey counter behavior.
-- Actual Pocket ID 2.18.0 login and existing linked-account login with exact callback, Basic client authentication, and S256. Use a new disposable instance and credentials; do not modify an existing operator identity provider.
-- OIDC rejection of missing/wrong/replayed state and nonce, invalid signature/issuer/audience/authorized party/expiry, wrong verifier, reused codes, untrusted discovery destinations/redirects, and account-link conflicts. Matching email must not cause automatic linking.
-- Session idle/absolute expiry, logout/revocation, CSRF failures, forwarded-header spoofing, database failures, and preservation of a usable recovery path.
-
-## Sources
-
-- [WebAuthn 0.18.2](https://github.com/go-webauthn/webauthn/releases/tag/v0.18.2)
-- [go-oidc verifier 3.21.0](https://github.com/coreos/go-oidc/blob/v3.21.0/oidc/verify.go)
-- [OAuth2 PKCE 0.37.0](https://github.com/golang/oauth2/blob/v0.37.0/pkce.go)
-- [TOTP implementation 1.5.0](https://github.com/pquerna/otp/blob/v1.5.0/totp/totp.go)
-- [Pocket ID discovery 2.18.0](https://github.com/pocket-id/pocket-id/blob/v2.18.0/backend/internal/controller/well_known_controller.go)
-- [Pocket ID client authentication tests](https://github.com/pocket-id/pocket-id/blob/v2.18.0/backend/internal/oidc/token_handler_test.go)
-- [Pocket ID virtual-authenticator test setup](https://github.com/pocket-id/pocket-id/blob/v2.18.0/tests/utils/passkey.util.ts)
-- [OWASP password storage](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html)
-- [OAuth 2.0 security best current practice](https://datatracker.ietf.org/doc/html/rfc9700)
+1. Test concurrent bootstrap, repeated bootstrap, invitation expiry/replay, and administrator-only invitation creation.
+2. Test user-verified registration/login and rejection of wrong origins, RP IDs, missing verification, expired ceremonies, and replay.
+3. Test unauthenticated query rejection, session expiry/revocation, logout, CSRF rejection, and database outages.
+4. Test operator recovery with disposable accounts, database/key restore, migration concurrency, and restart persistence.
+5. Run browser tests with virtual authenticators, then have the operator verify a real Passkey on the configured HTTPS origin. Virtual tests do not replace this check.

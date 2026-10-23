@@ -97,6 +97,10 @@ export async function requestJSON<T>(
   fetcher: typeof fetch = fetch,
 ): Promise<T> {
   const response = await fetcher(path, { signal, headers: { Accept: "application/json" } })
+  if (response.status === 401) {
+    if (typeof window !== "undefined") window.dispatchEvent(new Event("logice:session-expired"))
+    throw new ApiError("Your session expired. Sign in again.", 401, "session_expired")
+  }
   // Do not expose storage internals, even if an upstream error contains them.
   if (response.status === 503) {
     throw new ApiError(

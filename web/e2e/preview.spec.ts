@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test"
+import { expect, test } from "./auth-fixtures"
 
 const fixedTime = new Date("2026-10-22T14:30:00Z")
 
@@ -7,7 +7,8 @@ test("preview updates in place, pauses, resumes, and uses no telemetry APIs", as
 }, testInfo) => {
   const apiRequests: string[] = []
   page.on("request", (request) => {
-    if (new URL(request.url()).pathname.startsWith("/api/")) apiRequests.push(request.url())
+    const path = new URL(request.url()).pathname
+    if (path.startsWith("/api/") && !path.startsWith("/api/auth/")) apiRequests.push(request.url())
   })
   await page.clock.install({ time: fixedTime })
   await page.setViewportSize({ width: 1600, height: 1000 })
