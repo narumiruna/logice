@@ -1,0 +1,78 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "logice.name" . }}-collector
+  labels:
+    {{- include "logice.labels" . | nindent 4 }}
+data:
+  config.yaml: |
+    # Single-project feasibility configuration. Do not expose it as a multi-project service.
+    extensions:
+      health_check:
+        endpoint: 0.0.0.0:13133
+      bearertokenauth:
+        token: ${env:OTLP_TOKEN}
+
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+            auth:
+              authenticator: bearertokenauth
+          http:
+            endpoint: 0.0.0.0:4318
+            auth:
+              authenticator: bearertokenauth
+
+    processors:
+      memory_limiter:
+        check_interval: 1s
+        limit_mib: 128
+        spike_limit_mib: 32
+      resource/project:
+        attributes:
+          - key: logice.project.id
+            action: upsert
+            value: validation
+      attributes/project:
+        actions:
+          - key: logice.project.id
+            action: delete
+
+    exporters:
+      clickhouse:
+        endpoint: tcp://{{ include "logice.name" . }}-clickhouse:9000
+        database: logice
+        username: logice
+        password: ${env:CLICKHOUSE_PASSWORD}
+        # Single-project exporter-managed schema; not a production migration system.
+        create_schema: true
+        ttl: {{ .Values.collector.ttl | quote }}
+        async_insert: false
+        timeout: 5s
+        sending_queue:
+          enabled: true
+          num_consumers: 2
+          queue_size: 100
+          batch:
+            min_size: 512
+            max_size: 2048
+            flush_timeout: 1s
+        retry_on_failure:
+          enabled: true
+          initial_interval: 1s
+          max_interval: 5s
+          max_elapsed_time: 300s
+
+    service:
+      extensions: [health_check, bearertokenauth]
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [memory_limiter, resource/project, attributes/project]
+          exporters: [clickhouse]
+        logs:
+          receivers: [otlp]
+          processors: [memory_limiter, resource/project, attributes/project]
+          exporters: [clickhouse]

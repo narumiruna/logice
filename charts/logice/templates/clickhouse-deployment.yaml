@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "logice.name" . }}-clickhouse
+  labels:
+    {{- include "logice.labels" . | nindent 4 }}
+    app.kubernetes.io/component: clickhouse
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: logice
+      app.kubernetes.io/instance: {{ .Release.Name | quote }}
+      app.kubernetes.io/component: clickhouse
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: logice
+        app.kubernetes.io/instance: {{ .Release.Name | quote }}
+        app.kubernetes.io/component: clickhouse
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/clickhouse-config.yaml") . | sha256sum }}
+    spec:
+      automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: clickhouse
+          image: {{ .Values.clickhouse.image | quote }}
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: CLICKHOUSE_USER
+              value: logice
+            - name: CLICKHOUSE_DB
+              value: logice
+            - name: CLICKHOUSE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret | quote }}
+                  key: CLICKHOUSE_PASSWORD
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/clickhouse
+            - name: config
+              mountPath: /etc/clickhouse-server/config.d/logice.xml
+              subPath: logice.xml
+              readOnly: true
+          ports:
+            - name: native
+              containerPort: 9000
+            - name: health
+              containerPort: 8123
+          startupProbe:
+            httpGet:
+              path: /ping
+              port: health
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: health
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: health
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.clickhouse.resources | nindent 12 }}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "logice.name" . }}-clickhouse
+        - name: config
+          configMap:
+            name: {{ include "logice.name" . }}-clickhouse

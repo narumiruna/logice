@@ -74,6 +74,10 @@ docker compose --project-name logice-validation down
 
 Do not expose this proof through Cloudflare Tunnel. Never commit `.env`, tunnel credentials, database dumps, or authentication secrets. Changing `.env` does not rotate a password already stored in a PostgreSQL volume.
 
+## Private Kubernetes deployment
+
+See the [Helm chart](charts/logice/README.md) and [Argo CD Application example](charts/argocd-application.example.yaml). Supply published API/web images and an existing Secret. Services are internal by default. The application still has no authentication; restrict access separately.
+
 ## Local development
 
 Go 1.26.10 and 1.27.3 include the certificate-distrust fix for [GO-2026-6809](https://pkg.go.dev/vuln/GO-2026-6809). CI and the API image use Go 1.26.10. The module's language version remains Go 1.26.
