@@ -41,15 +41,17 @@ Copy and edit [the Application example](../argocd-application.example.yaml) in y
 
 The example uses manual sync and a pinned Git commit. Create the namespace and Secrets before the first sync, then sync the Application. No cluster resources are installed by the chart itself; Argo CD can create the destination namespace through `CreateNamespace=true`.
 
-Required Helm values:
+The chart renders without Helm overrides, so Argo CD can create an Application directly from `charts/logice`. Rendering does not provision credentials or publish images. Before the first sync, configure these values:
 
-| Value | Purpose |
-| --- | --- |
-| `existingSecret` | Secret containing `CLICKHOUSE_PASSWORD` and `OTLP_TOKEN` |
-| `api.image.repository`, `api.image.tag` | Published API image |
-| `web.image.repository`, `web.image.tag` | Published web image |
+| Value | Default | Deployment requirement |
+| --- | --- | --- |
+| `existingSecret` | `logice-secrets` | Pre-create this Secret with `CLICKHOUSE_PASSWORD` and `OTLP_TOKEN` |
+| `api.image.repository`, `api.image.tag` | `logice-api:local` | Override with your published API image |
+| `web.image.repository`, `web.image.tag` | `logice-web:local` | Override with your published web image |
 
-See [values.yaml](values.yaml) for resource limits, private registry access, storage, telemetry TTL, and optional Ingress. Rendering without the required values fails deliberately. The Secret must exist at deployment time; offline rendering cannot check its contents.
+The local image defaults are not published registry images. Use them only when you have built and loaded those images into every eligible cluster node. For a private registry, also set `imagePullSecrets`.
+
+See [values.yaml](values.yaml) for resource limits, storage, telemetry TTL, and optional Ingress. Explicitly empty image or Secret names are rejected. The Secret must exist at deployment time; offline rendering cannot check its contents.
 
 ## Access and ingestion
 
@@ -82,16 +84,14 @@ The Nginx ConfigMap replaces the image's Docker-only DNS settings with the Kuber
 
 ## Local checks
 
-Supply test-only identifiers; no cluster or real credentials are required:
+No overrides, cluster, or real credentials are required:
 
 ```sh
-helm lint charts/logice --strict \
-  --set existingSecret=test \
-  --set api.image.repository=test/api --set api.image.tag=test \
-  --set web.image.repository=test/web --set web.image.tag=test
+helm lint charts/logice --strict
+helm template charts/logice --name-template logice --namespace logice --kube-version 1.36.5 --include-crds
 uv run charts/logice/tests/check.py
 ```
 
-The test requires `helm` on PATH and uses PyYAML through uv. It checks rendering, deterministic output, service wiring, Secret references, persistence retention, configuration, and optional Ingress.
+The test requires `helm` on PATH and uses PyYAML through uv. It checks the Argo CD render command without overrides, configured rendering, deterministic output, service wiring, Secret references, persistence retention, configuration, and optional Ingress.
 
 Local rendering does not prove cluster rollout. Before use, the cluster operator must check image pulls, PVC binding and write access, workload readiness, authenticated OTLP ingestion, query results, private routing, and data persistence after a ClickHouse restart. No live cluster deployment is performed by these checks.

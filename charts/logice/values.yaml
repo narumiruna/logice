@@ -1,8 +1,10 @@
-# Supply immutable API/web images built from this repository.
+# Local image names let Argo CD render without overrides.
+# Before syncing, supply published, immutable API/web images or load these images
+# into every eligible node. The default local images are not published by CI.
 api:
   image:
-    repository: ""
-    tag: ""
+    repository: logice-api
+    tag: local
     pullPolicy: IfNotPresent
   resources:
     requests:
@@ -13,8 +15,8 @@ api:
 
 web:
   image:
-    repository: ""
-    tag: ""
+    repository: logice-web
+    tag: local
     pullPolicy: IfNotPresent
   resources:
     requests:
@@ -28,7 +30,7 @@ imagePullSecrets: []
 
 # Pre-create this Secret in the release namespace. No credentials are generated.
 # Required keys: CLICKHOUSE_PASSWORD and OTLP_TOKEN.
-existingSecret: ""
+existingSecret: logice-secrets
 
 clickhouse:
   image: clickhouse/clickhouse-server:26.8.30.8@sha256:4c520c82c14c817f40107fbe90547a43200bf293fe2a99ce7d7d89e528004f92

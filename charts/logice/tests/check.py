@@ -36,7 +36,7 @@ def render(values=None, release="test"):
     return output, [item for item in yaml.safe_load_all(output) if item]
 
 
-def check_resources(documents, prefix):
+def check_resources(documents, prefix, secret="test-secret"):
     objects = {(item["kind"], item["metadata"]["name"]): item for item in documents}
     assert len(objects) == len(documents), "Duplicate object names"
     assert not any(item["kind"] == "Secret" for item in documents)
@@ -66,7 +66,7 @@ def check_resources(documents, prefix):
         for env in container.get("env", []):
             if "valueFrom" in env:
                 ref = env["valueFrom"]["secretKeyRef"]
-                assert ref["name"] == "test-secret"
+                assert ref["name"] == secret
                 assert ref["key"] in {"CLICKHOUSE_PASSWORD", "OTLP_TOKEN"}
         for volume in pod["spec"].get("volumes", []):
             if "configMap" in volume:
@@ -99,6 +99,23 @@ def check_resources(documents, prefix):
 
 
 def main():
+    # Match Argo CD Application creation: no values file or parameters.
+    helm("lint", str(CHART), "--strict", values={})
+    defaults = helm(
+        "template", str(CHART), "--name-template", "logice",
+        "--namespace", "logice", "--kube-version", "1.36.5",
+        "--include-crds", values={},
+    )
+    assert defaults == render({}, release="logice")[0]
+    documents = [item for item in yaml.safe_load_all(defaults) if item]
+    assert len(documents) == 12
+    check_resources(documents, "logice-logice", secret="logice-secrets")
+    for item in documents:
+        if item["kind"] == "Deployment":
+            component = item["metadata"]["labels"]["app.kubernetes.io/component"]
+            if component in {"api", "web"}:
+                container = item["spec"]["template"]["spec"]["containers"][0]
+                assert container["image"] == f"logice-{component}:local"
     helm("lint", str(CHART), "--strict")
     output, documents = render()
     assert output == render()[0], "Rendering must be deterministic"
@@ -107,7 +124,7 @@ def main():
     pvc = next(item for item in documents if item["kind"] == "PersistentVolumeClaim")
     assert "storageClassName" not in pvc["spec"]
     for key in VALUES:
-        values = {k: v for k, v in VALUES.items() if k != key}
+        values = {**VALUES, key: ""}
         failure = helm("template", "test", str(CHART), values=values, succeeds=False)
         assert key in failure
     failure = helm(
