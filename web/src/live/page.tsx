@@ -286,6 +286,7 @@ function LiveWorkspace({
         </div>
         <form
           id="live-query"
+          aria-label="Live filters"
           className="lv-query lp-querybar"
           onSubmit={(event) => {
             event.preventDefault()
@@ -518,10 +519,31 @@ function LiveWorkspace({
             </button>
           </div>
         </div>
+        {queryDirty && (
+          <div className="lv-query-pending">
+            <span role="status">Unapplied filter changes</span>
+            <button className="lv-pending-apply" type="submit" form="live-query">
+              Apply changes
+            </button>
+            <button type="button" onClick={() => setDraft(route)}>
+              Discard changes
+            </button>
+          </div>
+        )}
         {forced && (
-          <p className="lv-filter-context">
-            Filters keep matching paths open. Context ancestors do not count as matches.
-          </p>
+          <div className="lv-filter-context">
+            <span>
+              Filters keep matching paths open. Context ancestors do not count as matches.
+            </span>
+            <button
+              type="button"
+              onClick={() =>
+                apply({ ...route, search: "", service: "", errorsOnly: false, minSeverity: 0 })
+              }
+            >
+              Reset filters
+            </button>
+          </div>
         )}
         <LiveTree
           ref={treeHandle}
@@ -549,16 +571,6 @@ function LiveWorkspace({
                   ? "Change the filters or send telemetry through your Collector."
                   : "Refresh or resume Live to read stored telemetry."}
               </p>
-              {snapshot && forced && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    apply({ ...route, search: "", service: "", errorsOnly: false, minSeverity: 0 })
-                  }
-                >
-                  Reset filters
-                </button>
-              )}
             </div>
           }
           footer={

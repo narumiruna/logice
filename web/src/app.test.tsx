@@ -5,7 +5,7 @@ import { App } from "./app"
 import { Attributes, Notice } from "./components"
 import { FilterForm } from "./filters"
 import { LogList, LogRecord, TraceList } from "./lists"
-import { parseRoute } from "./telemetry"
+import { filterResetHref, parseRoute } from "./telemetry"
 import { ThemeProvider } from "./theme"
 import { TraceDetail } from "./trace-detail"
 
@@ -106,6 +106,25 @@ describe("telemetry views", () => {
     expect(html).toContain("Traces can be partial")
   })
 
+  it("offers the same filter reset in the form and empty results only when filtered", () => {
+    for (const page of ["traces", "logs"]) {
+      const route = parseRoute(`/${page}?from=${window.from}&to=${window.to}&service=missing`)
+      const resetHref = filterResetHref(route)
+      const form = renderToStaticMarkup(<FilterForm route={route} />)
+      const props = { result: { items: [], hasMore: false }, window, resetHref }
+      const results = renderToStaticMarkup(
+        page === "traces" ? <TraceList {...props} /> : <LogList {...props} />,
+      )
+      for (const html of [form, results]) {
+        expect(html).toContain("Reset filters")
+        expect(html).toContain(resetHref?.replaceAll("&", "&amp;"))
+      }
+      expect(renderToStaticMarkup(<FilterForm route={parseRoute(`/${page}`)} />)).not.toContain(
+        "Reset filters",
+      )
+    }
+  })
+
   it("renders empty states with Collector guidance, not fake records", () => {
     const traces = renderToStaticMarkup(
       <TraceList result={{ items: [], hasMore: false }} window={window} />,
@@ -132,6 +151,9 @@ describe("telemetry views", () => {
     )
     expect(html.match(/<details/g)).toHaveLength(2)
     expect(html).toContain("Show log details")
+    expect(html).toContain("Hide log details")
+    expect(html).toContain('data-label="Timestamp (UTC)"')
+    expect(html).toContain('data-label="Severity"')
     expect(html).toContain("Worker ready")
     expect(html).toContain("Inventory unavailable &lt;script&gt;alert(1)&lt;/script&gt;")
     expect(html).toContain("&lt;img src=x onerror=alert(1)&gt;")

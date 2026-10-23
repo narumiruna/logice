@@ -5,9 +5,11 @@ import { formatDuration, isTraceId, severity, traceHref } from "./telemetry"
 export function TraceList({
   result,
   window,
+  resetHref,
 }: {
   result: ListResult<TraceSummary>
   window: TimeWindow
+  resetHref?: string
 }) {
   const errors = result.items.reduce((total, trace) => total + trace.errorCount, 0)
   const services = new Set(result.items.map((trace) => trace.serviceName)).size
@@ -35,10 +37,10 @@ export function TraceList({
           <span className="muted">Window-bounded summaries</span>
         </div>
         {result.items.length === 0 ? (
-          <EmptyState kind="traces" />
+          <EmptyState kind="traces" resetHref={resetHref} />
         ) : (
           <div className="table-scroll">
-            <table className="data-table trace-table">
+            <table className="data-table record-table trace-table">
               <caption className="sr-only">Traces in the selected time window</caption>
               <thead>
                 <tr>
@@ -57,7 +59,7 @@ export function TraceList({
               <tbody>
                 {result.items.map((trace) => (
                   <tr key={trace.traceId}>
-                    <td>
+                    <td className="trace-identity">
                       <div className="record-name">
                         {isTraceId(trace.traceId) ? (
                           <a href={traceHref(trace.traceId, window)}>
@@ -69,15 +71,19 @@ export function TraceList({
                       </div>
                       <code className="secondary-id">{trace.traceId}</code>
                     </td>
-                    <td>
+                    <td data-label="Service">
                       <span className="service-name">{trace.serviceName || "Unknown service"}</span>
                     </td>
-                    <td className="time-cell">
+                    <td className="time-cell" data-label="Started (UTC)">
                       <Timestamp value={trace.startTime} />
                     </td>
-                    <td className="numeric duration">{formatDuration(trace.durationNs)}</td>
-                    <td className="numeric">{trace.spanCount}</td>
-                    <td>
+                    <td className="numeric duration" data-label="Duration">
+                      {formatDuration(trace.durationNs)}
+                    </td>
+                    <td className="numeric" data-label="Spans">
+                      {trace.spanCount}
+                    </td>
+                    <td data-label="Errors">
                       <Badge
                         label={
                           trace.errorCount
@@ -159,15 +165,18 @@ export function LogTable({
   logs,
   window,
   correlated = false,
+  resetHref,
 }: {
   logs: Log[]
   window: TimeWindow
   correlated?: boolean
+  resetHref?: string
 }) {
-  if (logs.length === 0) return <EmptyState kind={correlated ? "correlated logs" : "logs"} />
+  if (logs.length === 0)
+    return <EmptyState kind={correlated ? "correlated logs" : "logs"} resetHref={resetHref} />
   return (
     <div className="table-scroll">
-      <table className="data-table log-table">
+      <table className="data-table record-table log-table">
         <caption className="sr-only">
           {correlated ? "Correlated logs" : "Logs in the selected time window"}
         </caption>
@@ -183,19 +192,22 @@ export function LogTable({
           {logs.map((log, index) => (
             // biome-ignore lint/suspicious/noArrayIndexKey: This immutable response has no stable log ID; loading unmounts the table before replacement.
             <tr key={`${log.timestamp}-${index}`}>
-              <td className="time-cell">
+              <td className="time-cell" data-label="Timestamp (UTC)">
                 <Timestamp value={log.timestamp} />
               </td>
-              <td>
+              <td data-label="Severity">
                 <Badge {...severity(log)} />
               </td>
-              <td>
+              <td data-label="Service">
                 <span className="service-name">{log.serviceName || "Unknown service"}</span>
               </td>
               <td className="log-content">
                 <pre className="body-preview">{log.body || "(Empty body)"}</pre>
                 <details className="log-expansion">
-                  <summary>Show log details</summary>
+                  <summary>
+                    <span className="log-show-label">Show log details</span>
+                    <span className="log-hide-label">Hide log details</span>
+                  </summary>
                   <LogRecord log={log} window={window} />
                 </details>
               </td>
@@ -207,7 +219,15 @@ export function LogTable({
   )
 }
 
-export function LogList({ result, window }: { result: ListResult<Log>; window: TimeWindow }) {
+export function LogList({
+  result,
+  window,
+  resetHref,
+}: {
+  result: ListResult<Log>
+  window: TimeWindow
+  resetHref?: string
+}) {
   return (
     <>
       <section className="panel" aria-labelledby="log-results">
@@ -217,7 +237,7 @@ export function LogList({ result, window }: { result: ListResult<Log>; window: T
           </h2>
           <span className="muted">Expand a record to inspect attributes</span>
         </div>
-        <LogTable logs={result.items} window={window} />
+        <LogTable logs={result.items} window={window} resetHref={resetHref} />
       </section>
       {result.hasMore && (
         <Truncation>

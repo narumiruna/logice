@@ -85,7 +85,13 @@ export function Attributes({ title, values }: { title: string; values: Record<st
   )
 }
 
-export function EmptyState({ kind }: { kind: "traces" | "logs" | "correlated logs" }) {
+export function EmptyState({
+  kind,
+  resetHref,
+}: {
+  kind: "traces" | "logs" | "correlated logs"
+  resetHref?: string
+}) {
   return (
     <div className="empty-state">
       <span className="empty-symbol" aria-hidden="true">
@@ -93,6 +99,11 @@ export function EmptyState({ kind }: { kind: "traces" | "logs" | "correlated log
       </span>
       <h3>No {kind} in this window</h3>
       <p>Try a wider time range or remove filters.</p>
+      {resetHref && (
+        <a className="button button-secondary empty-reset" href={resetHref}>
+          Reset filters
+        </a>
+      )}
       <p>
         To add local telemetry, send OTLP traces and logs from your application to the Collector
         configured for this validation project.

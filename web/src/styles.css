@@ -240,10 +240,23 @@ input[type="checkbox"] {
 .trace-filter input {
   font-family: "SFMono-Regular", Consolas, monospace;
 }
+.filter-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-top: 12px;
+}
 .filter-note {
   color: var(--color-muted);
-  font-size: 10px;
-  margin-top: 12px;
+  font-size: 11px;
+}
+.filter-reset {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 0;
 }
 .window-label {
   display: flex;
@@ -334,7 +347,7 @@ table {
   padding: 10px 18px;
   background: var(--color-surface-subtle);
   color: var(--color-muted);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   border-bottom: 1px solid var(--color-border-soft);
   white-space: nowrap;
@@ -371,7 +384,7 @@ table {
   font-size: 11px;
 }
 .time-cell {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--color-muted);
   width: 190px;
   min-width: 170px;
@@ -484,6 +497,9 @@ table {
   font-size: 26px;
   margin-bottom: 16px;
 }
+.empty-reset {
+  margin: 4px 0 16px;
+}
 .empty-state h3 {
   color: var(--color-heading);
   margin-bottom: 8px;
@@ -546,13 +562,23 @@ table {
 }
 .log-table {
   min-width: 760px;
+  table-layout: fixed;
 }
-.log-table .log-content {
-  width: 55%;
+.log-table > thead > tr > th:first-child {
+  width: 190px;
+}
+.log-table > thead > tr > th:nth-child(2) {
+  width: 90px;
+}
+.log-table > thead > tr > th:nth-child(3) {
+  width: 160px;
+}
+.log-table .service-name {
+  max-width: 100%;
 }
 .body-preview {
   line-height: 1.7;
-  font-size: 11px;
+  font-size: 12px;
   max-width: 700px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -565,8 +591,16 @@ table {
 .log-expansion > summary {
   display: list-item;
   color: var(--color-accent);
-  font-size: 10px;
+  font-size: 12px;
   width: fit-content;
+  padding: 4px 0;
+}
+.log-hide-label,
+.log-expansion[open] .log-show-label {
+  display: none;
+}
+.log-expansion[open] .log-hide-label {
+  display: inline;
 }
 .log-expansion[open] > summary {
   margin-bottom: 12px;
@@ -894,6 +928,80 @@ details[open] > .span-summary .span-name strong::before {
     max-width: 140px;
     font-size: 10px;
     text-align: right;
+  }
+  .record-table {
+    display: block;
+    min-width: 0;
+  }
+  .record-table > thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .record-table > tbody {
+    display: block;
+  }
+  .record-table > tbody > tr {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    padding: 16px;
+    border-bottom: 1px solid var(--color-border);
+  }
+  .record-table > tbody > tr:last-child {
+    border-bottom: 0;
+  }
+  .record-table > tbody > tr > td {
+    display: block;
+    min-width: 0;
+    width: auto;
+    padding: 0;
+    border: 0;
+    text-align: left;
+    overflow-wrap: anywhere;
+  }
+  .record-table > tbody > tr > td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 4px;
+    color: var(--color-muted);
+    font-family: Inter, ui-sans-serif, sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .trace-table .trace-identity,
+  .trace-table > tbody > tr > td:nth-child(2),
+  .record-table .time-cell,
+  .log-table .log-content {
+    grid-column: 1 / -1;
+    width: auto;
+  }
+  .record-table .record-name,
+  .record-table .service-name {
+    max-width: none;
+    font-size: 13px;
+  }
+  .record-table .secondary-id {
+    font-size: 11px;
+  }
+  .log-table > tbody > tr {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .record-table .body-preview {
+    max-width: none;
+  }
+  .record-table .log-expansion > summary {
+    padding: 7px 0;
+  }
+  .record-table .attribute-table {
+    table-layout: fixed;
+  }
+  .record-table .attribute-table th {
+    min-width: 0;
+    white-space: normal;
   }
   .trace-overview {
     padding: 18px;
