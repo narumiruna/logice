@@ -6,6 +6,7 @@ These examples send traces and standard-library logs to Logice through OTLP/HTTP
 | --- | --- |
 | `send_telemetry.py` | Generate successful and failed checkouts, parent/child spans, correlated logs, and one log without a trace. |
 | `http_server.py` | Run a loopback HTTP server with request spans, child spans, logs, and incoming W3C trace context. |
+| `multi_service.py` | Export cross-service sample traces and logs for `api`, `worker`, `postgres`, and `openai`, without remote service calls. |
 | `telemetry.py` | Configure authenticated exporters, log correlation, and shutdown. |
 | `test_examples.py` | Check protobuf exports with a local test receiver. |
 
@@ -40,6 +41,20 @@ The command prints the service name `python-send-example` and the generated trac
 
 Exporters flush before the process exits. Collector export batching can add a short delay before records appear. Generated IDs do not prove that storage accepted the records; check SDK errors on stderr and verify the records in Logice.
 
+## Generate multiple services
+
+After setting the Collector endpoint above, run:
+
+```sh
+uv run --project examples/python --locked --env-file .env python examples/python/multi_service.py
+```
+
+One run exports four traces, twenty spans, and thirty-six logs across `api`, `worker`, `postgres`, and `openai`. Each trace starts in `api`, continues in `worker` through W3C trace context, and includes database and completion spans. Two requests succeed; two have an intentional completion error with Error spans, ERROR logs, and WARN logs. Each service also emits one uncorrelated completion log.
+
+Open **http://127.0.0.1:5173/live** with the service filter empty to see all four services in the same hierarchy. Remove an existing service filter or select Reset view. Inspect a request to see its recorded IDs, service resources, and correlated logs.
+
+These operations run in one local process and use short real delays. They do not connect to PostgreSQL or call OpenAI. Only the OTLP exports use the network. All spans are completed exports; there is no simulated Running status. The command prints the service names and trace IDs, then flushes exporters and exits.
+
 ## Run the HTTP server
 
 ```sh
@@ -73,6 +88,6 @@ Run from the repository root:
 uv run --project examples/python --locked python -m unittest discover -s examples/python -v
 ```
 
-The four tests need no Docker, credentials, or existing Logice data. They check authenticated OTLP paths and protobuf payloads, span hierarchy, error status, log correlation, HTTP status and trace-context propagation, configuration validation, and logger cleanup. They use a temporary loopback receiver and do not read `.env`.
+The five tests need no Docker, credentials, or existing Logice data. They check authenticated OTLP paths and protobuf payloads, span hierarchy, cross-service resource names, error status, log correlation, HTTP status and trace-context propagation, configuration validation, and logger cleanup. They use a temporary loopback receiver and do not read `.env`.
 
 A separate local check on Python 3.14.7 ran both examples against the pinned Collector and ClickHouse images in a unique disposable Compose project. It verified eight stored spans, eleven logs, expected Error status and ERROR severity, and trace correlation. That check did not use operator credentials or data; its containers, network, and volume were removed.

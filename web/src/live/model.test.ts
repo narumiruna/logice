@@ -213,6 +213,8 @@ describe("nanosecond time mapping and bounded reconciliation", () => {
     const later = record("r2", { startTime: "2026-10-23T00:00:00.000000501Z", durationNs: "100" })
     const log = record("r3", { kind: "log", startTime: later.startTime, durationNs: "90000" })
     const other = record("r4", { traceId: "a".repeat(32), durationNs: "500" })
+    const tree = buildTree(snapshot([first, later, log, other]))
+    expect(tree.scaleNs).toBe(1000n)
     const timings = timeRatios([first, later, log, other])
     expect(timings.get(first.id)).toEqual({ offsetRatio: 0, durationRatio: 1 })
     expect(timings.get(later.id)).toEqual({ offsetRatio: 0.5, durationRatio: 0.1 })
@@ -224,6 +226,14 @@ describe("nanosecond time mapping and bounded reconciliation", () => {
     expect(boundedRatio(-1n, 10n)).toBe(0)
     expect(boundedRatio(20n, 10n)).toBe(1)
     expect(boundedRatio(9_007_199_254_740_993n, 18_014_398_509_481_986n)).toBe(0.5)
+  })
+  it("exposes an exact shared timing scale without counting log duration or unused context", () => {
+    const root = record("r1", { durationNs: "9007199254740993" })
+    const unused = record("r2", { contextOnly: true, durationNs: "999999999999999999" })
+    const log = record("r3", { kind: "log", spanId: root.spanId, durationNs: "999999999999999999" })
+    expect(buildTree(snapshot([root, log, unused])).scaleNs).toBe(9007199254740993n)
+    expect(buildTree(snapshot([])).scaleNs).toBe(1n)
+    expect(buildTree(snapshot([record("r4", { durationNs: "0" })])).scaleNs).toBe(1n)
   })
   it("counts logical new records relative only to the previous bounded response", () => {
     const first = snapshot([record("r1")])

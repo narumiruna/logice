@@ -20,6 +20,7 @@ export interface LiveTree {
   children: Map<string | null, string[]>
   roots: string[]
   timings: Map<string, LiveTiming>
+  scaleNs: bigint
   issues: Map<string, string>
 }
 export function isSpanId(id: string): boolean {
@@ -44,10 +45,9 @@ export function boundedRatio(value: bigint, scale: bigint): number {
   if (value >= scale) return 1
   return Number((value * 1_000_000_000n) / scale) / 1_000_000_000
 }
-export function timeRatios(records: Iterable<LiveRecord>): Map<string, LiveTiming> {
-  const rows = [...records]
+function timingBounds(records: Iterable<LiveRecord>) {
   const bounds = new Map<string, { from: bigint; to: bigint }>()
-  for (const item of rows) {
+  for (const item of records) {
     const start = timestampNs(item.startTime) ?? 0n
     const end = start + (item.kind === "span" ? BigInt(item.durationNs) : 0n)
     const key = groupId(item)
@@ -59,6 +59,11 @@ export function timeRatios(records: Iterable<LiveRecord>): Map<string, LiveTimin
   }
   let scale = 1n
   for (const { from, to } of bounds.values()) if (to - from > scale) scale = to - from
+  return { bounds, scale }
+}
+export function timeRatios(records: Iterable<LiveRecord>): Map<string, LiveTiming> {
+  const rows = [...records]
+  const { bounds, scale } = timingBounds(rows)
   return new Map(
     rows.map((item) => {
       const from = bounds.get(groupId(item))?.from ?? 0n
@@ -198,6 +203,7 @@ export function buildTree(
     children,
     roots,
     timings: timeRatios(byId.values()),
+    scaleNs: timingBounds(byId.values()).scale,
     issues,
   }
   return expanded ? flatten(tree, expanded, forced) : tree

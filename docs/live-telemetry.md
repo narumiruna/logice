@@ -9,16 +9,33 @@ This stack has no user authentication or dynamic project authorization. Keep it 
 ## Use the page
 
 1. Send telemetry through the existing Collector using the [Python examples](../examples/python/README.md) or your instrumented application.
-2. Open **Live**. The server resolves the default five-minute rolling window. Select one, five, or fifteen minutes, then select **Apply filters**.
+2. Open **Live**. The server resolves the default five-minute rolling window. Select one, five, or fifteen minutes. Select **Apply** in the search box, or press Enter there, to submit changes.
 3. Apply an exact service name, literal text, Errors only, or minimum log severity.
+   - These controls edit a draft until you select Apply. The Apply button changes color when the draft differs from the applied query.
+   - Service suggestions come from the current bounded response. You can also type an exact name that is not in the suggestions.
    - Text matches span names, log bodies, and trace/span IDs, without case sensitivity. It does not search attributes or execute SQL.
    - Errors only matches Error spans and logs with severity at least 17. Minimum severity applies only to logs.
    - Ancestors that do not match remain marked **Context** when available. They do not increase matching counts.
 4. Expand rows or enable Auto-expand. Select a message, or use the tree's arrow keys and Enter, to open the inspector.
-   - The inspector shows recorded IDs, timestamps, status/severity, attributes, scope, and stored JSON. Escape closes it and restores focus.
+   - The inspector shows recorded IDs, exact timestamps, status/severity, attributes, scope, schema URLs, trace flags, and stored JSON. Filter attributes by key or value, collapse groups, or copy a field. Escape closes the inspector and restores focus.
+   - The JSON preview shows at most 65,536 characters. Copy stored record JSON copies the complete stored projection, not the UI wrapper or original OTLP.
    - Logs without a usable recorded span remain visible. Missing parents, cycles, ambiguous parents, and malformed identifiers are labeled; no parent relationship is invented.
    - Open a trace link to inspect that trace in the retained absolute time window.
 5. Disable Follow latest by scrolling away from the bottom. Newly visible records do not move your reading position. Select **Jump to latest** to follow again.
+
+## Feed layout and controls
+
+Live uses the Design preview's compact query row, service color chips, connected hierarchy, direct-child counts, timing grid, and right-side inspector. It uses real stored telemetry, not the preview's simulated clock or records.
+
+- Service colors stay stable when results are reordered or filtered. Long names and messages use ellipsis; their full values are available in tooltips and the inspector.
+- Row timestamps show UTC seconds. Tooltips and the inspector retain the exact recorded timestamp.
+- Timing bars use one shared duration scale, shown in the column heading, with an offset relative to the earliest retained record in each trace. Error spans have red bars and an error badge. Logs have a severity-colored time marker and no duration.
+- Collapse all also disables Auto-expand. With query filters applied, expansion controls are disabled while matching ancestry paths remain open. Context ancestors do not count as matches.
+- Columns hides or shows column headings; it does not remove records or clear selection. Narrow feeds omit timing and duration columns; exact values remain available in the inspector.
+- Newly arrived records receive a short highlight. Reduced-motion mode disables this animation without stopping polling.
+- The feed footer shows update state, last successful update time, visible row count, and Follow latest. The count describes expanded logical rows, not histogram volume or a complete trace.
+- Refresh reads the represented query again. Reset view restores the five-minute Live query, clears filters and selection, and enables Auto-expand, Columns, and Follow latest. It does not delete stored telemetry.
+- `/` focuses search outside text controls and the inspector. Tree arrow keys navigate and expand records; Enter opens details. Inspector tabs support arrow keys, Home, and End. On narrow screens the inspector is a modal dialog.
 
 SDKs normally export spans after they end. Live shows stored spans; it does not infer Running status or increase durations on a timer. `Unset`, `Ok`, and `Error` are different statuses. An incomplete trace is not evidence that a span is still running.
 
@@ -34,6 +51,8 @@ A visible, online Live page sends one snapshot request at a time. It schedules t
   - A paused URL without a resolved window stays idle unless Refresh was requested. Query changes and page cleanup cancel any older interrupted request.
 - Transient failures retain the last response as stale and retry after 2, 4, 8, 16, then at most 30 seconds. Manual retry is available. Invalid queries, oversized responses, malformed API data, and unsupported endpoints stop automatic retries.
 - A future 401/403 response clears retained telemetry and stops updates. This behavior is not an authentication implementation.
+
+The compact histogram has five UTC axis labels. Bucket accessible names and tooltips include exact stored-row counts. Empty buckets have no volume bar. A drag highlights its selected range and freezes the displayed buckets and bounds until release; Escape, pointer cancellation, or lost capture cancels without zooming. The Now marker appears only for a healthy Live result; other views show Window end.
 
 The histogram counts matching **stored rows**, including repeated identical content, before feed caps. Its 60 server-counted buckets are not calculated from the rendered rows. Select a bucket, use the arrow keys to focus another bucket and Enter to select, or drag a range to pause and zoom. Selections narrower than one second expand inside the displayed bounds to the one-second minimum. Explicit **Fixed UTC interval** inputs also accept nanosecond timestamps.
 
@@ -86,6 +105,6 @@ See [validation evidence](validation.md) for real-service/browser tests, limits,
 
 ## Review and release restrictions
 
-The user can review layout density, hierarchy, inspector placement, colors, and motion using local `/live` and the prepared desktop/mobile captures. Automated tests do not establish subjective visual acceptance or full accessibility conformance.
+The user can review layout density, hierarchy, inspector placement, colors, and motion using local `/live` and the prepared desktop/mobile captures. The preview-parity update was checked with 239 unit tests and 67 Chromium workflows. Captures include `web/test-results/live-layout-*/`, theme views, and real local Python telemetry in `web/test-results/live-local-*.png`. Automated tests do not establish subjective visual acceptance or full accessibility conformance.
 
 Public use still requires separate authentication/project isolation, hostname/Tunnel configuration, production roles and migrations, approved retention/loss budgets, and backup/key recovery. Local Live completion does not close those release gates or the initial stack acceptance condition. No credentials or public deployment are required for this local page.

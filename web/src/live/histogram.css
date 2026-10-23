@@ -1,0 +1,122 @@
+/* Override the shared preview and legacy Live histogram styles with scoped rules. */
+.lp-root .lv-overview.lp-overview {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 8px 13px 7px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-panel);
+  background: var(--color-surface);
+  overflow: hidden;
+}
+.lv-overview .lp-overview-caption {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 2px 12px;
+  margin-bottom: 3px;
+  font-size: 9px;
+  color: var(--color-muted);
+}
+.lv-overview .lp-overview-caption strong {
+  font-weight: 600;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+.lv-overview .lv-hist-window {
+  white-space: nowrap;
+}
+.lv-overview .lv-hist-window[data-live="true"] {
+  color: var(--color-accent);
+}
+.lv-overview .lv-histogram {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  height: 38px;
+  border-bottom: 1px solid var(--color-border);
+  touch-action: none;
+  user-select: none;
+}
+.lv-overview .lv-histogram[data-live="true"]::after {
+  content: "";
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  bottom: 0;
+  border-right: 1px dashed var(--chart-accent);
+  pointer-events: none;
+}
+.lp-root .lv-overview .lv-histogram button {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  cursor: crosshair;
+}
+.lp-root .lv-overview .lv-histogram button:hover {
+  background: var(--color-surface-hover);
+}
+.lp-root .lv-overview .lv-histogram button:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+  z-index: 2;
+}
+.lv-overview .lv-histogram button > span {
+  position: absolute;
+  left: 18.75%;
+  right: 18.75%;
+  bottom: 0;
+  background: var(--chart-primary);
+  border-radius: 1.5px 1.5px 0 0;
+  pointer-events: none;
+}
+.lv-overview .lv-histogram button > .lv-hist-error {
+  background: var(--chart-error);
+}
+.lv-overview .lv-hist-selection {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 1;
+  box-sizing: border-box;
+  border: 1px solid var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 16%, transparent);
+  pointer-events: none;
+}
+.lv-overview .lp-time-axis {
+  display: flex;
+  justify-content: space-between;
+  gap: 2px;
+  margin-top: 4px;
+  font:
+    9px "SFMono-Regular",
+    Consolas,
+    monospace;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-muted);
+}
+.lv-overview .lp-time-axis time {
+  flex-shrink: 0;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+.lv-overview .lv-hist-hint {
+  margin-top: 3px;
+  color: var(--color-muted);
+  font-size: 9px;
+}
+@media (max-width: 700px) {
+  .lp-root .lv-overview.lp-overview {
+    padding: 7px 8px;
+  }
+  .lv-overview .lp-time-axis {
+    font-size: 8px;
+  }
+}
