@@ -9,7 +9,7 @@ services:
       CLICKHOUSE_ADDR: clickhouse:9000
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?Set CLICKHOUSE_PASSWORD}
       AUTH_ORIGIN: ${AUTH_ORIGIN:-http://localhost:5173}
-      AUTH_ENCRYPTION_KEY: ${AUTH_ENCRYPTION_KEY:?Set AUTH_ENCRYPTION_KEY to exactly 64 hex characters}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?Set ENCRYPTION_KEY to exactly 64 hex characters}
       PGHOST: postgres
       PGPORT: "5432"
       PGUSER: logice

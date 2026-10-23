@@ -12,7 +12,7 @@ export COMPOSE_DISABLE_ENV_FILE=1
 export POSTGRES_PASSWORD="$(openssl rand -hex 32)"
 export CLICKHOUSE_PASSWORD="$(openssl rand -hex 32)"
 export OTLP_TOKEN="$(openssl rand -hex 32)"
-export AUTH_ENCRYPTION_KEY="$(openssl rand -hex 32)"
+export ENCRYPTION_KEY="$(openssl rand -hex 32)"
 
 compose() {
   timeout --kill-after=5s 180 docker compose --project-directory "$root" --project-name "$project" \
@@ -93,7 +93,7 @@ timeout --kill-after=5s 20 docker run --detach --name "$replacement" \
   --network "${project}_default" --network-alias api \
   --env CLICKHOUSE_ADDR=clickhouse:9000 --env CLICKHOUSE_PASSWORD \
   --env PGHOST=postgres --env PGPORT=5432 --env PGUSER=logice --env PGDATABASE=logice \
-  --env PGPASSWORD="$POSTGRES_PASSWORD" --env AUTH_ORIGIN --env AUTH_ENCRYPTION_KEY \
+  --env PGPASSWORD="$POSTGRES_PASSWORD" --env AUTH_ORIGIN --env ENCRYPTION_KEY \
   "$image" -listen 0.0.0.0:8080 > /dev/null
 new_ip=$(timeout --kill-after=5s 20 docker inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$replacement")
 test -n "$old_ip"

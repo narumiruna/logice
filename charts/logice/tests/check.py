@@ -79,7 +79,7 @@ def check_resources(documents, prefix, secret="test-secret", origin="https://log
                     ref = env["valueFrom"]["secretKeyRef"]
                     assert ref["name"] == secret
                     assert ref["key"] in {
-                        "CLICKHOUSE_PASSWORD", "OTLP_TOKEN", "AUTH_ENCRYPTION_KEY", "POSTGRES_PASSWORD"
+                        "CLICKHOUSE_PASSWORD", "OTLP_TOKEN", "ENCRYPTION_KEY", "POSTGRES_PASSWORD"
                     }
         for volume in pod["spec"].get("volumes", []):
             if "configMap" in volume:
@@ -100,7 +100,7 @@ def check_resources(documents, prefix, secret="test-secret", origin="https://log
     assert migration["securityContext"] == api["securityContext"]
     env = {item["name"]: item for item in api_env}
     assert env["AUTH_ORIGIN"]["value"] == origin
-    assert env["AUTH_ENCRYPTION_KEY"]["valueFrom"]["secretKeyRef"]["key"] == "AUTH_ENCRYPTION_KEY"
+    assert env["ENCRYPTION_KEY"]["valueFrom"]["secretKeyRef"]["key"] == "ENCRYPTION_KEY"
     for key, value in {
         "PGHOST": f"{prefix}-postgres", "PGPORT": "5432",
         "PGUSER": "logice", "PGDATABASE": "logice",
@@ -157,7 +157,7 @@ def main():
     assert compose["migrate"]["build"] == compose["api"]["build"]
     assert compose["migrate"]["environment"] == compose["api"]["environment"]
     assert compose["api"]["environment"]["AUTH_ORIGIN"] == "${AUTH_ORIGIN:-http://localhost:5173}"
-    assert "AUTH_ENCRYPTION_KEY:?" in compose["api"]["environment"]["AUTH_ENCRYPTION_KEY"]
+    assert "ENCRYPTION_KEY:?" in compose["api"]["environment"]["ENCRYPTION_KEY"]
     assert compose["api"]["environment"]["PGPASSWORD"] == compose["postgres"]["environment"]["POSTGRES_PASSWORD"]
     # Match Argo CD Application creation: no values file or parameters.
     helm("lint", str(CHART), "--strict", values={})

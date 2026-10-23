@@ -11,8 +11,8 @@ See [authentication](../../docs/authentication.md) and the [Passkey operator run
 - Kubernetes 1.26 or later and Helm 3.
 - A default StorageClass, or explicit `clickhouse.persistence.storageClass` and `postgres.persistence.storageClass` values.
 - API and web images from the same tested authentication-capable revision.
-- Namespace-local `logice-secrets` with `CLICKHOUSE_PASSWORD`, `OTLP_TOKEN`, `POSTGRES_PASSWORD`, and `AUTH_ENCRYPTION_KEY`.
-  - `AUTH_ENCRYPTION_KEY` must be exactly 64 hex characters (32 bytes AES-256-GCM).
+- Namespace-local `logice-secrets` with `CLICKHOUSE_PASSWORD`, `OTLP_TOKEN`, `POSTGRES_PASSWORD`, and `ENCRYPTION_KEY`.
+  - `ENCRYPTION_KEY` must be exactly 64 hex characters (32 bytes AES-256-GCM).
   - Generate it with `openssl rand -hex 32`; back it up separately from PostgreSQL.
 - A namespace-local image pull Secret if packages are private.
 - Argo CD repository access and a restricted AppProject if using GitOps.
@@ -48,7 +48,7 @@ kubectl -n logice create secret generic logice-secrets \
   --from-file=CLICKHOUSE_PASSWORD=/secure/path/clickhouse-password \
   --from-file=OTLP_TOKEN=/secure/path/otlp-token \
   --from-file=POSTGRES_PASSWORD=/secure/path/postgres-password \
-  --from-file=AUTH_ENCRYPTION_KEY=/secure/path/auth-encryption-key
+  --from-file=ENCRYPTION_KEY=/secure/path/auth-encryption-key
 ```
 
 For an existing installation, merge the two new keys through the secret manager without deleting or changing existing values. Never put credentials in Git, Helm values, or the Application. The chart generates no Secrets, random values, or install hooks. Offline rendering cannot check Secret existence or key contents. Missing keys block container startup; malformed encryption keys must stop the backend.
@@ -60,7 +60,7 @@ Secret changes do not restart running Pods. Coordinate credential changes and re
 The API and its migration initContainer share the image, environment, and restricted security context:
 
 - `AUTH_ORIGIN` comes from `api.authOrigin`.
-- `AUTH_ENCRYPTION_KEY` references the same-named Secret key.
+- `ENCRYPTION_KEY` references the same-named Secret key.
 - `PGHOST` names the release's PostgreSQL Service, with `PGPORT=5432`, `PGUSER=logice`, and `PGDATABASE=logice`.
 - `PGPASSWORD` references `POSTGRES_PASSWORD`. No plaintext password or credential-bearing URL is placed in values.
 
