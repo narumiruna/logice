@@ -104,9 +104,8 @@ func (s *Service) Wrap(next http.Handler) http.Handler {
 		}
 		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()
-		r = r.WithContext(ctx)
 		if strings.HasPrefix(r.URL.Path, "/api/auth/") {
-			s.serve(w, r)
+			s.serve(w, r.WithContext(ctx))
 			return
 		}
 		if s.pool == nil {
@@ -114,6 +113,7 @@ func (s *Service) Wrap(next http.Handler) http.Handler {
 			return
 		}
 		_, err := sessionUser(ctx, s.pool, s.readCookie(r, "session"))
+		cancel()
 		if errors.Is(err, errDenied) {
 			denied(w)
 			return
@@ -122,6 +122,8 @@ func (s *Service) Wrap(next http.Handler) http.Handler {
 			unavailable(w)
 			return
 		}
+		// Query handlers own their deadlines. Preserve client cancellation, but
+		// do not pass the authentication deadline into telemetry work.
 		next.ServeHTTP(w, r)
 	})
 }
