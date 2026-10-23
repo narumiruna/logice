@@ -14,6 +14,10 @@ api:
       memory: 128Mi
 
 web:
+  # The UI and query API have no authentication. Restrict node network access.
+  service:
+    type: NodePort
+    nodePort: 30173
   image:
     repository: ghcr.io/narumiruna/logice-web
     tag: latest
@@ -56,7 +60,7 @@ collector:
     limits:
       memory: 256Mi
 
-# No public endpoints by default. Restrict access before enabling Ingress.
+# Ingress is off. Web is already exposed through NodePort by default.
 ingress:
   enabled: false
   className: ""

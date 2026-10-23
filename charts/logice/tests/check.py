@@ -56,8 +56,13 @@ def check_resources(documents, prefix, secret="test-secret"):
             assert container[probe]["httpGet"]["port"] in {
                 port["name"] for port in container["ports"]
             }
-        service = objects["Service", f"{prefix}-{component}"]
-        assert service["spec"]["type"] == "ClusterIP"
+        service_name = "logice-tunnel" if component == "web" else f"{prefix}-{component}"
+        service = objects["Service", service_name]
+        assert service["spec"]["type"] == ("NodePort" if component == "web" else "ClusterIP")
+        if component == "web":
+            assert service["spec"]["ports"][0]["nodePort"] == 30173
+        else:
+            assert all("nodePort" not in port for port in service["spec"]["ports"])
         assert service["spec"]["selector"] == pod["metadata"]["labels"]
         assert all(
             port["targetPort"] in {p["name"] for p in container["ports"]}
@@ -150,7 +155,7 @@ def main():
     assert ingress["spec"]["tls"][0]["secretName"] == "logice-tls"
     rule = ingress["spec"]["rules"][0]
     assert rule["host"] == "logice.internal.example.com"
-    assert rule["http"]["paths"][0]["backend"]["service"]["name"] == "other-logice-web"
+    assert rule["http"]["paths"][0]["backend"]["service"]["name"] == "logice-tunnel"
     for item in documents:
         if item["kind"] == "Deployment":
             assert item["spec"]["template"]["spec"]["imagePullSecrets"] == [{"name": "private-registry"}]
@@ -159,6 +164,10 @@ def main():
     _, documents = render({**VALUES, "clickhouse.persistence.storageClass": "fast-private"})
     pvc = next(item for item in documents if item["kind"] == "PersistentVolumeClaim")
     assert pvc["spec"]["storageClassName"] == "fast-private"
+    _, documents = render({**VALUES, "web.service.type": "ClusterIP"})
+    web_service = next(item for item in documents if item["kind"] == "Service" and item["metadata"]["name"] == "logice-tunnel")
+    assert web_service["spec"]["type"] == "ClusterIP"
+    assert "nodePort" not in web_service["spec"]["ports"][0]
     print("Helm lint and chart render checks passed")
 
 

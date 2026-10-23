@@ -67,12 +67,14 @@ See [values.yaml](values.yaml) for resource limits, storage, telemetry TTL, and 
 
 ## Access and ingestion
 
-All four Services use `ClusterIP`. No LoadBalancer, NodePort, Collector Ingress, or public database endpoint is created. This is not network isolation: other cluster workloads can reach these Services unless your cluster applies NetworkPolicies.
+The Web Service is named `logice-tunnel` and uses NodePort `30173` by default. Open `http://<node-ip>:30173`; on OrbStack, try `http://localhost:30173`. The name does not create a tunnel or provide authentication. Restrict access to the node port because the UI and query API have no authentication. Set `web.service.type: ClusterIP` to disable NodePort, or change `web.service.nodePort` if the port is already allocated. Only one release per namespace can use the fixed `logice-tunnel` Service name.
+
+The API, ClickHouse, and Collector Services remain `ClusterIP`. No LoadBalancer, Collector Ingress, or public database endpoint is created. Other cluster workloads can reach these Services unless your cluster applies NetworkPolicies.
 
 For the example release name `logice`, use:
 
 ```sh
-kubectl -n logice port-forward service/logice-logice-web 5173:8080
+kubectl -n logice port-forward service/logice-tunnel 5173:8080
 kubectl -n logice port-forward service/logice-logice-collector 4318:4318
 ```
 

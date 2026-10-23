@@ -3,12 +3,12 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "logice.name" $ }}-{{ $component }}
+  name: {{ if eq $component "web" }}logice-tunnel{{ else }}{{ include "logice.name" $ }}-{{ $component }}{{ end }}
   labels:
     {{- include "logice.labels" $ | nindent 4 }}
     app.kubernetes.io/component: {{ $component }}
 spec:
-  type: ClusterIP
+  type: {{ if eq $component "web" }}{{ $.Values.web.service.type }}{{ else }}ClusterIP{{ end }}
   selector:
     app.kubernetes.io/name: logice
     app.kubernetes.io/instance: {{ $.Release.Name | quote }}
@@ -18,5 +18,8 @@ spec:
     - name: {{ .name }}
       port: {{ .port }}
       targetPort: {{ .name }}
+      {{- if and (eq $component "web") (eq $.Values.web.service.type "NodePort") }}
+      nodePort: {{ $.Values.web.service.nodePort }}
+      {{- end }}
     {{- end }}
 {{- end }}
