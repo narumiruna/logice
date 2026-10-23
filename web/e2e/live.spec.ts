@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto"
-import { expect, test } from "@playwright/test"
 import type { LiveSnapshot } from "../src/live/api"
+import { expect, test } from "./auth-fixtures"
 import { assertBuckets, testTarget } from "./live-fixtures"
 
 test("Live automatically shows real post-open Collector exports, freezes while paused, and discovers late context", async ({

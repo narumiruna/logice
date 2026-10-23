@@ -7,6 +7,8 @@ metadata:
     app.kubernetes.io/component: api
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app.kubernetes.io/name: logice
@@ -24,6 +26,23 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      initContainers:
+        - name: migrate
+          image: {{ printf "%s:%s" .Values.api.image.repository .Values.api.image.tag | quote }}
+          imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+          args: ["migrate"]
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          env:
+            {{- include "logice.apiEnv" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.api.resources | nindent 12 }}
       containers:
         - name: api
           image: {{ printf "%s:%s" .Values.api.image.repository .Values.api.image.tag | quote }}
@@ -38,13 +57,7 @@ spec:
             capabilities:
               drop: [ALL]
           env:
-            - name: CLICKHOUSE_ADDR
-              value: {{ include "logice.name" . }}-clickhouse:9000
-            - name: CLICKHOUSE_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.existingSecret | quote }}
-                  key: CLICKHOUSE_PASSWORD
+            {{- include "logice.apiEnv" . | nindent 12 }}
           ports:
             - name: http
               containerPort: 8080

@@ -13,7 +13,7 @@ import (
 func (s *stack) checkConfig() {
 	s.t.Helper()
 	s.t.Log("verify required credentials and isolated random loopback bindings")
-	for _, key := range []string{"POSTGRES_PASSWORD", "CLICKHOUSE_PASSWORD", "OTLP_TOKEN"} {
+	for _, key := range []string{"POSTGRES_PASSWORD", "CLICKHOUSE_PASSWORD", "OTLP_TOKEN", "AUTH_ENCRYPTION_KEY"} {
 		var env []string
 		for _, entry := range s.env {
 			if !strings.HasPrefix(entry, key+"=") {
@@ -49,8 +49,8 @@ func (s *stack) checkConfig() {
 	// Parse only selected fields. Never log the rendered configuration,
 	// because it contains environment credentials.
 	s.must("decode Compose config", json.Unmarshal([]byte(s.run("config", "--format", "json")), &config))
-	if len(config.Services) != 5 {
-		s.t.Fatal("expected api, web, postgres, clickhouse, and collector services")
+	if len(config.Services) != 6 {
+		s.t.Fatal("expected api, migrate, web, postgres, clickhouse, and collector services")
 	}
 	api, hasAPI := config.Services["api"]
 	web, hasWeb := config.Services["web"]

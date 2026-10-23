@@ -36,7 +36,7 @@ def render(values=None, release="test"):
     return output, [item for item in yaml.safe_load_all(output) if item]
 
 
-def check_resources(documents, prefix, secret="test-secret"):
+def check_resources(documents, prefix, secret="test-secret", origin="https://logice.narumi.dev"):
     objects = {(item["kind"], item["metadata"]["name"]): item for item in documents}
     assert len(objects) == len(documents), "Duplicate object names"
     assert not any(item["kind"] == "Secret" for item in documents)
@@ -45,7 +45,7 @@ def check_resources(documents, prefix, secret="test-secret"):
         for item in documents
         if item["kind"] == "Deployment"
     }
-    assert set(deployments) == {"api", "web", "collector", "clickhouse"}
+    assert set(deployments) == {"api", "web", "collector", "clickhouse", "postgres"}
     for component, deployment in deployments.items():
         pod = deployment["spec"]["template"]
         assert deployment["spec"]["replicas"] == 1
@@ -53,9 +53,14 @@ def check_resources(documents, prefix, secret="test-secret"):
         assert deployment["spec"]["selector"]["matchLabels"] == pod["metadata"]["labels"]
         container = pod["spec"]["containers"][0]
         for probe in ("startupProbe", "readinessProbe", "livenessProbe"):
-            assert container[probe]["httpGet"]["port"] in {
-                port["name"] for port in container["ports"]
-            }
+            if component == "postgres":
+                assert container[probe]["exec"]["command"] == [
+                    "pg_isready", "-h", "127.0.0.1", "-U", "logice", "-d", "logice"
+                ]
+            else:
+                assert container[probe]["httpGet"]["port"] in {
+                    port["name"] for port in container["ports"]
+                }
         service_name = "logice-tunnel" if component == "web" else f"{prefix}-{component}"
         service = objects["Service", service_name]
         assert service["spec"]["type"] == ("NodePort" if component == "web" else "ClusterIP")
@@ -68,11 +73,14 @@ def check_resources(documents, prefix, secret="test-secret"):
             port["targetPort"] in {p["name"] for p in container["ports"]}
             for port in service["spec"]["ports"]
         )
-        for env in container.get("env", []):
-            if "valueFrom" in env:
-                ref = env["valueFrom"]["secretKeyRef"]
-                assert ref["name"] == secret
-                assert ref["key"] in {"CLICKHOUSE_PASSWORD", "OTLP_TOKEN"}
+        for workload in [container, *pod["spec"].get("initContainers", [])]:
+            for env in workload.get("env", []):
+                if "valueFrom" in env:
+                    ref = env["valueFrom"]["secretKeyRef"]
+                    assert ref["name"] == secret
+                    assert ref["key"] in {
+                        "CLICKHOUSE_PASSWORD", "OTLP_TOKEN", "AUTH_ENCRYPTION_KEY", "POSTGRES_PASSWORD"
+                    }
         for volume in pod["spec"].get("volumes", []):
             if "configMap" in volume:
                 assert ("ConfigMap", volume["configMap"]["name"]) in objects
@@ -81,6 +89,44 @@ def check_resources(documents, prefix, secret="test-secret"):
 
     api_env = deployments["api"]["spec"]["template"]["spec"]["containers"][0]["env"]
     assert api_env[0]["value"] == f"{prefix}-clickhouse:9000"
+    api_pod = deployments["api"]["spec"]["template"]["spec"]
+    api = api_pod["containers"][0]
+    migration = api_pod["initContainers"][0]
+    assert migration["name"] == "migrate"
+    assert migration["args"] == ["migrate"]
+    assert migration["image"] == api["image"]
+    assert migration["imagePullPolicy"] == api["imagePullPolicy"]
+    assert migration["env"] == api_env
+    assert migration["securityContext"] == api["securityContext"]
+    env = {item["name"]: item for item in api_env}
+    assert env["AUTH_ORIGIN"]["value"] == origin
+    assert env["AUTH_ENCRYPTION_KEY"]["valueFrom"]["secretKeyRef"]["key"] == "AUTH_ENCRYPTION_KEY"
+    for key, value in {
+        "PGHOST": f"{prefix}-postgres", "PGPORT": "5432",
+        "PGUSER": "logice", "PGDATABASE": "logice",
+    }.items():
+        assert env[key]["value"] == value
+    assert env["PGPASSWORD"]["valueFrom"]["secretKeyRef"]["key"] == "POSTGRES_PASSWORD"
+    postgres_pod = deployments["postgres"]["spec"]["template"]["spec"]
+    postgres = postgres_pod["containers"][0]
+    compose = yaml.safe_load((CHART.parents[1] / "compose.yaml").read_text())
+    assert postgres["image"] == compose["services"]["postgres"]["image"]
+    pg_env = {item["name"]: item for item in postgres["env"]}
+    assert pg_env["POSTGRES_USER"]["value"] == "logice"
+    assert pg_env["POSTGRES_DB"]["value"] == "logice"
+    assert pg_env["POSTGRES_PASSWORD"]["valueFrom"]["secretKeyRef"]["key"] == "POSTGRES_PASSWORD"
+    assert postgres_pod["securityContext"]["fsGroup"] == 70
+    assert postgres_pod["securityContext"]["runAsUser"] == 70
+    assert postgres["securityContext"]["readOnlyRootFilesystem"] is True
+    assert {mount["mountPath"] for mount in postgres["volumeMounts"]} == {
+        "/var/lib/postgresql", "/var/run/postgresql", "/tmp"
+    }
+    assert deployments["api"]["spec"]["strategy"]["type"] == "Recreate"
+    assert deployments["postgres"]["spec"]["strategy"]["type"] == "Recreate"
+    pg_pvc = objects["PersistentVolumeClaim", f"{prefix}-postgres"]
+    assert pg_pvc["spec"]["resources"]["requests"]["storage"] == "5Gi"
+    assert pg_pvc["metadata"]["annotations"]["helm.sh/resource-policy"] == "keep"
+    assert pg_pvc["metadata"]["annotations"]["argocd.argoproj.io/sync-options"] == "Prune=false,Delete=false"
     assert deployments["clickhouse"]["spec"]["strategy"]["type"] == "Recreate"
     assert deployments["collector"]["spec"]["strategy"]["type"] == "Recreate"
     pvc = objects["PersistentVolumeClaim", f"{prefix}-clickhouse"]
@@ -104,6 +150,15 @@ def check_resources(documents, prefix, secret="test-secret"):
 
 
 def main():
+    compose = yaml.safe_load((CHART.parents[1] / "compose.yaml").read_text())["services"]
+    assert compose["api"]["depends_on"]["migrate"]["condition"] == "service_completed_successfully"
+    assert compose["migrate"]["depends_on"]["postgres"]["condition"] == "service_healthy"
+    assert compose["migrate"]["command"] == ["migrate"]
+    assert compose["migrate"]["build"] == compose["api"]["build"]
+    assert compose["migrate"]["environment"] == compose["api"]["environment"]
+    assert compose["api"]["environment"]["AUTH_ORIGIN"] == "${AUTH_ORIGIN:-http://localhost:5173}"
+    assert "AUTH_ENCRYPTION_KEY:?" in compose["api"]["environment"]["AUTH_ENCRYPTION_KEY"]
+    assert compose["api"]["environment"]["PGPASSWORD"] == compose["postgres"]["environment"]["POSTGRES_PASSWORD"]
     # Match Argo CD Application creation: no values file or parameters.
     helm("lint", str(CHART), "--strict", values={})
     defaults = helm(
@@ -113,7 +168,7 @@ def main():
     )
     assert defaults == render({}, release="logice")[0]
     documents = [item for item in yaml.safe_load_all(defaults) if item]
-    assert len(documents) == 12
+    assert len(documents) == 15
     check_resources(documents, "logice-logice", secret="logice-secrets")
     for item in documents:
         if item["kind"] == "Deployment":
@@ -125,11 +180,11 @@ def main():
     helm("lint", str(CHART), "--strict")
     output, documents = render()
     assert output == render()[0], "Rendering must be deterministic"
-    assert len(documents) == 12
+    assert len(documents) == 15
     check_resources(documents, "test-logice")
-    pvc = next(item for item in documents if item["kind"] == "PersistentVolumeClaim")
-    assert "storageClassName" not in pvc["spec"]
-    for key in VALUES:
+    for pvc in (item for item in documents if item["kind"] == "PersistentVolumeClaim"):
+        assert "storageClassName" not in pvc["spec"]
+    for key in (*VALUES, "api.authOrigin"):
         values = {**VALUES, key: ""}
         failure = helm("template", "test", str(CHART), values=values, succeeds=False)
         assert key in failure
@@ -142,14 +197,16 @@ def main():
         **VALUES,
         "ingress.enabled": "true",
         "ingress.host": "logice.internal.example.com",
+        "api.authOrigin": "https://logice.internal.example.com",
         "ingress.className": "private",
         "ingress.tls[0].secretName": "logice-tls",
         "ingress.tls[0].hosts[0]": "logice.internal.example.com",
         "imagePullSecrets[0].name": "private-registry",
         "clickhouse.persistence.storageClass": "",
+        "postgres.persistence.storageClass": "",
     }
     _, documents = render(custom, release="other")
-    check_resources(documents, "other-logice")
+    check_resources(documents, "other-logice", origin="https://logice.internal.example.com")
     ingress = next(item for item in documents if item["kind"] == "Ingress")
     assert ingress["spec"]["ingressClassName"] == "private"
     assert ingress["spec"]["tls"][0]["secretName"] == "logice-tls"
@@ -161,9 +218,17 @@ def main():
             assert item["spec"]["template"]["spec"]["imagePullSecrets"] == [{"name": "private-registry"}]
         if item["kind"] == "PersistentVolumeClaim":
             assert item["spec"]["storageClassName"] == ""
-    _, documents = render({**VALUES, "clickhouse.persistence.storageClass": "fast-private"})
-    pvc = next(item for item in documents if item["kind"] == "PersistentVolumeClaim")
-    assert pvc["spec"]["storageClassName"] == "fast-private"
+    _, documents = render({
+        **VALUES, "clickhouse.persistence.storageClass": "fast-private",
+        "postgres.persistence.storageClass": "fast-private",
+    })
+    for pvc in (item for item in documents if item["kind"] == "PersistentVolumeClaim"):
+        assert pvc["spec"]["storageClassName"] == "fast-private"
+    for origin in ("", "http://logice.narumi.dev", "https://logice.narumi.dev/path", "https://logice.narumi.dev/"):
+        failure = helm("template", "test", str(CHART), values={**VALUES, "api.authOrigin": origin}, succeeds=False)
+        assert "api.authOrigin" in failure
+    _, local = render({**VALUES, "api.authOrigin": "http://localhost:5173"})
+    check_resources(local, "test-logice", origin="http://localhost:5173")
     _, documents = render({**VALUES, "web.service.type": "ClusterIP"})
     web_service = next(item for item in documents if item["kind"] == "Service" and item["metadata"]["name"] == "logice-tunnel")
     assert web_service["spec"]["type"] == "ClusterIP"

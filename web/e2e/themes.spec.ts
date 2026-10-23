@@ -1,5 +1,6 @@
-import { expect, type Page, test } from "@playwright/test"
+import type { Page } from "@playwright/test"
 import type { Log, Span, TraceSummary } from "../src/api"
+import { expect, test } from "./auth-fixtures"
 import { control, record, snapshot } from "./live-fixtures"
 
 const traceId = "1234567890abcdef1234567890abcdef"
@@ -39,7 +40,11 @@ const log: Log = {
 }
 
 async function mockTelemetry(page: Page) {
-  await page.route("**/api/**", (route) => route.abort())
+  await page.route("**/api/**", (route) =>
+    new URL(route.request().url()).pathname.startsWith("/api/auth/")
+      ? route.continue()
+      : route.abort(),
+  )
   await page.route("**/api/traces?**", (route) =>
     route.fulfill({ json: { items: [trace], hasMore: false } }),
   )
@@ -135,7 +140,7 @@ test("theme switches with the keyboard, survives reload, and follows navigation"
   await page.getByRole("searchbox", { name: "Search", exact: true }).fill("unsaved filter")
   const before = page.url()
   await selector.focus()
-  await page.keyboard.press("ArrowDown")
+  await page.keyboard.press("s")
   await page.keyboard.press("Enter")
   await expect(selector).toHaveValue("studio")
   await expect(selector).toBeFocused()
@@ -204,7 +209,8 @@ test("theme changes retain Preview state and make no telemetry requests", async 
   await mockTelemetry(page)
   const requests: string[] = []
   page.on("request", (request) => {
-    if (new URL(request.url()).pathname.startsWith("/api/")) requests.push(request.url())
+    const path = new URL(request.url()).pathname
+    if (path.startsWith("/api/") && !path.startsWith("/api/auth/")) requests.push(request.url())
   })
   await page.setViewportSize({ width: 1600, height: 1000 })
   await page.goto("/preview")

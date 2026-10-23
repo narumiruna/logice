@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test"
+import { expect, test } from "./auth-fixtures"
 import { advance, control, record, snapshot, testTarget } from "./live-fixtures"
 
 test.beforeEach(() => {
@@ -142,7 +142,11 @@ test("Live marks new arrivals once, keeps explicit filter submission and service
   await expect.poll(() => state.queries.length).toBe(requests + 1)
   expect(state.queries.at(-1)?.get("search")).toBe("First")
   await expect(page.getByRole("button", { name: "Expand all", exact: true })).toBeDisabled()
+  const beforeReset = state.queries.length
   await page.getByRole("button", { name: "Reset view" }).click()
+  await expect.poll(() => state.queries.length).toBe(beforeReset + 1)
+  await expect(page.getByText("Live · polling after each response", { exact: true })).toBeVisible()
+  await page.clock.runFor(50)
   await expect(page.getByLabel("Search live events", { exact: true })).toHaveValue("")
   await expect(page.getByRole("button", { name: "Expand all", exact: true })).toBeEnabled()
   const added = record(1, { name: "New event" })

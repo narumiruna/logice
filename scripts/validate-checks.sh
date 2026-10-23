@@ -26,7 +26,7 @@ if PATH="$work/go-bin" command -v node; then
   printf '%s\n' 'Node.js unexpectedly available in Go-only PATH.' >&2
   exit 1
 fi
-CGO_ENABLED=0 PATH="$work/go-bin" run sh scripts/check-go.sh
+(CGO_ENABLED=0 PATH="$work/go-bin" run sh scripts/check-go.sh)
 test ! -e web/dist
 
 HUSKY= run npm --prefix web ci

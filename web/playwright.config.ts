@@ -8,11 +8,20 @@ export default defineConfig({
   workers: 1,
   retries: 0,
   reporter: "list",
-  outputDir: "test-results",
+  outputDir: process.env.LOGICE_E2E_OUTPUT_DIR ?? "test-results",
   use: {
     baseURL: process.env.LOGICE_E2E_URL ?? "http://127.0.0.1:1",
-    trace: "retain-on-failure",
-    screenshot: "only-on-failure",
+    // Authentication responses contain disposable bearer tokens. Do not save them.
+    trace: "off",
+    screenshot: "off",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    { name: "setup", testMatch: /auth\.setup\.ts/, use: { ...devices["Desktop Chrome"] } },
+    {
+      name: "chromium",
+      testIgnore: /auth\.setup\.ts/,
+      dependencies: ["setup"],
+      use: { ...devices["Desktop Chrome"] },
+    },
+  ],
 })

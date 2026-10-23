@@ -68,19 +68,19 @@ func newStack(t *testing.T) *stack {
 	s := &stack{
 		t: t, ctx: ctx, root: filepath.Clean(filepath.Join(filepath.Dir(source), "../..")),
 		project: "logice-validation-" + randomHex(t, 8),
-		secrets: []string{randomHex(t, 24), randomHex(t, 24), randomHex(t, 24)},
+		secrets: []string{randomHex(t, 24), randomHex(t, 24), randomHex(t, 24), randomHex(t, 32)},
 		ports:   make(map[string]string), http: &http.Client{Timeout: 5 * time.Second},
 	}
 	for _, entry := range os.Environ() {
 		key, _, _ := strings.Cut(entry, "=")
 		// Retain Docker connection settings so the selected daemon is used,
 		// but do not inherit Compose files, projects, profiles, or env files.
-		if strings.HasPrefix(key, "COMPOSE_") || key == "POSTGRES_PASSWORD" || key == "CLICKHOUSE_PASSWORD" || key == "OTLP_TOKEN" {
+		if strings.HasPrefix(key, "COMPOSE_") || key == "POSTGRES_PASSWORD" || key == "CLICKHOUSE_PASSWORD" || key == "OTLP_TOKEN" || strings.HasPrefix(key, "AUTH_") {
 			continue
 		}
 		s.env = append(s.env, entry)
 	}
-	s.env = append(s.env, "POSTGRES_PASSWORD="+s.secrets[0], "CLICKHOUSE_PASSWORD="+s.secrets[1], "OTLP_TOKEN="+s.secrets[2], "COMPOSE_DISABLE_ENV_FILE=1")
+	s.env = append(s.env, "POSTGRES_PASSWORD="+s.secrets[0], "CLICKHOUSE_PASSWORD="+s.secrets[1], "OTLP_TOKEN="+s.secrets[2], "AUTH_ENCRYPTION_KEY="+s.secrets[3], "AUTH_ORIGIN=http://localhost:5173", "COMPOSE_DISABLE_ENV_FILE=1")
 	// Register before startup: partial startup and assertion failures must also clean up.
 	t.Cleanup(func() {
 		defer cancel()

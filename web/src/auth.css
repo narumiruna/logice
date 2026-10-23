@@ -1,0 +1,77 @@
+.auth-page {
+  max-width: 540px;
+  margin: 8vh auto;
+  padding: 24px;
+}
+
+.auth-card,
+.auth-account {
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  padding: 24px;
+}
+
+.auth-card,
+.auth-card form,
+.auth-account form,
+.auth-invitation {
+  display: grid;
+  gap: 12px;
+}
+
+.auth-card form {
+  margin-top: 20px;
+  border-top: 1px solid var(--color-border);
+  padding-top: 20px;
+}
+
+.auth-card button,
+.auth-account button,
+.auth-page button {
+  padding: 8px 16px;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border-radius: 4px;
+}
+
+.auth-card input,
+.auth-account input {
+  min-width: 0;
+  width: 100%;
+  padding: 8px;
+  color: var(--color-text);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+}
+
+.auth-card button:disabled,
+.auth-account button:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.auth-account {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 24px;
+}
+
+.auth-account details {
+  max-width: 440px;
+  width: 100%;
+}
+
+.auth-account form,
+.auth-invitation {
+  margin-top: 12px;
+}
+
+.auth-message {
+  padding: 12px 24px;
+  color: var(--color-error);
+  background: var(--color-error-soft);
+}
