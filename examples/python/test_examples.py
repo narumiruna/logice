@@ -57,7 +57,7 @@ class ExampleTests(unittest.TestCase):
             os.environ,
             {
                 "OTEL_EXPORTER_OTLP_ENDPOINT": f"http://127.0.0.1:{self.collector.server_port}",
-                "OTLP_TOKEN": "unit-test-token",
+                "LOGICE_PROJECT_TOKEN": "unit-test-token",
             },
             clear=True,
         )
@@ -256,7 +256,7 @@ class ExampleTests(unittest.TestCase):
         for token in ["", "contains space", "bad\r\nheader", "non-ascii-秘密"]:
             with (
                 self.subTest(token=token),
-                patch.dict(os.environ, {"OTLP_TOKEN": token}),
+                patch.dict(os.environ, {"LOGICE_PROJECT_TOKEN": token}),
             ):
                 with self.assertRaises(ValueError):
                     settings()

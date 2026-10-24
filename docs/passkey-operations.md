@@ -10,12 +10,20 @@ This is an operator runbook, not authorization to deploy. No live cluster change
 4. Keep Cloudflare Access and private routing enabled. During the initial transition, stop or isolate the old unauthenticated API before permitting traffic to the new release. Do not rely on a rolling update to remove that exposure.
 5. Obtain separate operator approval before syncing or restarting live workloads. Validate with disposable accounts before real enrollment.
 
+## Project access cutover
+
+Schema version 2 adds projects, membership, and project token hashes. Follow [project access, cutover, and rollback](project-access.md) before a multi-project release. Old `validation` data is not assigned to any account. Stop direct Collector ingestion, rotate `OTLP_TOKEN` into an internal-only credential, and move applications to project tokens through Go. Never roll back to an unscoped reader while multi-project data is exposed.
+
+Owner account recovery uses the same account UUID and retains its project ownership. The local recovery command records `operator_account_recovery` in affected projects. It does not automatically revoke project application tokens; after recovery, verify ownership and explicitly revoke suspected tokens.
+
 ## Configuration
 
 | Setting | Requirement |
 | --- | --- |
 | `AUTH_ORIGIN` | Always required; exactly `https://logice.narumi.dev` in deployment. Compose defaults to `http://localhost:5173`. No path or trailing slash. |
 | `ENCRYPTION_KEY` | Exactly 64 hex characters; decoded as 32-byte AES-256-GCM key. Secret-backed in Helm. |
+| `COLLECTOR_URL` | Server-only private Collector base URL; Compose and Helm provide it. |
+| `OTLP_TOKEN` | Server and Collector internal credential; never an SDK project token. |
 | PostgreSQL | `DATABASE_URL`, or `PGHOST`, `PGPORT`, `PGUSER`, `PGDATABASE`, `PGPASSWORD`. Do not set conflicting sources. |
 
 The required key setting is now `ENCRYPTION_KEY`, not `AUTH_ENCRYPTION_KEY`. For an existing installation, copy the same value to the new Secret key and update the image and chart together. Do not generate a replacement key during the rename. The old environment variable no longer satisfies startup validation. Remove the old Secret key only after all workloads use the new setting.

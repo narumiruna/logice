@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test"
 import type { Log, TraceSummary } from "../src/api"
-import { expect, test } from "./auth-fixtures"
+import { expect, projectHref, test, workspace } from "./auth-fixtures"
 import { control, record, row, snapshot, testTarget } from "./live-fixtures"
 
 const window = {
@@ -34,7 +34,7 @@ async function mockLists(page: Page) {
     ["traces", trace],
     ["logs", log],
   ] as const) {
-    await page.route(`**/api/${kind}?**`, (route) => {
+    await page.route(`**/api/projects/*/${kind}?**`, (route) => {
       const empty = new URL(route.request().url()).searchParams.get("service") === "missing"
       return route.fulfill({ json: { items: empty ? [] : [item], hasMore: false } })
     })
@@ -63,7 +63,9 @@ for (const kind of ["traces", "logs"]) {
     await mockLists(page)
     for (const range of ["", "&range=6h"]) {
       await page.goto(
-        `/${kind}?from=${window.from}&to=${window.to}&limit=100&service=missing&search=inventory&errorsOnly=true&minSeverity=17&traceId=${trace.traceId}${range}`,
+        projectHref(
+          `/${kind}?from=${window.from}&to=${window.to}&limit=100&service=missing&search=inventory&errorsOnly=true&minSeverity=17&traceId=${trace.traceId}${range}`,
+        ),
       )
       await expect(page.getByRole("heading", { name: `No ${kind} in this window` })).toBeVisible()
       const reset = page.getByRole("link", { name: "Reset filters", exact: true })
@@ -95,7 +97,7 @@ for (const theme of ["classic", "studio"]) {
       await mockLists(page)
       await page.setViewportSize({ width, height: 1000 })
       await page.addInitScript((value) => localStorage.setItem("logice.theme", value), theme)
-      await page.goto("/traces")
+      await page.goto(projectHref("/traces"))
       const traceLink = page.getByRole("link", { name: trace.name, exact: true })
       await expect(traceLink).toBeVisible()
       await expect(
@@ -110,7 +112,7 @@ for (const theme of ["classic", "studio"]) {
         await expect(page.locator(".trace-table")).toHaveCSS("display", "table")
       }
       await page.screenshot({ path: testInfo.outputPath(`${theme}-traces-${width}.png`) })
-      await page.goto("/logs")
+      await page.goto(projectHref("/logs"))
       const body = page.locator(".body-preview")
       await expect(body).toHaveText(log.body)
       await body.scrollIntoViewIfNeeded()
@@ -125,7 +127,9 @@ for (const theme of ["classic", "studio"]) {
         .locator(".log-body")
         .evaluate((element) => element.scrollIntoView({ block: "center" }))
       await expect(page.locator(".log-body")).toBeInViewport({ ratio: 1 })
-      const correlation = page.locator(`a[href^="/traces/${trace.traceId}?"]`)
+      const correlation = page.locator(
+        `a[href^="/projects/${workspace().project.id}/traces/${trace.traceId}?"]`,
+      )
       await expect(correlation).toBeVisible()
       const href = new URL((await correlation.getAttribute("href")) ?? "", page.url())
       expect(href.searchParams.get("from")).toBe(new URL(page.url()).searchParams.get("from"))
@@ -154,7 +158,9 @@ for (const theme of ["classic", "studio"]) {
     await page.setViewportSize({ width: 390, height: 1000 })
     await page.addInitScript((value) => localStorage.setItem("logice.theme", value), theme)
     await page.goto(
-      `/live?mode=paused&from=${window.from}&to=${window.to}&service=controlled-live&search=Exported&errorsOnly=true&minSeverity=17`,
+      projectHref(
+        `/live?mode=paused&from=${window.from}&to=${window.to}&service=controlled-live&search=Exported&errorsOnly=true&minSeverity=17`,
+      ),
     )
     await expect(row(page, first.id)).toBeVisible()
     const before = page.url()

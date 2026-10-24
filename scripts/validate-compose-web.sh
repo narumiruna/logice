@@ -24,7 +24,7 @@ cleanup() {
   trap - 0 HUP INT TERM
   if [ "$status" -ne 0 ]; then
     timeout --kill-after=2s 5 docker compose --project-directory "$root" --project-name "$project" \
-      --file "$root/compose.yaml" --file "$work/ports.yaml" logs --no-color --tail 40 api web >&2 || true
+      --file "$root/compose.yaml" --file "$work/ports.yaml" logs --no-color --tail 40 api web migrate postgres >&2 || true
   fi
   timeout --kill-after=2s 5 docker rm --force "$replacement" >/dev/null 2>&1 || true
   if ! timeout --kill-after=2s 30 docker compose --project-directory "$root" --project-name "$project" \
@@ -55,6 +55,8 @@ esac
 api=$(compose ps --quiet api)
 test "$(timeout --kill-after=5s 20 docker inspect --format '{{json .HostConfig.PortBindings}}' "$api")" = '{}'
 test "$(compose exec -T api id -u)" = 65532
+collector=$(compose ps --quiet collector)
+test "$(timeout --kill-after=5s 20 docker inspect --format '{{json .HostConfig.PortBindings}}' "$collector")" = '{}'
 base="$AUTH_ORIGIN"
 curl --fail --silent --show-error --max-time 10 "$base/" > "$work/index.html"
 grep -q '<div id="root"></div>' "$work/index.html"
@@ -70,21 +72,25 @@ for path in /api /api/not-found; do
   grep -qi '^Content-Type: application/json' "$work/headers"
   grep -q '"code":"unauthorized"' "$work/error.json"
 done
+for path in /v1 /v1/not-found; do
+  code=$(curl --silent --show-error --max-time 10 -D "$work/headers" -o "$work/error.json" -w '%{http_code}' "$base$path")
+  test "$code" = 404
+  grep -qi '^Content-Type: application/json' "$work/headers"
+done
 curl --fail --silent --show-error --max-time 10 "$base/traces/example" > "$work/route.html"
 cmp "$work/index.html" "$work/route.html"
 code=$(curl --silent --show-error --max-time 10 -o /dev/null -w '%{http_code}' "$base/assets/missing.js")
 test "$code" = 404
 # Run browser workflows against this project's real Collector and query API.
 export LOGICE_E2E_URL="$base"
-export LOGICE_E2E_OTLP_URL="http://$(compose port collector 4318)"
+export LOGICE_E2E_OTLP_URL="$base"
 export LOGICE_E2E_PROJECT="$project"
-export LOGICE_E2E_TOKEN="$OTLP_TOKEN"
 # Keep the invitation in subprocess environment only, never command arguments or logs.
 LOGICE_E2E_INVITATION=$(compose exec -T api /app/logice bootstrap -name 'Browser administrator' | uv run python -c 'import json,sys; print(json.load(sys.stdin)["token"])')
 export LOGICE_E2E_INVITATION
 export LOGICE_E2E_AUTH_FILE="$work/browser-auth.json"
 export LOGICE_E2E_OUTPUT_DIR="$work/browser-results"
-timeout --kill-after=5s 180 npm --prefix "$root/web" run test:e2e
+timeout --kill-after=5s 180 npm --prefix "$root/web" run test:e2e -- --max-failures=1
 # Allocate the replacement while the old API still owns its address. This
 # guarantees a different dynamic IP without a fixed subnet or a static --ip.
 image=$(timeout --kill-after=5s 20 docker inspect --format '{{.Config.Image}}' "$api")
@@ -92,6 +98,7 @@ old_ip=$(timeout --kill-after=5s 20 docker inspect --format '{{range .NetworkSet
 timeout --kill-after=5s 20 docker run --detach --name "$replacement" \
   --network "${project}_default" --network-alias api \
   --env CLICKHOUSE_ADDR=clickhouse:9000 --env CLICKHOUSE_PASSWORD \
+  --env COLLECTOR_URL=http://collector:4318 --env OTLP_TOKEN \
   --env PGHOST=postgres --env PGPORT=5432 --env PGUSER=logice --env PGDATABASE=logice \
   --env PGPASSWORD="$POSTGRES_PASSWORD" --env AUTH_ORIGIN --env ENCRYPTION_KEY \
   "$image" -listen 0.0.0.0:8080 > /dev/null
@@ -112,9 +119,11 @@ import json
 import os
 import urllib.request
 with open(os.environ["LOGICE_E2E_AUTH_FILE"]) as source:
-    cookies = json.load(source)["state"]["cookies"]
+    saved = json.load(source)
+    cookies = saved["state"]["cookies"]
+    project_id = saved["project"]["id"]
 request = urllib.request.Request(
-    os.environ["LOGICE_E2E_URL"] + "/api/traces?limit=1",
+    os.environ["LOGICE_E2E_URL"] + "/api/projects/" + project_id + "/traces?limit=1",
     headers={"Cookie": "; ".join(c["name"] + "=" + c["value"] for c in cookies)},
 )
 with urllib.request.urlopen(request, timeout=10) as response:

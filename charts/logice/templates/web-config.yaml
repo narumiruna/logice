@@ -27,6 +27,18 @@ data:
             proxy_set_header Host $host;
         }
 
+        location = /v1 {
+            proxy_pass http://logice_api;
+            proxy_set_header Host $host;
+        }
+
+        location /v1/ {
+            client_max_body_size 8m;
+            proxy_pass http://logice_api;
+            proxy_set_header Host $host;
+            proxy_read_timeout 12s;
+        }
+
         location /assets/ {
             try_files $uri =404;
         }

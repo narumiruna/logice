@@ -10,7 +10,7 @@ docker compose up --build --detach --wait --wait-timeout 120
 
 Open `http://127.0.0.1:5173`. If the page still shows the old foundation message, rebuild the web/API services and reload the page. Do not remove database volumes to update the application.
 
-The application reads only the fixed `validation` project. Authentication and multi-project authorization are not implemented. Keep the published ports on loopback; do not expose this stack through a public proxy or tunnel.
+Sign in, then create or select a project. Queries require project membership; ingestion uses project-level tokens. See [project roles, API, and migration](project-access.md). Keep local published ports on loopback; public deployment requires separate operator validation.
 
 ## Use the views
 
@@ -36,18 +36,18 @@ The application does not automatically insert sample records. You can send sampl
 
 ## Send data
 
-Use `docker compose port collector 4318` to find the OTLP/HTTP endpoint. Configure an instrumented application with these standard OpenTelemetry SDK settings:
+Create an ingestion token in **Project settings**, and load it into `LOGICE_PROJECT_TOKEN` from protected application storage. Configure these SDK settings:
 
 ```sh
 export OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
-export OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:REPLACE_WITH_COLLECTOR_PORT
-export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${OTLP_TOKEN}"
+export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:5173
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${LOGICE_PROJECT_TOKEN}"
 export OTEL_SERVICE_NAME=my-application
 ```
 
-`OTLP_TOKEN` must match the protected `.env` value. Set it in the application's environment; do not commit it or paste it into shared logs. These settings require an SDK that supports them; they do not instrument an application by themselves. Send traces to `/v1/traces` and logs to `/v1/logs`. Include the trace and span IDs on log records for correlation.
+Use the project token, not the internal `.env` `OTLP_TOKEN`. Set it in the application's environment; do not commit it or paste it into shared logs. These settings require an SDK that supports them; they do not instrument an application by themselves. Send traces to `/v1/traces` and logs to `/v1/logs`. Include the trace and span IDs on log records for correlation.
 
-The Collector replaces the resource project attribute with `validation`. Clients cannot choose another project with a browser query parameter.
+The Go proxy authenticates the project token and sends trusted project metadata to the private Collector. Collector replaces the resource project attribute with that project UUID. Clients cannot choose another project with resource attributes, headers, or a browser query parameter.
 
 ## Query API
 
@@ -55,9 +55,9 @@ All routes use GET and return JSON:
 
 | Route | Result | Filters |
 | --- | --- | --- |
-| `/api/traces` | Trace summaries | `from`, `to`, `service`, `search`, `errorsOnly`, `limit` |
-| `/api/logs` | Log records with detail fields | `from`, `to`, `service`, `search`, `minSeverity`, `traceId`, `limit` |
-| `/api/traces/{traceId}` | Spans and correlated logs | `from`, `to` |
+| `/api/projects/{projectID}/traces` | Trace summaries | `from`, `to`, `service`, `search`, `errorsOnly`, `limit` |
+| `/api/projects/{projectID}/logs` | Log records with detail fields | `from`, `to`, `service`, `search`, `minSeverity`, `traceId`, `limit` |
+| `/api/projects/{projectID}/traces/{traceId}` | Spans and correlated logs | `from`, `to` |
 
 - `from` and `to` are RFC3339 timestamps with up to nine fractional digits. Supply both or neither. The default is the last hour.
   - The interval includes `from` and excludes `to`. The maximum interval is 24 hours.
@@ -69,7 +69,7 @@ All routes use GET and return JSON:
 - Trace detail returns at most 500 spans and 200 logs, with separate truncation flags.
 - Timestamps preserve nanoseconds in JSON. Duration values are decimal nanosecond strings to avoid JavaScript integer precision loss.
 
-Every storage query enforces the fixed project and time bounds. Queries have a five-second deadline, a 128 MiB ClickHouse memory limit, and an 8 MiB result limit. The application uses read-only query settings with the existing local database account; this is not a separate least-privilege production role.
+Every storage query enforces the authorized project and time bounds. Queries have a five-second deadline, a 128 MiB ClickHouse memory limit, and an 8 MiB result limit. The application uses read-only query settings with the existing local database account; this is not a separate least-privilege production role.
 
 HTTP 400 indicates invalid filters. HTTP 404 indicates an unknown trace in the selected window. HTTP 503 indicates unavailable storage or a query resource limit. `/api/healthz` remains a process-liveness check, not a database-readiness check.
 

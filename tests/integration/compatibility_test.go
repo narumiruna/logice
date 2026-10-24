@@ -33,7 +33,7 @@ func expectedCompatibilityAttrs(location string) map[string]string {
 	}
 	switch location {
 	case "resource":
-		attrs["logice.project.id"] = "validation"
+		attrs["logice.project.id"] = fixtureProject
 		attrs["service.name"] = "deterministic-telemetry"
 	case "record": // The configured processor deletes this key, not just its value.
 	default:
@@ -65,6 +65,9 @@ func (s *stack) compatibilityExport(conn *grpc.ClientConn, protocol, token strin
 	if protocol == "http" {
 		data, err := proto.Marshal(request)
 		s.must("encode compatibility request", err)
+		if authorized {
+			token = s.applicationToken
+		}
 		code, body := s.post(path, token, data)
 		if !authorized {
 			if code != 401 && code != 403 {
@@ -80,7 +83,7 @@ func (s *stack) compatibilityExport(conn *grpc.ClientConn, protocol, token strin
 		ctx, cancel := context.WithTimeout(s.ctx, 10*time.Second)
 		defer cancel()
 		if token != "" {
-			ctx = metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+token)
+			ctx = metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+token, "x-logice-project-id", fixtureProject)
 		}
 		var err error
 		switch r := request.(type) {

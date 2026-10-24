@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -45,7 +46,12 @@ func TestAuthenticatedQueryContexts(t *testing.T) {
 	if _, err := pool.Exec(ctx, "INSERT INTO auth_sessions(token_hash,user_id) VALUES($1,$2)", digest(session), userID); err != nil {
 		t.Fatal(err)
 	}
+	project := uuid.NewString()
+	if _, err := pool.Exec(ctx, "INSERT INTO projects(id,name,owner_user_id) VALUES($1,'Query project',$2)", project, userID); err != nil {
+		t.Fatal(err)
+	}
 	request := func(parent context.Context, path string) *http.Request {
+		path = strings.Replace(path, "/api/", "/api/projects/"+project+"/", 1)
 		r := httptest.NewRequest("GET", path, nil).WithContext(parent)
 		r.AddCookie(&http.Cookie{Name: s.cookieName("session"), Value: session})
 		return r
@@ -59,7 +65,7 @@ func TestAuthenticatedQueryContexts(t *testing.T) {
 				reader := waitingReader{wait: func(query context.Context) error { <-query.Done(); return query.Err() }}
 				handler := httpapi.NewServer(reader).Handler
 				next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					if r.Context() != parent {
+					if r.Context().Done() != parent.Done() {
 						t.Error("authentication replaced the original query request context")
 					}
 					handler.ServeHTTP(w, r)

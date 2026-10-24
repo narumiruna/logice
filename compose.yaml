@@ -7,6 +7,8 @@ services:
     command: ["-listen", "0.0.0.0:8080"]
     environment: &api-environment
       CLICKHOUSE_ADDR: clickhouse:9000
+      COLLECTOR_URL: http://collector:4318
+      OTLP_TOKEN: ${OTLP_TOKEN:?Set OTLP_TOKEN}
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?Set CLICKHOUSE_PASSWORD}
       AUTH_ORIGIN: ${AUTH_ORIGIN:-http://localhost:5173}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:?Set ENCRYPTION_KEY to exactly 64 hex characters}
@@ -65,7 +67,7 @@ services:
       # PostgreSQL 18 stores versioned cluster directories under this path.
       - postgres-data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      test: ["CMD-SHELL", "pg_isready -h postgres -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 2s
       timeout: 5s
       retries: 30
@@ -86,7 +88,7 @@ services:
     healthcheck:
       test:
         - CMD-SHELL
-        - clickhouse-client --user "$$CLICKHOUSE_USER" --password "$$CLICKHOUSE_PASSWORD" --query 'SELECT 1'
+        - clickhouse-client --host clickhouse --user "$$CLICKHOUSE_USER" --password "$$CLICKHOUSE_PASSWORD" --query 'SELECT 1'
       interval: 2s
       timeout: 5s
       retries: 45
@@ -103,10 +105,7 @@ services:
     environment:
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?Set CLICKHOUSE_PASSWORD}
       OTLP_TOKEN: ${OTLP_TOKEN:?Set OTLP_TOKEN}
-    ports:
-      - "127.0.0.1::4317"
-      - "127.0.0.1::4318"
-      - "127.0.0.1::13133"
+    # Receiver ports are private; application traffic must pass through Go.
     volumes:
       - ./deploy/otel-collector.yaml:/etc/otelcol-contrib/config.yaml:ro
     depends_on:

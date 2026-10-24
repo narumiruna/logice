@@ -27,7 +27,7 @@ class Telemetry:
 
 def settings() -> tuple[str, str]:
     endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "").rstrip("/")
-    token = os.environ.get("OTLP_TOKEN", "")
+    token = os.environ.get("LOGICE_PROJECT_TOKEN", "")
     try:
         url = urlsplit(endpoint)
         valid = (
@@ -44,12 +44,12 @@ def settings() -> tuple[str, str]:
         valid = False
     if not valid:
         raise ValueError(
-            "Set OTEL_EXPORTER_OTLP_ENDPOINT to the Collector base URL, "
-            "for example http://127.0.0.1:4318 (without /v1/traces or /v1/logs)."
+            "Set OTEL_EXPORTER_OTLP_ENDPOINT to the Logice application base URL, "
+            "for example http://localhost:5173 (without /v1/traces or /v1/logs)."
         )
     if not re.fullmatch(r"[A-Za-z0-9._~+/-]+=*", token):
         raise ValueError(
-            "Set OTLP_TOKEN to the Collector token from the protected .env file."
+            "Set LOGICE_PROJECT_TOKEN to a project ingestion token from protected application storage."
         )
     return endpoint, token
 

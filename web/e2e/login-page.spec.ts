@@ -1,4 +1,4 @@
-import { expect, test } from "./auth-fixtures"
+import { expect, projectHref, test } from "./auth-fixtures"
 
 test.use({ storageState: { cookies: [], origins: [] } })
 
@@ -13,7 +13,7 @@ for (const theme of ["classic", "studio"] as const) {
         const path = new URL(request.url()).pathname
         if (path.startsWith("/api/") && !path.startsWith("/api/auth/")) queries.push(path)
       })
-      await page.goto("/live")
+      await page.goto(projectHref("/live"))
       await expect(page.getByRole("heading", { name: "Sign in to Logice" })).toBeVisible()
       await page.getByRole("combobox", { name: "Theme", exact: true }).selectOption(theme)
       await expect(page.locator("html")).toHaveAttribute("data-theme", theme)
@@ -57,7 +57,7 @@ test("loading and session errors use the login layout and keep telemetry locked"
     if (!retry) await pending
     await route.fulfill({ status: retry ? 401 : 503, json: { error: { code: "unavailable" } } })
   })
-  await page.goto("/live")
+  await page.goto(projectHref("/live"))
   await expect(page.getByRole("heading", { name: "Checking your session…" })).toBeVisible()
   await expect(page.locator(".auth-layout")).toBeVisible()
   await expect(page.locator(".application-shell")).toHaveCount(0)

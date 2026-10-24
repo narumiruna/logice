@@ -71,7 +71,7 @@ func liveIdentitySQL(logs bool) string {
 	if logs {
 		return "concat('log:v1:', lower(hex(SHA256(payload))))"
 	}
-	return `if(match(TraceId, '^[0-9a-fA-F]{32}$') AND lower(TraceId) != repeat('0',32) AND match(SpanId, '^[0-9a-fA-F]{16}$') AND lower(SpanId) != repeat('0',16), concat('span:validation:',lower(TraceId),':',lower(SpanId)), concat('span-content:v1:',lower(hex(SHA256(payload)))))`
+	return `if(match(TraceId, '^[0-9a-fA-F]{32}$') AND lower(TraceId) != repeat('0',32) AND match(SpanId, '^[0-9a-fA-F]{16}$') AND lower(SpanId) != repeat('0',16), concat('span:',ResourceAttributes['logice.project.id'],':',lower(TraceId),':',lower(SpanId)), concat('span-content:v1:',lower(hex(SHA256(payload)))))`
 }
 
 // Canonical content is grouped, not its digest. The aggregation evaluates all
@@ -82,7 +82,7 @@ func liveGroupedSQL(f LiveFilter, logs bool) (string, []any) {
 		table = "otel_logs"
 	}
 	match, args := liveMatch(f, logs)
-	args = append(args, f.From.UnixNano(), f.To.UnixNano())
+	args = append(args, f.project, f.From.UnixNano(), f.To.UnixNano())
 	parent := "lower(ParentSpanId)"
 	if logs {
 		parent = "''"
@@ -119,7 +119,7 @@ func liveHistogramQuery(f LiveFilter, logs bool) (string, []any) {
 	// timestamp exactly on an uneven boundary to the following bucket.
 	q := `SELECT toUInt8(intDiv((toInt128(toUnixTimestamp64Nano(Timestamp))-toInt128(?)+1)*60-1,toInt128(?))) AS bucket,
  count(), countIf(` + errorPredicate + `) FROM logice.` + table + ` WHERE (` + match + `) AND ` + scope + ` GROUP BY bucket ORDER BY bucket`
-	return q, append([]any{f.From.UnixNano(), f.To.Sub(f.From).Nanoseconds()}, append(args, f.From.UnixNano(), f.To.UnixNano())...)
+	return q, append([]any{f.From.UnixNano(), f.To.Sub(f.From).Nanoseconds()}, append(args, f.project, f.From.UnixNano(), f.To.UnixNano())...)
 }
 
 func liveContextQuery(f LiveFilter, traces []string, matching []LiveRecord) (string, []any) {
@@ -152,5 +152,5 @@ func liveContextQuery(f LiveFilter, traces []string, matching []LiveRecord) (str
  SELECT *,row_number() OVER (PARTITION BY traceGroup ORDER BY has(?, concat(traceGroup,':',splitByChar(':',identity)[4])) DESC,earliest ASC,identity ASC) AS rank
  FROM (` + grouped + `)) ORDER BY rank ASC,indexOf(?,traceGroup) ASC,identity ASC LIMIT ` + fmt.Sprint(LiveContextLimit+1)
 	// Placeholders occur in SQL textual order: rank references precede base.
-	return query, []any{pairs, f.From.UnixNano(), f.To.UnixNano(), traces, ids, traces}
+	return query, []any{pairs, f.project, f.From.UnixNano(), f.To.UnixNano(), traces, ids, traces}
 }

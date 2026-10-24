@@ -1,4 +1,4 @@
-import { expect, test } from "./auth-fixtures"
+import { expect, projectHref, test } from "./auth-fixtures"
 import {
   advance,
   control,
@@ -20,7 +20,7 @@ test("Live ignores an obsolete response even when transport ignores abort, and n
   await page.addInitScript(() => {
     const original = window.fetch.bind(window)
     window.fetch = (input, init) => {
-      if (String(input).startsWith("/api/live?"))
+      if (String(input).startsWith("/api/projects/"))
         return original(input, { ...init, signal: undefined })
       return original(input, init)
     }
@@ -29,7 +29,7 @@ test("Live ignores an obsolete response even when transport ignores abort, and n
   const held = new Promise<void>((resolve) => {
     release = resolve
   })
-  await page.route("**/api/live?**", async (route) => {
+  await page.route("**/api/projects/*/live?**", async (route) => {
     const query = new URL(route.request().url()).searchParams
     if (query.get("service") !== "obsolete") {
       await route.fallback()
@@ -41,7 +41,7 @@ test("Live ignores an obsolete response even when transport ignores abort, and n
     old.filters.service = "obsolete"
     await route.fulfill({ json: old })
   })
-  await page.goto("/live?service=obsolete")
+  await page.goto(projectHref("/live?service=obsolete"))
   await expect.poll(() => state.queries.length).toBe(1)
   await page.getByLabel("Service filter", { exact: true }).fill("current")
   await page.getByRole("button", { name: "Apply filters", exact: true }).click()
@@ -63,10 +63,10 @@ for (const status of [400, 404, 422]) {
   }) => {
     const state = await control(page)
     state.status = status
-    await page.goto("/live")
+    await page.goto(projectHref("/live"))
     const error = page.getByRole("alert")
     await expect(error).toBeVisible()
-    await expect(error).toContainText(status === 404 ? "does not support Live" : String(status))
+    await expect(error).toContainText(status === 404 ? "project is unavailable" : String(status))
     await expect(page.locator("[data-event-id]")).toHaveCount(0)
     await expect(page.getByText("No matching events", { exact: true })).toHaveCount(0)
     const count = state.queries.length
@@ -88,7 +88,7 @@ test("Live waits two seconds after response completion and clamps overload retry
     release = resolve
   })
   let initial = true
-  await page.route("**/api/live?**", async (route) => {
+  await page.route("**/api/projects/*/live?**", async (route) => {
     if (initial) {
       initial = false
       await held
@@ -106,7 +106,7 @@ test("Live waits two seconds after response completion and clamps overload retry
     }
     await route.fallback()
   })
-  await page.goto("/live")
+  await page.goto(projectHref("/live"))
   await page.clock.fastForward(4000)
   expect(state.queries).toHaveLength(0)
   release()
@@ -133,7 +133,7 @@ test("Live shows stored conflict and ambiguous-parent warnings without inventing
     parentSpanId: record(1).spanId,
   })
   const state = await control(page, snapshot([conflicted, record(1)]))
-  await page.goto("/live")
+  await page.goto(projectHref("/live"))
   await expect(row(page, conflicted.id)).toContainText("Ambiguous parent")
   await expect(row(page, conflicted.id)).toHaveAttribute("aria-level", "1")
   const duration = await row(page, conflicted.id).locator(".lv-duration").textContent()
@@ -158,17 +158,17 @@ test("Live retains only a bounded snapshot plus one outside selection through fi
   let active = 0
   let maximumActive = 0
   page.on("request", (request) => {
-    if (new URL(request.url()).pathname === "/api/live") {
+    if (new URL(request.url()).pathname === projectHref("/api/live")) {
       active++
       maximumActive = Math.max(maximumActive, active)
     }
   })
   const complete = (request: { url: () => string }) => {
-    if (new URL(request.url()).pathname === "/api/live") active--
+    if (new URL(request.url()).pathname === projectHref("/api/live")) active--
   }
   page.on("requestfinished", complete)
   page.on("requestfailed", complete)
-  await page.goto("/live")
+  await page.goto(projectHref("/live"))
   const tree = page.getByRole("treegrid")
   await expect(tree).toHaveAttribute("aria-rowcount", "1501")
   await tree.focus()
@@ -224,7 +224,7 @@ test("Live preserves the orphan anchor itself and its keyboard focus when a late
   })
   child.parentSpanId = parent.spanId
   const state = await control(page, snapshot(rows))
-  await page.goto("/live")
+  await page.goto(projectHref("/live"))
   await expect(page.getByRole("treegrid")).toHaveAttribute("aria-rowcount", "181")
   await page.clock.runFor(50)
   const pane = page.locator(".lv-scroll")
@@ -262,7 +262,7 @@ test("Live Home transfers focus from a still-mounted previous row to an offscree
   page,
 }) => {
   await control(page, snapshot(Array.from({ length: 180 }, (_, index) => record(index))))
-  await page.goto("/live")
+  await page.goto(projectHref("/live"))
   await expect(page.getByRole("treegrid")).toHaveAttribute("aria-rowcount", "181")
   const pane = page.locator(".lv-scroll")
   await pane.evaluate((element) => {
@@ -287,7 +287,7 @@ test("Live outside focus cancels pending restoration after a focused row was vir
   page,
 }) => {
   await control(page, snapshot(Array.from({ length: 180 }, (_, index) => record(index))))
-  await page.goto("/live")
+  await page.goto(projectHref("/live"))
   await expect(page.getByRole("treegrid")).toHaveAttribute("aria-rowcount", "181")
   const pane = page.locator(".lv-scroll")
   const move = async (index: number) => {
@@ -323,7 +323,7 @@ test("Live Pause during an uncommitted search freezes the displayed snapshot's q
     release = resolve
   })
   let started = false
-  await page.route("**/api/live?**", async (route) => {
+  await page.route("**/api/projects/*/live?**", async (route) => {
     const query = new URL(route.request().url()).searchParams
     if (query.get("search") !== "Uncommitted B") {
       await route.fallback()
@@ -336,7 +336,7 @@ test("Live Pause during an uncommitted search freezes the displayed snapshot's q
     response.filters.search = "Uncommitted B"
     await route.fulfill({ json: response })
   })
-  await page.goto("/live?search=Committed%20A")
+  await page.goto(projectHref("/live?search=Committed%20A"))
   await expect(row(page, record(0).id)).toBeVisible()
   await page.getByLabel("Search live events", { exact: true }).fill("Uncommitted B")
   await page.getByRole("button", { name: "Apply filters", exact: true }).click()
@@ -365,7 +365,7 @@ test("Live fixed UTC drafts survive polling and follow or auto-expand changes un
   page,
 }) => {
   const state = await control(page)
-  await page.goto("/live")
+  await page.goto(projectHref("/live"))
   await expect(row(page, record(0).id)).toBeVisible()
   await page.getByText("Fixed UTC interval", { exact: true }).click()
   const from = "2026-10-23T00:00:10.000000123Z"
@@ -392,7 +392,7 @@ test("Live keeps selection through a healthy empty snapshot and Escape restores 
   page,
 }) => {
   const state = await control(page)
-  await page.goto("/live")
+  await page.goto(projectHref("/live"))
   await row(page, record(0).id).getByRole("button", { name: "Inspect Exported span 0" }).click()
   const inspector = page.getByRole("dialog", { name: "Event details" })
   await expect(inspector).toBeVisible()

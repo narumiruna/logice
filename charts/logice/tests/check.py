@@ -100,6 +100,13 @@ def check_resources(documents, prefix, secret="test-secret", origin="https://log
     assert migration["securityContext"] == api["securityContext"]
     env = {item["name"]: item for item in api_env}
     assert env["AUTH_ORIGIN"]["value"] == origin
+    assert env["COLLECTOR_URL"]["value"] == f"http://{prefix}-collector:4318"
+    assert env["OTLP_TOKEN"]["valueFrom"]["secretKeyRef"]["key"] == "OTLP_TOKEN"
+    policy = objects["NetworkPolicy", f"{prefix}-collector"]["spec"]
+    assert policy["podSelector"]["matchLabels"] == deployments["collector"]["spec"]["template"]["metadata"]["labels"]
+    assert policy["policyTypes"] == ["Ingress"]
+    assert policy["ingress"][0]["ports"] == [{"protocol": "TCP", "port": 4318}]
+    assert policy["ingress"][0]["from"] == [{"podSelector": {"matchLabels": deployments["api"]["spec"]["template"]["metadata"]["labels"]}}]
     assert env["ENCRYPTION_KEY"]["valueFrom"]["secretKeyRef"]["key"] == "ENCRYPTION_KEY"
     for key, value in {
         "PGHOST": f"{prefix}-postgres", "PGPORT": "5432",
@@ -146,12 +153,14 @@ def check_resources(documents, prefix, secret="test-secret", origin="https://log
     for protocol in config["receivers"]["otlp"]["protocols"].values():
         assert protocol["auth"]["authenticator"] == "bearertokenauth"
     for pipeline in config["service"]["pipelines"].values():
-        assert pipeline["processors"] == ["memory_limiter", "resource/project", "attributes/project"]
+        assert pipeline["processors"] == ["memory_limiter", "transform/project", "resource/project", "filter/project", "attributes/project"]
 
 
 def main():
     compose = yaml.safe_load((CHART.parents[1] / "compose.yaml").read_text())["services"]
     assert compose["api"]["depends_on"]["migrate"]["condition"] == "service_completed_successfully"
+    assert not compose["collector"].get("ports")
+    assert compose["api"]["environment"]["COLLECTOR_URL"] == "http://collector:4318"
     assert compose["migrate"]["depends_on"]["postgres"]["condition"] == "service_healthy"
     assert compose["migrate"]["command"] == ["migrate"]
     assert compose["migrate"]["build"] == compose["api"]["build"]
@@ -168,7 +177,7 @@ def main():
     )
     assert defaults == render({}, release="logice")[0]
     documents = [item for item in yaml.safe_load_all(defaults) if item]
-    assert len(documents) == 15
+    assert len(documents) == 16
     check_resources(documents, "logice-logice", secret="logice-secrets")
     for item in documents:
         if item["kind"] == "Deployment":
@@ -180,7 +189,7 @@ def main():
     helm("lint", str(CHART), "--strict")
     output, documents = render()
     assert output == render()[0], "Rendering must be deterministic"
-    assert len(documents) == 15
+    assert len(documents) == 16
     check_resources(documents, "test-logice")
     for pvc in (item for item in documents if item["kind"] == "PersistentVolumeClaim"):
         assert "storageClassName" not in pvc["spec"]

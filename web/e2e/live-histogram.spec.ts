@@ -1,4 +1,4 @@
-import { expect, test } from "./auth-fixtures"
+import { expect, projectHref, test } from "./auth-fixtures"
 import { advance, control, iso, ns, rebucket, record, snapshot, testTarget } from "./live-fixtures"
 
 test.beforeEach(() => {
@@ -13,7 +13,7 @@ test("Live histogram has compact bars, empty buckets and five readable UTC ticks
     snapshot([record(0, { occurrences: "9007199254740993", statusCode: "Error" })]),
   )
   await page.setViewportSize({ width: 390, height: 844 })
-  await page.goto("/live")
+  await page.goto(projectHref("/live"))
   const histogram = page.getByRole("region", { name: "Stored event histogram" })
   await expect(histogram).toContainText("9007199254740993 matching rows")
   const chart = histogram.locator(".lv-histogram")
@@ -39,7 +39,7 @@ for (const reverse of [false, true]) {
     page,
   }) => {
     const state = await control(page)
-    await page.goto("/live")
+    await page.goto(projectHref("/live"))
     const chart = page.locator(".lv-histogram")
     await expect(chart.locator("button")).toHaveCount(60)
     const box = await chart.boundingBox()
@@ -76,7 +76,7 @@ for (const reverse of [false, true]) {
 for (const cancellation of ["Escape", "pointercancel", "lostpointercapture"] as const) {
   test(`Live histogram clears its drag without zoom on ${cancellation}`, async ({ page }) => {
     const state = await control(page)
-    await page.goto("/live")
+    await page.goto(projectHref("/live"))
     const chart = page.locator(".lv-histogram")
     await expect(chart.locator("button")).toHaveCount(60)
     const box = await chart.boundingBox()

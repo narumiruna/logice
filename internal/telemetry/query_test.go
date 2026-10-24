@@ -11,7 +11,7 @@ const traceID = "0123456789abcdef0123456789abcdef"
 
 func testFilter() Filter {
 	from := time.Date(2026, 1, 1, 0, 0, 0, 123456789, time.UTC)
-	return Filter{From: from, To: from.Add(time.Hour)}
+	return Filter{From: from, To: from.Add(time.Hour), project: "validation"}
 }
 
 func TestQueriesScopeAndParameters(t *testing.T) {
@@ -31,7 +31,7 @@ func TestQueriesScopeAndParameters(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			query, args := builder()
-			for _, required := range []string{"ResourceAttributes['logice.project.id'] = 'validation'", "toUnixTimestamp64Nano(Timestamp) >= ?", "toUnixTimestamp64Nano(Timestamp) < ?", "ServiceName = ?", "TraceId = ?", "LIMIT ?"} {
+			for _, required := range []string{"ResourceAttributes['logice.project.id'] = ?", "toUnixTimestamp64Nano(Timestamp) >= ?", "toUnixTimestamp64Nano(Timestamp) < ?", "ServiceName = ?", "TraceId = ?", "LIMIT ?"} {
 				if !strings.Contains(query, required) {
 					t.Fatalf("missing %q in %s", required, query)
 				}
@@ -42,7 +42,7 @@ func TestQueriesScopeAndParameters(t *testing.T) {
 			if strings.Count(query, "?") != len(args) {
 				t.Fatalf("placeholders do not match args: %s, %#v", query, args)
 			}
-			if args[0] != f.From.UnixNano() || args[1] != f.To.UnixNano() || args[2] != f.Service {
+			if args[0] != f.project || args[1] != f.From.UnixNano() || args[2] != f.To.UnixNano() || args[3] != f.Service {
 				t.Fatalf("bounds or service parameters = %#v", args)
 			}
 			for _, arg := range args {
@@ -53,7 +53,7 @@ func TestQueriesScopeAndParameters(t *testing.T) {
 		})
 	}
 	query, args := tracesQuery(f)
-	want := []any{f.From.UnixNano(), f.To.UnixNano(), f.Service, f.Search, f.Search, traceID, "Error", 2}
+	want := []any{f.project, f.From.UnixNano(), f.To.UnixNano(), f.Service, f.Search, f.Search, traceID, "Error", 2}
 	if !reflect.DeepEqual(args, want) || !strings.Contains(query, "HAVING countIf(StatusCode = ?) > 0") || strings.Contains(query, "AND StatusCode =") {
 		t.Fatalf("error trace grouping: %s, %#v", query, args)
 	}
@@ -63,7 +63,7 @@ func TestQueriesScopeAndParameters(t *testing.T) {
 		}
 	}
 	query, args = logsQuery(f, 200)
-	want = []any{f.From.UnixNano(), f.To.UnixNano(), f.Service, f.Search, 17, traceID, 201}
+	want = []any{f.project, f.From.UnixNano(), f.To.UnixNano(), f.Service, f.Search, 17, traceID, 201}
 	if !reflect.DeepEqual(args, want) || !strings.Contains(query, "position(Body, ?) > 0") || strings.Contains(query, "LIKE") {
 		t.Fatalf("literal log search: %s, %#v", query, args)
 	}

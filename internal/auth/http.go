@@ -21,9 +21,10 @@ import (
 
 // Service owns the authentication boundary. Static web assets contain no user data.
 type Service struct {
-	settings *settings
-	pool     *pgxpool.Pool
-	limits   limiter
+	settings  *settings
+	pool      *pgxpool.Pool
+	limits    limiter
+	ingestion http.Handler
 }
 
 // New validates trusted origin and encryption settings. A nil database is never an auth bypass.
@@ -87,13 +88,22 @@ func decode(r *http.Request, v any) error {
 	return nil
 }
 
-// Wrap protects every API route except liveness and the explicit authentication endpoints.
+// Wrap requires sessions and project access for application APIs, and separate
+// project bearer tokens for OTLP. Liveness and authentication entry points are explicit exceptions.
 // Neither forwarded headers nor Cloudflare identity headers confer authentication.
 func (s *Service) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("Referrer-Policy", "no-referrer")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
+		if r.URL.Path == "/v1/traces" || r.URL.Path == "/v1/logs" {
+			if s.ingestion == nil {
+				unavailable(w)
+				return
+			}
+			s.ingestion.ServeHTTP(w, r)
+			return
+		}
 		if r.URL.Path == "/api/healthz" {
 			next.ServeHTTP(w, r)
 			return
@@ -112,7 +122,7 @@ func (s *Service) Wrap(next http.Handler) http.Handler {
 			unavailable(w)
 			return
 		}
-		_, err := sessionUser(ctx, s.pool, s.readCookie(r, "session"))
+		u, err := sessionUser(ctx, s.pool, s.readCookie(r, "session"))
 		cancel()
 		if errors.Is(err, errDenied) {
 			denied(w)
@@ -124,7 +134,7 @@ func (s *Service) Wrap(next http.Handler) http.Handler {
 		}
 		// Query handlers own their deadlines. Preserve client cancellation, but
 		// do not pass the authentication deadline into telemetry work.
-		next.ServeHTTP(w, r)
+		s.projectRoute(w, r, u, next)
 	})
 }
 

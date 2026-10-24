@@ -1,4 +1,10 @@
 import { readFileSync } from "node:fs"
+
+vi.mock("../project-path", async (original) => ({
+  ...(await original<typeof import("../project-path")>()),
+  projectApi: (path: string) => `/api/projects/11111111-1111-1111-1111-111111111111${path}`,
+}))
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import {
   fetchLive,
@@ -647,7 +653,6 @@ describe("suspension and recovery", () => {
   it.each([
     [400, "invalid_query"],
     [422, "response_too_large"],
-    [404, "unsupported_endpoint"],
     [200, "invalid_response"],
     [200, "response_too_large"],
   ])(
@@ -674,7 +679,7 @@ describe("suspension and recovery", () => {
       expect(request).toHaveBeenCalledTimes(3)
     },
   )
-  it.each([401, 403])(
+  it.each([401, 403, 404])(
     "clears retained telemetry and last-success time on HTTP %s",
     async (status) => {
       const request = vi

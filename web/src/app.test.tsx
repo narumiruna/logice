@@ -56,8 +56,8 @@ describe("application shell", () => {
         </ThemeProvider>,
       )
       expect(html).toContain("Logice")
-      expect(html).toContain("Local validation")
-      expect(html).toContain("Validation project only")
+      expect(html).toContain("Project workspace")
+      expect(html).toContain("Project-scoped telemetry")
       expect(html).toContain("Skip to content")
       expect(html).toContain("Loading traces")
       expect(html).toContain("No live polling")

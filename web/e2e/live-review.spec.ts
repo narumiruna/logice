@@ -1,4 +1,4 @@
-import { expect, test } from "./auth-fixtures"
+import { expect, projectHref, test } from "./auth-fixtures"
 import {
   advance,
   control,
@@ -27,7 +27,7 @@ for (const suspension of ["hidden", "offline"] as const) {
     })
     let first = true
     let aborted = false
-    await page.route("**/api/live?**", async (route) => {
+    await page.route("**/api/projects/*/live?**", async (route) => {
       if (!first) {
         await route.fallback()
         return
@@ -46,12 +46,12 @@ for (const suspension of ["hidden", "offline"] as const) {
       mode: "paused",
       service: "fixed-review",
     })
-    await page.goto(`/live?${query}`)
+    await page.goto(projectHref(`/live?${query}`))
     const url = page.url()
     await expect.poll(() => state.queries.length).toBe(1)
     const failure = page.waitForEvent(
       "requestfailed",
-      (request) => new URL(request.url()).pathname === "/api/live",
+      (request) => new URL(request.url()).pathname === projectHref("/api/live"),
     )
     if (suspension === "hidden") {
       await page.evaluate(() => {
@@ -107,7 +107,7 @@ for (const suspension of ["hidden", "offline"] as const) {
 
 test("Live keeps the focused histogram slot when rolling timestamps change", async ({ page }) => {
   const state = await control(page)
-  await page.goto("/live")
+  await page.goto(projectHref("/live"))
   await expect(row(page, record(0).id)).toBeVisible()
   const buttons = page.locator(".lv-histogram button")
   const selected = buttons.nth(27)

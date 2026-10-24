@@ -25,6 +25,10 @@ type liveDriverContext struct{ context.Context }
 func (liveDriverContext) Deadline() (time.Time, bool) { return time.Time{}, false }
 
 func (s *Store) Live(ctx context.Context, f LiveFilter) (LiveSnapshot, error) {
+	f.project = projectFrom(ctx)
+	if f.project == "" {
+		return LiveSnapshot{}, ErrScope
+	}
 	if err := f.Validate(); err != nil {
 		return LiveSnapshot{}, err
 	}
@@ -125,7 +129,7 @@ func (s *Store) liveRecords(ctx context.Context, q string, args []any, logs, con
 
 func liveIdentity(r LiveRecord, payload string) string {
 	if r.Kind == "span" && liveValidID(r.TraceID, 32) && liveValidID(r.SpanID, 16) {
-		return "span:validation:" + strings.ToLower(r.TraceID) + ":" + strings.ToLower(r.SpanID)
+		return "span:" + r.ResourceAttributes["logice.project.id"] + ":" + strings.ToLower(r.TraceID) + ":" + strings.ToLower(r.SpanID)
 	}
 	sum := sha256.Sum256([]byte(payload))
 	prefix := "log:v1:"

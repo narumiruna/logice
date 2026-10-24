@@ -4,6 +4,7 @@ import { ApiError, fetchList, fetchTrace } from "./api"
 import { Notice, WindowLabel } from "./components"
 import { FilterForm } from "./filters"
 import { LogList, TraceList } from "./lists"
+import { projectPath } from "./project-path"
 import { AppShell } from "./shell"
 import { filterResetHref, listHref, parseRoute, routeHref } from "./telemetry"
 import { TraceDetail } from "./trace-detail"
@@ -124,7 +125,7 @@ export function App() {
         ) : route.error ? (
           <Notice title="Invalid query" tone="error">
             <p>{route.error}</p>
-            <a href={logs ? "/logs" : "/traces"}>Reset to the last hour</a>
+            <a href={projectPath(logs ? "/logs" : "/traces")}>Reset to the last hour</a>
           </Notice>
         ) : (
           <>
@@ -174,7 +175,7 @@ export function App() {
           </>
         )}
         <footer className="page-footer">
-          <span>Local validation project</span>
+          <span>Project-scoped telemetry</span>
           <span>UTC timestamps · No automatic refresh</span>
         </footer>
       </main>

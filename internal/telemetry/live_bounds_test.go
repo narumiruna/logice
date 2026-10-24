@@ -21,7 +21,7 @@ type liveTestConn struct{ testConn }
 func (liveTestConn) CheckNamedValue(*driver.NamedValue) error { return nil }
 
 func TestLiveDriverBudget(t *testing.T) {
-	parent, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	parent, cancel := context.WithTimeout(WithProject(context.Background(), "validation"), 20*time.Millisecond)
 	defer cancel()
 	ctx, stop := queryContext(parent)
 	defer stop()
@@ -41,7 +41,7 @@ func TestLiveDriverBudget(t *testing.T) {
 		t.Fatal("driver lost cancellation reason")
 	}
 	type key struct{}
-	canceled, parentCancel := context.WithCancel(context.WithValue(context.Background(), key{}, "retained"))
+	canceled, parentCancel := context.WithCancel(context.WithValue(WithProject(context.Background(), "validation"), key{}, "retained"))
 	budget, budgetCancel := queryContext(canceled)
 	defer budgetCancel()
 	wrapped := liveDriverContext{budget}
@@ -103,7 +103,7 @@ func TestLiveFiveQueriesForOneHundredTraces(t *testing.T) {
 	}
 	store := NewStore(sql.OpenDB(liveTestConnector{testConnector{query: query}}))
 	t.Cleanup(func() { _ = store.Close() })
-	r, err := store.Live(context.Background(), f)
+	r, err := store.Live(WithProject(context.Background(), "validation"), f)
 	if err != nil || calls != 5 || len(r.Spans) != 100 || len(r.Context) != 100 || r.ContextTruncated {
 		t.Fatalf("bounded context: calls=%d spans=%d context=%d error=%v", calls, len(r.Spans), len(r.Context), err)
 	}

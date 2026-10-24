@@ -1,4 +1,5 @@
 import type { TimeWindow } from "../api"
+import { localProjectPath, projectPath } from "../project-path"
 import { timestampNs } from "../telemetry"
 
 export type LiveRange = "1m" | "5m" | "15m"
@@ -71,7 +72,7 @@ export function validateLiveRoute(route: LiveRoute): void {
 
 export function parseLiveRoute(href: string): LiveRoute {
   const url = new URL(href, "http://local")
-  if (url.pathname !== "/live" && url.pathname !== "/live/")
+  if (localProjectPath(href) !== "/live" && localProjectPath(href) !== "/live/")
     throw new LiveRouteError("This is not a Live URL.")
   try {
     for (const part of url.search.slice(1).split("&")) decodeURIComponent(part.replace(/\+/g, " "))
@@ -146,7 +147,7 @@ export function liveQuery(route: LiveRoute): URLSearchParams {
 export function liveHref(route: LiveRoute): string {
   const params = liveQuery(route)
   params.set("mode", route.live ? "live" : "paused")
-  return `/live?${params}`
+  return `${projectPath("/live")}?${params}`
 }
 
 export function pinLiveRoute(route: LiveRoute, window: TimeWindow): LiveRoute {

@@ -4,6 +4,8 @@ import { App } from "./app"
 import { SessionGate } from "./auth"
 import { LivePage } from "./live/page"
 import { LivePreview } from "./preview/live-preview"
+import { localProjectPath } from "./project-path"
+import { ProjectGate } from "./projects"
 import { initializeTheme, ThemeProvider } from "./theme"
 
 const root = document.getElementById("root")
@@ -19,10 +21,14 @@ createRoot(root).render(
       <SessionGate>
         {window.location.pathname.replace(/\/$/, "") === "/preview" ? (
           <LivePreview />
-        ) : window.location.pathname.replace(/\/$/, "") === "/live" ? (
-          <LivePage />
         ) : (
-          <App />
+          <ProjectGate>
+            {localProjectPath(window.location.href).replace(/\/$/, "") === "/live" ? (
+              <LivePage />
+            ) : (
+              <App />
+            )}
+          </ProjectGate>
         )}
       </SessionGate>
     </ThemeProvider>

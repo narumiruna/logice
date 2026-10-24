@@ -2,7 +2,7 @@
 
 A self-hosted observability platform under development, with a Go backend, React/TypeScript frontend, PostgreSQL application data, and ClickHouse telemetry.
 
-**Current status:** a real-data Live explorer, local trace/log lists, structured filters, span and log details, ClickHouse query APIs, web/API container images, and real-service validation. Invitation-only Passkey deployment wiring is included; release requires matching authentication-capable API/web images and operator validation. Multi-project access and production readiness remain out of scope.
+**Current status:** a real-data Live explorer, local trace/log lists, structured filters, span and log details, ClickHouse query APIs, web/API container images, and real-service validation. Invitation-only Passkey deployment wiring is included; release requires matching authentication-capable API/web images and operator validation. Project roles (Owner, Developer, Viewer), isolated telemetry reads, and project-level ingestion tokens are implemented. Production readiness still requires operator validation. See [project access and migration](docs/project-access.md).
 
 ## Usage
 
@@ -19,7 +19,7 @@ The choice persists in this browser across navigation and reloads. Switching doe
 
 ## Live explorer
 
-Open **http://localhost:5173/live** after building the web/API services. It combines actual exported spans and logs with bounded automatic polling, a server-counted histogram, an expandable hierarchy, and an inspector. Pause freezes the current window. See [Live usage, identity rules, and limits](docs/live-telemetry.md). This remains a fixed-project feature without running-span streaming. The query API requires a signed-in session in the authentication release.
+After login, select a project and open **Live** at `/projects/{projectID}/live`. It combines actual exported spans and logs with bounded automatic polling, a server-counted histogram, an expandable hierarchy, and an inspector. Pause freezes the current window. See [Live usage, identity rules, and limits](docs/live-telemetry.md). Each query is authorized against project membership. Running-span streaming is not supported. The query API requires a signed-in session in the authentication release.
 
 ### Design preview
 
@@ -46,7 +46,7 @@ The test starts a randomly named isolated Compose project, generates temporary c
 
 ## Run with Docker Compose
 
-This Compose file starts the web application, Go API, PostgreSQL, ClickHouse, and OpenTelemetry Collector. It is for local validation, not a production deployment. It uses one ingestion token and one fixed project ID. All published ports bind to loopback. The web port is fixed at `5173`; database and Collector host ports are random. Docker builds the application images, so host Go and Node.js installations are not required.
+This Compose file starts the web application, Go API, PostgreSQL, ClickHouse, and OpenTelemetry Collector. It is for local validation, not a production deployment. Projects have separate membership and application ingestion tokens. All published ports bind to loopback. The web port is fixed at `5173`; database host ports are random. Collector ports are private. Docker builds the application images, so host Go and Node.js installations are not required.
 
 In a new checkout, create a protected `.env` once. This command refuses to overwrite an existing file:
 
@@ -61,7 +61,6 @@ test ! -e .env && (
 )
 docker compose --project-name logice-validation config --quiet
 docker compose --project-name logice-validation up --build --detach --wait --wait-timeout 120
-docker compose --project-name logice-validation port collector 4318
 ```
 
 Compose runs `logice migrate` before starting the API. Bootstrap the first administrator once:
@@ -72,9 +71,9 @@ docker compose --project-name logice-validation run --rm --no-deps api bootstrap
 
 This prints only a single-use enrollment invitation. Keep it out of logs and transfer it securely. Open **http://localhost:5173**, expand **Accept an invitation**, enter the invitation token, and select **Create a passkey** within one hour. For later visits, select **Sign in with a passkey**. The login page supports desktop/mobile layouts and the Classic/Studio themes. It does not request telemetry before login. Use this exact origin, not `127.0.0.1`. See [operations](docs/passkey-operations.md) for later invitations and lost-Passkey recovery.
 
-After login, select **Live**, **Traces**, or **Logs**, apply filters, and open a record for details. Views are empty until your applications send matching telemetry. Nginx serves static assets without requiring authentication and forwards `/api` to Go, which protects query routes. The API has no published host port. Check process liveness with `curl http://localhost:5173/api/healthz`. PostgreSQL stores authentication data; ClickHouse stores telemetry for the fixed `validation` project. Stop Vite first if it already uses port `5173`.
+After login, create or select a project, then select **Live**, **Traces**, or **Logs**, apply filters, and open a record for details. Views are empty until your applications send matching telemetry. Nginx serves static assets without requiring authentication and forwards `/api` and `/v1/` to Go, which checks project access and ingestion tokens. The API has no published host port. Check process liveness with `curl http://localhost:5173/api/healthz`. PostgreSQL stores accounts, projects, memberships, and token hashes; ClickHouse stores project-scoped telemetry. Stop Vite first if it already uses port `5173`.
 
-Use the displayed Collector address as the OTLP/HTTP endpoint and send `Authorization: Bearer <OTLP_TOKEN>`. Use `/v1/traces` and `/v1/logs`. Query port `4317` for the local gRPC endpoint or `13133` for the Collector health endpoint. The test harness waits for Collector HTTP readiness separately; Compose's `--wait` alone does not establish Collector readiness.
+Create a token in **Project settings** and use `http://localhost:5173` as the OTLP/HTTP protobuf base endpoint, with `Authorization: Bearer <PROJECT_TOKEN>`. Paths are `/v1/traces` and `/v1/logs`. The `.env` `OTLP_TOKEN` is an internal Collector credential, not an application credential. Public project-token gRPC is not supported. See [roles, tokens, migration, and rollback](docs/project-access.md).
 
 Stop without deleting data:
 
@@ -100,7 +99,7 @@ Use Go 1.26.10 or a patched later release and Node.js 26.11.1 with npm 11.20.0. 
 npm --prefix web ci
 ```
 
-Export `AUTH_ORIGIN=http://localhost:5173`, a valid 64-hex-character `ENCRYPTION_KEY`, and `DATABASE_URL` for your local PostgreSQL instance (or the equivalent libpq `PG*` variables). A protected `.env` used by Compose is not automatically loaded by `go run`. Run migrations and bootstrap with the same configuration before starting the server:
+Export `COLLECTOR_URL` for a private Collector, its internal `OTLP_TOKEN`, `AUTH_ORIGIN=http://localhost:5173`, a valid 64-hex-character `ENCRYPTION_KEY`, and `DATABASE_URL` for your local PostgreSQL instance (or the equivalent libpq `PG*` variables). A protected `.env` used by Compose is not automatically loaded by `go run`. Run migrations and bootstrap with the same configuration before starting the server:
 
 ```sh
 go run ./cmd/logice migrate
@@ -114,7 +113,7 @@ go run ./cmd/logice
 npm --prefix web run dev
 ```
 
-Go defaults to `127.0.0.1:8080`; Compose explicitly uses `-listen 0.0.0.0:8080` inside the API container. `GET /api/healthz` reports process liveness, not database or application readiness. Vite listens on `127.0.0.1:5173` and forwards `/api` to Go. Browse with `http://localhost:5173` to match `AUTH_ORIGIN`. A port conflict fails instead of selecting another port. Go does not yet serve frontend assets. Do not expose these development servers publicly.
+Go defaults to `127.0.0.1:8080`; Compose explicitly uses `-listen 0.0.0.0:8080` inside the API container. `GET /api/healthz` reports process liveness, not database or application readiness. Vite listens on `127.0.0.1:5173` and forwards `/api` and `/v1` to Go. Browse with `http://localhost:5173` to match `AUTH_ORIGIN`. A port conflict fails instead of selecting another port. Go does not yet serve frontend assets. Do not expose these development servers publicly.
 
 ## Repository checks
 

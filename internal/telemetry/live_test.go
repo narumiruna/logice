@@ -143,12 +143,12 @@ func TestLiveQueryPredicatesAndBounds(t *testing.T) {
 		if !strings.Contains(histogram, scope) || !strings.Contains(histogram, "toInt128") || strings.Contains(histogram, "LIMIT") {
 			t.Fatal("histogram lost scope/counts")
 		}
-		if logs && hargs[len(hargs)-3] != 17 {
+		if logs && hargs[len(hargs)-4] != 17 {
 			t.Fatal("error severity threshold not combined")
 		}
 	}
 	q, args := liveContextQuery(f, []string{traceID}, []LiveRecord{{ID: "id", Kind: "span", TraceID: traceID, ParentSpanID: "0123456789abcdef"}})
-	if strings.Contains(q, "positionCaseInsensitive") || strings.Contains(q, "ServiceName =") || !strings.Contains(q, "PARTITION BY traceGroup") || !strings.Contains(q, "LIMIT 501") || len(args) != 6 {
+	if strings.Contains(q, "positionCaseInsensitive") || strings.Contains(q, "ServiceName =") || !strings.Contains(q, "PARTITION BY traceGroup") || !strings.Contains(q, "LIMIT 501") || len(args) != 7 {
 		t.Fatal("context not fair/bounded")
 	}
 }
@@ -168,7 +168,7 @@ func TestLiveSharedBudgetAndComponentFailures(t *testing.T) {
 		cancellations = append(cancellations, ctx.Done())
 		return rows(), nil
 	})
-	result, err := store.Live(context.Background(), f)
+	result, err := store.Live(WithProject(context.Background(), "validation"), f)
 	if err != nil || len(result.Histogram) != 60 || calls != 4 {
 		t.Fatalf("empty live %d %v", calls, err)
 	}
@@ -186,7 +186,7 @@ func TestLiveSharedBudgetAndComponentFailures(t *testing.T) {
 			}
 			return rows(), nil
 		})
-		got, err := failed.Live(context.Background(), f)
+		got, err := failed.Live(WithProject(context.Background(), "validation"), f)
 		if err == nil || got.Histogram != nil {
 			t.Fatal("partial success")
 		}
@@ -194,14 +194,14 @@ func TestLiveSharedBudgetAndComponentFailures(t *testing.T) {
 	missing := testStore(t, func(context.Context, string, []driver.NamedValue) (driver.Rows, error) {
 		return nil, &clickhouse.Exception{Code: 60}
 	})
-	if _, err = missing.Live(context.Background(), f); err != nil {
+	if _, err = missing.Live(WithProject(context.Background(), "validation"), f); err != nil {
 		t.Fatal(err)
 	}
 	calls = 0
-	if _, err = store.Live(context.Background(), LiveFilter{}); err == nil || calls != 0 {
+	if _, err = store.Live(WithProject(context.Background(), "validation"), LiveFilter{}); err == nil || calls != 0 {
 		t.Fatal("invalid filter reached database")
 	}
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(WithProject(context.Background(), "validation"))
 	cancel()
 	if _, err = store.Live(ctx, f); err == nil {
 		t.Fatal("cancellation ignored")
@@ -226,7 +226,7 @@ func TestLiveCollisionAndStoredRead(t *testing.T) {
 			}
 			return rows(first), nil
 		})
-		result, err := store.liveRecords(context.Background(), q, args, true, false)
+		result, err := store.liveRecords(WithProject(context.Background(), "validation"), q, args, true, false)
 		if invalid {
 			if err == nil {
 				t.Fatal("digest collision merged")

@@ -2,7 +2,7 @@
 
 ## Scope and release gate
 
-Logice uses invitation-only Passkey accounts and server-side sessions for its single shared telemetry project. Password login, TOTP, OIDC, and Pocket ID are not part of this authentication release. The [earlier multi-method design](design/authentication-methods.md) remains a deferred reference, not the release scope.
+Logice uses invitation-only Passkey accounts and server-side sessions. Projects have separate membership and Owner, Developer, and Viewer roles; see [project access](project-access.md). Password login, TOTP, OIDC, and Pocket ID are not part of this authentication release. The [earlier multi-method design](design/authentication-methods.md) remains a deferred reference, not the release scope.
 
 Deployment wiring alone does not prove that authentication is available. Do not deploy until matching API and web images contain the authentication implementation and its tests pass. Keep Cloudflare Access enabled. An operator must verify a real Passkey login on `https://logice.narumi.dev` before release approval. Do not use existing operator accounts for automated tests.
 
@@ -14,8 +14,8 @@ See [Passkey operations](passkey-operations.md) for configuration, migration, bo
 - Static frontend assets can be public. Health probes do not require a session. Authentication entry points permit only their defined login or invitation ceremony operations, not query access.
 - Enrollment requires an unexpired invitation. There is no public signup or unauthenticated server mode.
 - Only an authenticated administrator can create invitations through the application. The first administrator is created through the operator-only bootstrap CLI.
-- OTLP ingestion remains separate. The Collector requires `Authorization: Bearer <OTLP_TOKEN>`; a browser session does not authorize ingestion, and an ingestion token does not authorize queries.
-- All signed-in users access the current shared project. This does not implement multi-project authorization.
+- OTLP ingestion uses project tokens through Go. The private Collector uses a separate internal `OTLP_TOKEN`; never give that credential to SDKs. Browser sessions do not authorize ingestion, and ingestion tokens do not authorize queries.
+- Signed-in users can access only projects they own or have joined. Platform administrators have no implicit project access.
 
 ## Configuration and storage
 
@@ -43,7 +43,7 @@ See [Passkey operations](passkey-operations.md) for configuration, migration, bo
 
 Keep Cloudflare Access in front of the application while authentication is validated. The chart's default web NodePort `30173` can bypass Cloudflare Access if a client can reach a node directly. Restrict node firewall rules or use `web.service.type: ClusterIP` with private tunnel routing. ClusterIP alone does not restrict other cluster workloads; apply cluster network policy where required.
 
-Nginx forwards `/api` to the Go API; it need not require authentication for static files. TLS terminates at the trusted edge. Do not use proxy headers to override the configured WebAuthn origin or weaken cookie policy.
+Nginx forwards `/api` and `/v1/` to the Go API; it need not require authentication for static files. TLS terminates at the trusted edge. Do not use proxy headers to override the configured WebAuthn origin or weaken cookie policy.
 
 ## Required release evidence
 
