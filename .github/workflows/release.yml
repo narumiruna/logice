@@ -1,0 +1,58 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26.11.1
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: test "$(npm --version)" = 11.20.0
+      - uses: actions/setup-go@v7
+        with:
+          go-version: 1.26.10
+          cache: true
+      - run: HUSKY=0 npm --prefix web ci
+      - run: go mod verify
+      - run: sh scripts/check-go.sh
+      - run: npm --prefix web run ci
+      - name: Create version PR or push release tag
+        id: changesets
+        uses: changesets/action@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
+        with:
+          cwd: web
+          version-script: npm run version:release
+          publish-script: npm run release:tag
+          commit-message: "chore(release): version Logice"
+          pr-title: "chore(release): version Logice"
+          pr-draft: create
+          create-github-releases: false
+          push-git-tags: true
+      - name: Create GitHub release or recover an incomplete release
+        if: steps.changesets.outputs.has-changesets == 'false'
+        run: npm --prefix web run release:github
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
