@@ -39,6 +39,29 @@ services:
     restart: "no"
     mem_limit: 128m
 
+  alerts-worker:
+    profiles: ["alerts"]
+    build:
+      context: .
+      dockerfile: deploy/api.Dockerfile
+    command: ["alerts-worker"]
+    environment:
+      CLICKHOUSE_ADDR: clickhouse:9000
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?Set CLICKHOUSE_PASSWORD}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?Set ENCRYPTION_KEY}
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: logice
+      PGDATABASE: logice
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      clickhouse:
+        condition: service_healthy
+    restart: on-failure
+    mem_limit: 128m
+
   web:
     build:
       context: .

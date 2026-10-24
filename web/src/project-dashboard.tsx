@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react"
 import { fetchList, type ListResult, type Log, type TraceSummary } from "./api"
 import { canManageTokens, type Project } from "./project-api"
+import { ProjectOverview } from "./project-overview"
 import { AppShell } from "./shell"
 import { formatDuration, isTraceId, listHref, relativeWindow, traceHref } from "./telemetry"
 
 export function ProjectDashboard({ project }: { project: Project }) {
+  const [service, setService] = useState("")
+  const [draftService, setDraftService] = useState("")
   const [range, setRange] = useState<"15m" | "1h" | "24h">("1h")
   const [window, setWindow] = useState(() => relativeWindow("1h"))
   const [data, setData] = useState<{
@@ -20,7 +23,7 @@ export function ProjectDashboard({ project }: { project: Project }) {
     setError("")
     const filters = {
       ...window,
-      service: "",
+      service,
       search: "",
       limit: 5,
       errorsOnly: false,
@@ -42,7 +45,7 @@ export function ProjectDashboard({ project }: { project: Project }) {
         if (!controller.signal.aborted) setBusy(false)
       })
     return () => controller.abort()
-  }, [window])
+  }, [window, service])
   const base = `/projects/${project.id}`
   return (
     <AppShell page="dashboard">
@@ -51,7 +54,10 @@ export function ProjectDashboard({ project }: { project: Project }) {
           <div>
             <span className="eyebrow">{project.name} / Overview</span>
             <h1>Dashboard</h1>
-            <p>A recent sample of your project's stored traces and logs.</p>
+            <p>
+              Stored project telemetry across the selected UTC window, with recent records for
+              investigation.
+            </p>
           </div>
           <div className="dashboard-actions">
             <label>
@@ -86,29 +92,32 @@ export function ProjectDashboard({ project }: { project: Project }) {
         <p className="dashboard-window">
           UTC window: <time>{window.from}</time> – <time>{window.to}</time>
         </p>
-        <section className="dashboard-stats" aria-label="Recent telemetry sample">
-          <article>
-            <span>Traces in sample</span>
-            <strong>
-              {data ? `${data.traces.items.length}${data.traces.hasMore ? "+" : ""}` : "—"}
-            </strong>
-            <small>Up to 5 most recent matching traces</small>
-          </article>
-          <article>
-            <span>Logs in sample</span>
-            <strong>
-              {data ? `${data.logs.items.length}${data.logs.hasMore ? "+" : ""}` : "—"}
-            </strong>
-            <small>Up to 5 most recent matching logs</small>
-          </article>
-          <article>
-            <span>Error traces in sample</span>
-            <strong>
-              {data ? data.traces.items.filter((trace) => trace.errorCount > 0).length : "—"}
-            </strong>
-            <small>Not a project-wide error rate</small>
-          </article>
-        </section>
+        <form
+          className="settings-form"
+          onSubmit={(event) => {
+            event.preventDefault()
+            setService(draftService)
+            setData(null)
+            setWindow(relativeWindow(range))
+          }}
+        >
+          <label>
+            Dashboard service
+            <input
+              value={draftService}
+              onChange={(e) => setDraftService(e.target.value)}
+              maxLength={200}
+            />
+          </label>
+          <button className="button button-secondary" type="submit">
+            Apply dashboard service
+          </button>
+        </form>
+        <ProjectOverview window={window} service={service} />
+        <p className="settings-hint">
+          Up to 5 most recent matching records are shown below. Sample counts are not a project-wide
+          error rate.
+        </p>
         {busy && (
           <p className="workspace-loading" role="status">
             Loading dashboard…
@@ -128,11 +137,19 @@ export function ProjectDashboard({ project }: { project: Project }) {
           </div>
         )}
         {data && (
-          <div className="dashboard-grid">
+          <section className="dashboard-grid" aria-label="Recent telemetry sample">
             <section className="settings-card">
               <div className="settings-card-heading">
                 <h2>Recent traces</h2>
-                <a href={listHref("traces", window)}>View all traces</a>
+                <small>
+                  {data.traces.items.length}
+                  {data.traces.hasMore ? "+" : ""} sampled traces
+                </small>
+                <a
+                  href={`${listHref("traces", window)}${service ? `&service=${encodeURIComponent(service)}` : ""}`}
+                >
+                  View all traces
+                </a>
               </div>
               {data.traces.items.length ? (
                 <ul className="dashboard-records">
@@ -160,7 +177,11 @@ export function ProjectDashboard({ project }: { project: Project }) {
             <section className="settings-card">
               <div className="settings-card-heading">
                 <h2>Recent logs</h2>
-                <a href={listHref("logs", window)}>View all logs</a>
+                <a
+                  href={`${listHref("logs", window)}${service ? `&service=${encodeURIComponent(service)}` : ""}`}
+                >
+                  View all logs
+                </a>
               </div>
               {data.logs.items.length ? (
                 <ul className="dashboard-records">
@@ -185,7 +206,7 @@ export function ProjectDashboard({ project }: { project: Project }) {
                 </p>
               )}
             </section>
-          </div>
+          </section>
         )}
         <section className="settings-card ingestion-guide">
           <div>
@@ -209,6 +230,9 @@ export function ProjectDashboard({ project }: { project: Project }) {
               }
             >
               {canManageTokens(project.role) ? "Manage ingestion tokens" : "View project members"}
+            </a>
+            <a className="button button-secondary" href={`${base}/setup`}>
+              Start project setup
             </a>
             <a className="button button-secondary" href={`${base}/live`}>
               Open Live

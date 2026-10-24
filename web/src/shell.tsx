@@ -15,6 +15,9 @@ type Page =
   | "dashboard"
   | "settings"
   | "account"
+  | "setup"
+  | "views"
+  | "alerts"
 
 export function AppShell({
   page,
@@ -57,6 +60,36 @@ export function AppShell({
             label: "Project settings",
             icon: "box" as const,
             href: projectPath("/settings"),
+          },
+        ]
+      : []),
+    ...(scoped
+      ? [
+          {
+            page: "setup" as const,
+            label: "Connect application",
+            icon: "box" as const,
+            href: projectPath("/setup"),
+          },
+        ]
+      : []),
+    ...(scoped
+      ? [
+          {
+            page: "views" as const,
+            label: "Saved views",
+            icon: "layers" as const,
+            href: projectPath("/views"),
+          },
+        ]
+      : []),
+    ...(scoped
+      ? [
+          {
+            page: "alerts" as const,
+            label: "Alerts",
+            icon: "activity" as const,
+            href: projectPath("/alerts"),
           },
         ]
       : []),

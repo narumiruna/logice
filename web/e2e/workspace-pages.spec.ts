@@ -180,7 +180,12 @@ test("dashboard labels bounded real samples, preserves scope and clears errors o
     new RegExp(`/projects/${project}/traces/${trace.traceId}\\?`),
   )
   await expect(page.getByRole("region", { name: "Recent telemetry sample" })).toContainText("1+")
-  await expect(page.getByText("Not a project-wide error rate", { exact: true })).toBeVisible()
+  await expect(
+    page.getByText(
+      "Up to 5 most recent matching records are shown below. Sample counts are not a project-wide error rate.",
+      { exact: true },
+    ),
+  ).toBeVisible()
   fail = true
   await page.getByRole("button", { name: "Refresh dashboard" }).click()
   await expect(page.getByRole("alert")).toContainText("Dashboard unavailable")

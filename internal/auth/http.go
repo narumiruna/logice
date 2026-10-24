@@ -17,14 +17,16 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/narumiruna/logice/internal/alerts"
 )
 
 // Service owns the authentication boundary. Static web assets contain no user data.
 type Service struct {
-	settings  *settings
-	pool      *pgxpool.Pool
-	limits    limiter
-	ingestion http.Handler
+	settings    *settings
+	pool        *pgxpool.Pool
+	limits      limiter
+	ingestion   http.Handler
+	alertCrypto *alerts.Crypto
 }
 
 // New validates trusted origin and encryption settings. A nil database is never an auth bypass.
@@ -33,7 +35,11 @@ func New(c Config, pool *pgxpool.Pool) (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Service{settings: s, pool: pool}, nil
+	crypto, err := alerts.NewCrypto(c.EncryptionKey)
+	if err != nil {
+		return nil, err
+	}
+	return &Service{settings: s, pool: pool, alertCrypto: crypto}, nil
 }
 
 func (s *Service) cookieName(kind string) string {
@@ -140,7 +146,7 @@ func (s *Service) Wrap(next http.Handler) http.Handler {
 
 func (s *Service) serve(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
-	readOnly := path == "/api/auth/csrf" || path == "/api/auth/session"
+	readOnly := path == "/api/auth/csrf" || path == "/api/auth/session" || path == "/api/auth/passkeys"
 	if (readOnly && r.Method != http.MethodGet) || (!readOnly && r.Method != http.MethodPost) {
 		w.Header().Set("Allow", map[bool]string{true: "GET", false: "POST"}[readOnly])
 		failure(w, 405, "method_not_allowed", "Method not allowed.")
@@ -188,6 +194,8 @@ func (s *Service) serve(w http.ResponseWriter, r *http.Request) {
 		r = r.WithContext(context.WithValue(r.Context(), browserVersionKey{}, version))
 	}
 	switch path {
+	case "/api/auth/passkeys", "/api/auth/passkeys/rename", "/api/auth/passkeys/authorize/begin", "/api/auth/passkeys/authorize/finish", "/api/auth/passkeys/add/finish":
+		s.passkeys(w, r)
 	case "/api/auth/session":
 		u, err := sessionUser(r.Context(), s.pool, s.readCookie(r, "session"))
 		if errors.Is(err, errDenied) {
@@ -231,6 +239,10 @@ type ceremony struct {
 	Session        webauthn.SessionData `json:"session"`
 	UserID         string               `json:"userId,omitempty"`
 	Generation     int64                `json:"generation,omitempty"`
+	Operation      string               `json:"operation,omitempty"`
+	Target         string               `json:"target,omitempty"`
+	CredentialName string               `json:"credentialName,omitempty"`
+	SessionHash    []byte               `json:"sessionHash,omitempty"`
 	Invitation     []byte               `json:"invitation,omitempty"` // hash only, not the raw invitation
 }
 
@@ -450,7 +462,7 @@ func (s *Service) finishEnrollment(w http.ResponseWriter, r *http.Request) {
 		unavailable(w)
 		return
 	}
-	if _, err = tx.Exec(r.Context(), "INSERT INTO auth_credentials(id,user_id,data) VALUES($1,$2,$3)", credential.ID, u.ID, data); err != nil {
+	if _, err = tx.Exec(r.Context(), "INSERT INTO auth_credentials(id,user_id,data,created_at) VALUES($1,$2,$3,now())", credential.ID, u.ID, data); err != nil {
 		denied(w)
 		return
 	}
@@ -537,7 +549,7 @@ func (s *Service) finishLogin(w http.ResponseWriter, r *http.Request) {
 		unavailable(w)
 		return
 	}
-	tag, err := tx.Exec(r.Context(), "UPDATE auth_credentials SET data=$1 WHERE id=$2 AND user_id=$3", data, credential.ID, account.ID)
+	tag, err := tx.Exec(r.Context(), "UPDATE auth_credentials SET data=$1,last_used_at=now() WHERE id=$2 AND user_id=$3", data, credential.ID, account.ID)
 	if err != nil || tag.RowsAffected() != 1 {
 		unavailable(w)
 		return

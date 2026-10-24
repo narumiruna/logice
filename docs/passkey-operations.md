@@ -16,6 +16,12 @@ Schema version 2 adds projects, membership, and project token hashes. Follow [pr
 
 Owner account recovery uses the same account UUID and retains its project ownership. The local recovery command records `operator_account_recovery` in affected projects. It does not automatically revoke project application tokens; after recovery, verify ownership and explicitly revoke suspected tokens.
 
+## Self-service credentials and workspace migration
+
+Account Settings supports backup Passkeys, naming, and removal after fresh user verification. The last Passkey cannot be removed. See [workflow security, migration, and rollback](project-workflows.md). Management metadata uses opaque UUIDs and preserves unknown legacy dates. Required WebAuthn ceremony descriptors are not general-purpose management identifiers.
+
+The authentication-v2 contract remains present. New images additionally require workspace migrations 1–3 for saved views, Passkey metadata, and alert storage. Run the matching migration CLI before serving new images; keep the database/key backup and additive tables on rollback. Test with a physical user-verifying authenticator on the intended HTTPS origin before a production release; virtual browser tests do not establish that gate.
+
 ## Configuration
 
 | Setting | Requirement |
@@ -105,7 +111,7 @@ docker compose --project-name logice-validation run --rm --no-deps api recover -
 
 Recovery revokes that user's sessions and old credentials, records an `operator_recovery` event in PostgreSQL, and prints a new enrollment invitation. Transfer it securely and complete enrollment within one hour. Existing Passkeys for that account no longer work. This is an operator-only recovery path, not a public bypass. Record the operator action and affected UUID, but never record the invitation. If the only administrator loses access, use recovery rather than deleting authentication tables or repeating bootstrap.
 
-Sessions expire after 24 hours idle or seven days absolute. Logout revokes this browser's sessions and pending ceremonies, including concurrent login attempts. Other browsers retain their sessions until logout, expiry, or operator recovery. Invitations expire after one hour; ceremonies expire after five minutes. Authentication and query requests must fail closed when PostgreSQL is unavailable.
+Sessions expire after 24 hours idle or seven days absolute. Logout revokes this browser's sessions and pending ceremonies, including concurrent login attempts. Other browsers retain their sessions until logout, expiry, operator recovery, or self-service Passkey removal. A verified Passkey removal revokes other account sessions and rotates the current session atomically. Invitations expire after one hour; ceremonies expire after five minutes. Authentication and query requests must fail closed when PostgreSQL is unavailable.
 
 ## Backup and restore
 

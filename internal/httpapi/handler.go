@@ -37,6 +37,10 @@ func newHandler(readers ...telemetry.Reader) http.Handler {
 			return
 		}
 
+		if r.URL.Path == "/api/overview" {
+			serveOverview(reader, w, r)
+			return
+		}
 		if r.URL.Path == "/api/live" {
 			live.ServeHTTP(w, r)
 			return

@@ -164,6 +164,10 @@ func TestProjectAccessAndTokenLifecycle(t *testing.T) {
 	check(call("outsider", "POST", "/api/projects/"+foreign.ID+"/tokens/"+created.ID+"/revoke", `{}`), 404)
 	check(call("owner", "POST", base+"/tokens/"+created.ID+"/revoke", `{}`), 200)
 	check(call("owner", "POST", base+"/tokens/"+created.ID+"/revoke", `{}`), 200)
+	var revocations int
+	if err := pool.QueryRow(ctx, "SELECT count(*) FROM project_events WHERE project_id=$1 AND action='revoke_token' AND target=$2", p.ID, created.ID).Scan(&revocations); err != nil || revocations != 1 {
+		t.Fatal("idempotent revocation must record one change", err, revocations)
+	}
 	check(ingest(created.Token, nil), 401)
 	exec("UPDATE project_tokens SET revoked_at=NULL,expires_at=now()-interval '1 second' WHERE id=$1", created.ID)
 	check(ingest(created.Token, nil), 401)

@@ -2,7 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { TimeWindow } from "../api"
 import { Glyph } from "../preview/icons"
 import { projectPath } from "../project-path"
+import { SaveViewButton } from "../save-view-button"
 import { AppShell } from "../shell"
+import { captureView, liveDisplay } from "../view-definition"
 import { LiveApiError, type LiveRecord, type LiveSnapshot } from "./api"
 import { Histogram } from "./histogram"
 import { Inspector } from "./inspector"
@@ -29,7 +31,7 @@ export function LivePage() {
     return () => window.removeEventListener("popstate", onPop)
   }, [])
   const navigate = useCallback((route: LiveRoute, replace = false) => {
-    const href = liveHref(route)
+    const href = `${liveHref(route)}${window.location.hash}`
     const validated = parseLiveRoute(new URL(href, window.location.origin).href)
     if (replace) window.history.replaceState(null, "", href)
     else window.history.pushState(null, "", href)
@@ -66,9 +68,9 @@ function LiveWorkspace({
   const [fixedTo, setFixedTo] = useState(route.to ?? "")
   const fixedDirty = useRef(false)
   const [expanded, setExpanded] = useState(new Set<string>())
-  const [autoExpand, setAutoExpand] = useState(true)
-  const [follow, setFollow] = useState(true)
-  const [headers, setHeaders] = useState(true)
+  const [autoExpand, setAutoExpand] = useState(() => liveDisplay().autoExpand)
+  const [follow, setFollow] = useState(() => liveDisplay().follow)
+  const [headers, setHeaders] = useState(() => liveDisplay().headers)
   const [arrivals, setArrivals] = useState(new Set<string>())
   const [pending, setPending] = useState(0)
   const [selected, setSelected] = useState<LiveRecord | null>(null)
@@ -272,6 +274,9 @@ function LiveWorkspace({
             <h1>
               Live <span className="lp-heading-caption">Every event. In context.</span>
             </h1>
+            <SaveViewButton
+              definition={captureView(window.location.href, { headers, follow, autoExpand })}
+            />
           </div>
           <div
             className="lp-live-meta lv-status"

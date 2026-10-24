@@ -1,0 +1,105 @@
+{{- if .Values.alertsWorker.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "logice.name" . }}-alerts-worker
+  labels:
+    {{- include "logice.labels" . | nindent 4 }}
+    app.kubernetes.io/component: alerts-worker
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: logice
+      app.kubernetes.io/instance: {{ .Release.Name | quote }}
+      app.kubernetes.io/component: alerts-worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: logice
+        app.kubernetes.io/instance: {{ .Release.Name | quote }}
+        app.kubernetes.io/component: alerts-worker
+    spec:
+      automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: alerts-worker
+          image: {{ printf "%s:%s" .Values.api.image.repository .Values.api.image.tag | quote }}
+          imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+          args: ["alerts-worker"]
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          env:
+            - name: CLICKHOUSE_ADDR
+              value: {{ include "logice.name" . }}-clickhouse:9000
+            - name: PGHOST
+              value: {{ include "logice.name" . }}-postgres
+            - name: PGPORT
+              value: "5432"
+            - name: PGUSER
+              value: logice
+            - name: PGDATABASE
+              value: logice
+            {{- range $env, $key := dict "CLICKHOUSE_PASSWORD" "CLICKHOUSE_PASSWORD" "ENCRYPTION_KEY" "ENCRYPTION_KEY" "PGPASSWORD" "POSTGRES_PASSWORD" }}
+            - name: {{ $env }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.existingSecret | quote }}
+                  key: {{ $key }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.api.resources | nindent 12 }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "logice.name" . }}-alerts-worker
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: logice
+      app.kubernetes.io/instance: {{ .Release.Name | quote }}
+      app.kubernetes.io/component: alerts-worker
+  policyTypes: [Ingress, Egress]
+  ingress: []
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: logice
+              app.kubernetes.io/instance: {{ .Release.Name | quote }}
+            matchExpressions:
+              - key: app.kubernetes.io/component
+                operator: In
+                values: [postgres, clickhouse]
+      ports:
+        - {protocol: TCP, port: 5432}
+        - {protocol: TCP, port: 9000}
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except: [0.0.0.0/8, 10.0.0.0/8, 100.64.0.0/10, 127.0.0.0/8, 169.254.0.0/16, 172.16.0.0/12, 192.0.0.0/24, 192.0.2.0/24, 192.88.99.0/24, 192.168.0.0/16, 198.18.0.0/15, 198.51.100.0/24, 203.0.113.0/24, 224.0.0.0/4, 240.0.0.0/4]
+        - ipBlock:
+            cidr: 2000::/3
+            except: [2001::/23, 2001:db8::/32, 2002::/16]
+      ports:
+        - {protocol: TCP, port: 443}
+{{- end }}

@@ -96,11 +96,16 @@ func (s *stack) checkPersistence(pg, ch *sql.DB) {
 	if name != "Stack validation" || value != "persistent" {
 		s.t.Fatal("database values did not persist")
 	}
-	// PostgreSQL contains authentication/project metadata and Goose fixtures, not telemetry.
+	// PostgreSQL contains authentication/project/workspace metadata and Goose fixtures, not telemetry.
 	var tables int
 	s.must("check PostgreSQL metadata-only schema", pg.QueryRowContext(ctx, "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'").Scan(&tables))
-	if tables != 14 {
+	if tables != 20 {
 		s.t.Fatalf("expected application metadata and Goose tables only, got %d", tables)
+	}
+	var workspace int
+	s.must("check additive workspace table inventory", pg.QueryRowContext(ctx, `SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE' AND table_name IN ('workspace_schema_versions','project_views','alert_destinations','alert_rules','alert_incidents','alert_deliveries')`).Scan(&workspace))
+	if workspace != 6 {
+		s.t.Fatal("workspace migration table inventory is incomplete", workspace)
 	}
 }
 
