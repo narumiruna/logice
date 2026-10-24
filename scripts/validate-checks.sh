@@ -33,7 +33,12 @@ HUSKY= run npm --prefix web ci
 test "$(git config --get core.hooksPath)" = .husky/_
 run node -e '
 const p = require("./web/package.json");
-if (p.private !== true || p.name !== "logice-web" || p.scripts.release || p.scripts.changeset || p.devDependencies["@changesets/cli"]) process.exit(1);
+const c = require("./web/.changeset/config.json");
+if (p.private !== true || p.name !== "logice-web" || p.scripts.release || p.scripts.publish ||
+    p.scripts.changeset !== "changeset" || !p.devDependencies["@changesets/cli"] ||
+    p.scripts["release:tag"] !== "node scripts/release.mjs tag" ||
+    p.scripts["release:github"] !== "node scripts/release.mjs github" ||
+    c.privatePackages.version !== true || c.privatePackages.tag !== true) process.exit(1);
 '
 
 snapshot() {
