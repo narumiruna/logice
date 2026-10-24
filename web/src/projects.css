@@ -15,6 +15,7 @@
   background: var(--color-surface);
   color: var(--color-text);
   font-size: 12px;
+  line-height: 18px;
 }
 .account-bar small {
   display: block;

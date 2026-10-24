@@ -140,6 +140,8 @@ for (const theme of ["classic", "studio"] as const) {
           width: document.documentElement.scrollWidth,
         }))
         expect(scroll.width).toBeLessThanOrEqual(scroll.viewport)
+        const accountBar = await page.getByLabel("Account", { exact: true }).boundingBox()
+        expect(Number.isInteger(accountBar?.height)).toBe(true)
         if (index === 0) await expect(page.locator(".project-card").first()).toBeVisible()
         if (index === 2)
           await expect(
