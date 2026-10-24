@@ -6,9 +6,6 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
-	"crypto/sha256"
-	"encoding/base64"
-	"encoding/binary"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -73,23 +70,8 @@ func TestConcurrentVerifiedPasskeyRemoval(t *testing.T) {
 		if response.Code != 200 || json.Unmarshal(response.Body.Bytes(), &options) != nil {
 			t.Fatal("begin removal", response.Code)
 		}
-		client, _ := json.Marshal(map[string]any{"type": "webauthn.get", "challenge": options.PublicKey.Challenge, "origin": "https://example.test", "crossOrigin": false})
-		rp := sha256.Sum256([]byte("example.test"))
-		data := append([]byte{}, rp[:]...)
-		data = append(data, 0x05)
-		counter := make([]byte, 4)
-		binary.BigEndian.PutUint32(counter, 1)
-		data = append(data, counter...)
-		clientHash := sha256.Sum256(client)
-		signed := append(append([]byte{}, data...), clientHash[:]...)
-		hash := sha256.Sum256(signed)
-		signature, err := ecdsa.SignASN1(rand.Reader, device.private, hash[:])
-		if err != nil {
-			t.Fatal(err)
-		}
-		encode := base64.RawURLEncoding.EncodeToString
-		payload, _ := json.Marshal(map[string]any{"id": encode(device.raw), "rawId": encode(device.raw), "type": "public-key", "response": map[string]any{"clientDataJSON": encode(client), "authenticatorData": encode(data), "signature": encode(signature), "userHandle": encode([]byte(user))}, "clientExtensionResults": map[string]any{}})
-		request := httptest.NewRequest("POST", "/api/auth/passkeys/authorize/finish", strings.NewReader(string(payload))).WithContext(ctx)
+		payload := managementProof(t, device.private, device.raw, user, options.PublicKey.Challenge, "https://example.test", "example.test", 0x05)
+		request := httptest.NewRequest("POST", "/api/auth/passkeys/authorize/finish", strings.NewReader(payload)).WithContext(ctx)
 		request.Header.Set("Origin", "https://example.test")
 		request.Header.Set("Content-Type", "application/json")
 		request.Header.Set("X-CSRF-Token", begin.Header.Get("X-CSRF-Token"))
