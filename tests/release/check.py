@@ -258,6 +258,108 @@ esac
         self.publication_race(newer_batch=False)
 
 
+class DockerWorkflowTests(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory(prefix="logice-docker-tags-")
+        self.addCleanup(self.directory.cleanup)
+        self.root = Path(self.directory.name) / "repo"
+        self.root.mkdir()
+        self.env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+        self.env.update({
+            "GIT_AUTHOR_NAME": "Docker test", "GIT_AUTHOR_EMAIL": "docker-test@example.invalid",
+            "GIT_COMMITTER_NAME": "Docker test", "GIT_COMMITTER_EMAIL": "docker-test@example.invalid",
+            "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull, "GIT_TERMINAL_PROMPT": "0",
+        })
+        self.git("init", "--initial-branch=main")
+        (self.root / "VERSION").write_text("1.2.3\n")
+        self.git("add", "VERSION")
+        self.git("-c", "commit.gpgsign=false", "commit", "-m", "test: Docker source")
+        self.revision = self.git("rev-parse", "HEAD").strip()
+        self.workflow = yaml.load((ROOT / ".github/workflows/docker.yml").read_text(), Loader=yaml.BaseLoader)
+        self.image = next(step for step in self.workflow["jobs"]["publish"]["steps"] if step.get("id") == "image")
+
+    def git(self, *args):
+        return subprocess.check_output(["git", *args], cwd=self.root, env=self.env, text=True, stderr=subprocess.PIPE, timeout=15)
+
+    def metadata(self, ref, tag="", called=False, expected="", component="api", succeeds=True):
+        with tempfile.NamedTemporaryFile(dir=self.directory.name) as output:
+            env = dict(self.env, REPOSITORY="NarumiRuna/Logice", COMPONENT=component, REF=ref,
+                       VERSION_TAG=tag, CALLED=str(called).lower(), EXPECTED_REVISION=expected,
+                       GITHUB_OUTPUT=output.name, GITHUB_SHA="not-the-checked-out-commit")
+            result = subprocess.run(["bash", "-c", self.image["run"]], cwd=self.root, env=env,
+                                    capture_output=True, text=True, timeout=15)
+            text = Path(output.name).read_text()
+        if not succeeds:
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(text, "")
+            return []
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(f"revision={self.revision}\n", text)
+        return text.split("tags<<IMAGE_TAGS\n", 1)[1].split("\nIMAGE_TAGS", 1)[0].splitlines()
+
+    def test_main_latest_and_manual_branch_behavior(self):
+        for component in ("api", "web"):
+            name = f"ghcr.io/narumiruna/logice-{component}"
+            self.assertEqual(self.metadata("refs/heads/main", component=component),
+                             [f"{name}:{self.revision}", f"{name}:latest"])
+            self.assertEqual(self.metadata("refs/heads/topic", component=component), [f"{name}:{self.revision}"])
+
+    def test_annotated_release_tag_uses_commit_not_tag_object(self):
+        self.git("-c", "tag.gpgSign=false", "tag", "-a", "v1.2.3", "-m", "Fixture tag")
+        self.assertNotEqual(self.git("rev-parse", "v1.2.3").strip(), self.revision)
+        self.git("checkout", "--detach", "v1.2.3")
+        self.assertEqual(self.metadata("refs/tags/v1.2.3", "v1.2.3"),
+                         [f"ghcr.io/narumiruna/logice-api:{self.revision}", "ghcr.io/narumiruna/logice-api:v1.2.3"])
+
+    def test_reusable_release_never_updates_latest(self):
+        self.assertEqual(self.metadata("refs/heads/main", "v1.2.3", called=True, expected=self.revision),
+                         [f"ghcr.io/narumiruna/logice-api:{self.revision}", "ghcr.io/narumiruna/logice-api:v1.2.3"])
+
+    def test_invalid_tags_and_unpinned_calls_fail_before_outputs(self):
+        for tag in ("latest", "v01.2.3", "v1.2", "v1.2.3-beta.1", "v1.2.3/other", "v1.2.3\nlatest", "v1.2.3; echo unsafe", "v" + "9" * 130 + ".0.0"):
+            self.metadata("refs/tags/invalid", tag, succeeds=False)
+        for expected, tag in (("", "v1.2.3"), ("main", "v1.2.3"), ("f" * 40, "v1.2.3"), (self.revision, "")):
+            self.metadata("refs/heads/main", tag, called=True, expected=expected, succeeds=False)
+
+    def test_docker_triggers_inputs_permissions_and_build_metadata(self):
+        events = self.workflow["on"]
+        self.assertEqual(events["push"], {"branches": ["main"], "tags": ["v*"]})
+        self.assertIn("workflow_dispatch", events)
+        self.assertEqual(set(events["workflow_call"]["inputs"]), {"revision", "version-tag"})
+        for spec in events["workflow_call"]["inputs"].values():
+            self.assertEqual(spec["type"], "string")
+            self.assertEqual(spec["required"], "true")
+        job = self.workflow["jobs"]["publish"]
+        self.assertEqual(job["permissions"], {"contents": "read", "packages": "write"})
+        self.assertEqual(job["strategy"]["matrix"]["component"], ["api", "web"])
+        self.assertEqual(job["steps"][0]["with"]["ref"], "${{ inputs.revision || github.sha }}")
+        self.assertEqual(self.image["env"]["CALLED"], '${{ contains(toJSON(inputs), \'"revision"\') }}')
+        self.assertIn("inputs.version-tag", self.image["env"]["VERSION_TAG"])
+        build = job["steps"][-1]["with"]
+        self.assertEqual(build["tags"], "${{ steps.image.outputs.tags }}")
+        self.assertIn("steps.image.outputs.revision", build["labels"])
+        self.assertEqual(build["platforms"], "linux/amd64,linux/arm64")
+
+    def test_release_tag_metadata_is_bound_to_the_published_commit(self):
+        workflow = yaml.load((ROOT / ".github/workflows/release.yml").read_text(), Loader=yaml.BaseLoader)
+        publish = workflow["jobs"]["publish"]
+        self.assertEqual(publish["outputs"], {
+            "release-commit": "${{ steps.publish.outputs.release-commit }}",
+            "published": "${{ steps.publish.outputs.published }}",
+            "image-tag": "${{ steps.image.outputs.tag }}",
+        })
+        step = next(step for step in publish["steps"] if step.get("id") == "image")
+        with tempfile.NamedTemporaryFile(dir=self.directory.name) as output:
+            env = dict(self.env, RELEASE_COMMIT=self.revision, GITHUB_OUTPUT=output.name)
+            subprocess.run(["bash", "-e", "-c", step["run"]], cwd=self.root, env=env, check=True, timeout=15)
+            self.assertEqual(Path(output.name).read_text(), "tag=v1.2.3\n")
+            Path(output.name).write_text("")
+            env["RELEASE_COMMIT"] = "f" * 40
+            failed = subprocess.run(["bash", "-e", "-c", step["run"]], cwd=self.root, env=env, timeout=15)
+            self.assertNotEqual(failed.returncode, 0)
+            self.assertEqual(Path(output.name).read_text(), "")
+
+
 class RepositoryContractTests(unittest.TestCase):
     def test_repository_versions_and_removed_changesets(self):
         version = (ROOT / "VERSION").read_text().strip()
@@ -296,12 +398,24 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertEqual(validate_source["env"]["EXPECTED_RELEASE_COMMIT"], "${{ steps.preview.outputs.release-commit }}")
         for command in ('git rev-parse HEAD', 'sh scripts/check-go.sh', 'npm --prefix web run ci', 'uv run tests/release/check.py'):
             self.assertIn(command, validate_source["run"])
-        publish = jobs["publish"]["steps"][-1]
+        publish = next(step for step in jobs["publish"]["steps"] if step.get("id") == "publish")
         self.assertEqual(publish["env"]["EXPECTED_RELEASE_COMMIT"], selected)
         self.assertEqual(publish["run"], 'bash "$CHANGENOTE_SOURCE/scripts/action/publish.sh" "$EXPECTED_RELEASE_COMMIT"')
         self.assertEqual(jobs["release"]["steps"][-1]["uses"], f"narumiruna/changenote@{PIN}")
         for name, job in jobs.items():
             self.assertIn("github.ref == 'refs/heads/main'", job["if"])
+            if name == "docker":
+                self.assertEqual(job["uses"], "./.github/workflows/docker.yml")
+                self.assertEqual(job["permissions"], {"contents": "read", "packages": "write"})
+                self.assertEqual(job["with"], {
+                    "revision": "${{ needs.publish.outputs.release-commit }}",
+                    "version-tag": "${{ needs.publish.outputs.image-tag }}",
+                })
+                self.assertIn("needs.publish.result == 'success'", job["if"])
+                self.assertIn("needs.publish.outputs.published == 'true'", job["if"])
+                self.assertIn("inputs.operation == 'retry-publication'", job["if"])
+                self.assertIn("needs.publish.outputs.release-commit != ''", job["if"])
+                continue
             self.assertLessEqual(int(job["timeout-minutes"]), 15)
             checkout = job["steps"][0]
             self.assertEqual(checkout["with"]["persist-credentials"], "false")
