@@ -23,6 +23,7 @@ export async function authenticator(page: Page) {
 
 export async function enroll(page: Page, token: string) {
   await page.goto("/")
+  await page.getByText("Accept an invitation", { exact: true }).click()
   await page.getByLabel("Invitation token", { exact: true }).fill(token)
   await page.getByRole("button", { name: "Create a passkey", exact: true }).click()
   await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible()

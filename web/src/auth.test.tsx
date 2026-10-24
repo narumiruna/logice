@@ -17,6 +17,7 @@ import {
 } from "./auth"
 import { fetchLive } from "./live/api"
 import { parseLiveRoute } from "./live/route"
+import { ThemeProvider } from "./theme"
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -184,9 +185,11 @@ describe("session and authentication UI", () => {
   it("does not render telemetry or fetch while checking the session", () => {
     const fetcher = vi.spyOn(globalThis, "fetch")
     const html = renderToStaticMarkup(
-      <SessionGate>
-        <div>PRIVATE TELEMETRY</div>
-      </SessionGate>,
+      <ThemeProvider>
+        <SessionGate>
+          <div>PRIVATE TELEMETRY</div>
+        </SessionGate>
+      </ThemeProvider>,
     )
     expect(html).toContain("Checking your session")
     expect(html).not.toContain("PRIVATE TELEMETRY")
@@ -195,19 +198,28 @@ describe("session and authentication UI", () => {
 
   it("fails closed on session errors and offers retry", () => {
     const html = renderToStaticMarkup(
-      <SessionView state={{ status: "error" }} onRetry={() => {}}>
-        PRIVATE TELEMETRY
-      </SessionView>,
+      <ThemeProvider>
+        <SessionView state={{ status: "error" }} onRetry={() => {}}>
+          PRIVATE TELEMETRY
+        </SessionView>
+      </ThemeProvider>,
     )
     expect(html).toContain("Telemetry is locked")
     expect(html).toContain("Retry")
     expect(html).not.toContain("PRIVATE TELEMETRY")
+    expect(html).toContain('class="auth-layout"')
+    expect(html).toContain("Example trace")
+    expect(html).toContain("Sample data")
+    expect(html).toContain("Passkey authentication")
   })
 
   it("offers explicit passkey actions and keeps invitation tokens out of URLs", () => {
     const html = renderToStaticMarkup(<SignIn busy={false} onAuthenticate={() => {}} />)
     expect(html).toContain("Sign in with a passkey")
     expect(html).toContain("Create a passkey")
+    expect(html).toContain('<details class="auth-enrollment">')
+    expect(html).toContain('maxLength="43"')
+    expect(html).toContain("No password is required")
     expect(html).toContain('type="password"')
     expect(html).toContain('autoComplete="off"')
     expect(html).not.toContain("action=")

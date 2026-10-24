@@ -70,7 +70,7 @@ Compose runs `logice migrate` before starting the API. Bootstrap the first admin
 docker compose --project-name logice-validation run --rm --no-deps api bootstrap -name 'Initial administrator'
 ```
 
-This prints only a single-use enrollment invitation. Keep it out of logs and transfer it securely. Open **http://localhost:5173**, use invitation enrollment, and create a user-verified Passkey within one hour. Use this exact origin, not `127.0.0.1`. See [operations](docs/passkey-operations.md) for later invitations and lost-Passkey recovery.
+This prints only a single-use enrollment invitation. Keep it out of logs and transfer it securely. Open **http://localhost:5173**, expand **Accept an invitation**, enter the invitation token, and select **Create a passkey** within one hour. For later visits, select **Sign in with a passkey**. The login page supports desktop/mobile layouts and the Classic/Studio themes. It does not request telemetry before login. Use this exact origin, not `127.0.0.1`. See [operations](docs/passkey-operations.md) for later invitations and lost-Passkey recovery.
 
 After login, select **Live**, **Traces**, or **Logs**, apply filters, and open a record for details. Views are empty until your applications send matching telemetry. Nginx serves static assets without requiring authentication and forwards `/api` to Go, which protects query routes. The API has no published host port. Check process liveness with `curl http://localhost:5173/api/healthz`. PostgreSQL stores authentication data; ClickHouse stores telemetry for the fixed `validation` project. Stop Vite first if it already uses port `5173`.
 
