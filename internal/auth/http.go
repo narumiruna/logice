@@ -199,6 +199,8 @@ func (s *Service) serve(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		response(w, 200, map[string]any{"user": u, "csrfToken": s.csrf(w, r)})
+	case "/api/auth/profile":
+		s.profile(w, r)
 	case "/api/auth/logout":
 		if err := logout(r.Context(), s.pool, s.readCookie(r, "csrf"), s.readCookie(r, "session")); err != nil {
 			unavailable(w)

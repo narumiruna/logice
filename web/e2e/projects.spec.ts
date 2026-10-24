@@ -11,7 +11,7 @@ test("project roles, one-time tokens, membership removal, ownership and project 
   const name = `Project ${randomBytes(5).toString("hex")}`
   await page.getByLabel("Project name", { exact: true }).fill(name)
   await page.getByRole("button", { name: "Create project", exact: true }).click()
-  await expect(page.getByRole("heading", { name: "Traces", exact: true })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Dashboard", exact: true })).toBeVisible()
   const project = /\/projects\/([^/]+)/.exec(new URL(page.url()).pathname)?.[1]
   if (!project) throw new Error("Project creation did not navigate")
   const base = `/api/projects/${project}`
@@ -80,6 +80,11 @@ test("project roles, one-time tokens, membership removal, ownership and project 
           data: { name: "denied" },
         })
         expect(denied.status()).toBe(403)
+        await member.goto("/account")
+        await expect(member.getByLabel("Display name", { exact: true })).toBeVisible()
+        await expect(
+          member.getByRole("heading", { name: "Registration invitations", exact: true }),
+        ).toHaveCount(0)
       }
     }
     const ownerToken = page.locator("li").filter({ hasText: "Owner application" })
@@ -90,7 +95,7 @@ test("project roles, one-time tokens, membership removal, ownership and project 
     await page.getByRole("link", { name: "Projects", exact: true }).click()
     await page.getByLabel("Project name", { exact: true }).fill(`${name} second`)
     await page.getByRole("button", { name: "Create project", exact: true }).click()
-    await expect(page.getByRole("heading", { name: "Traces", exact: true })).toBeVisible()
+    await expect(page.getByRole("heading", { name: "Dashboard", exact: true })).toBeVisible()
     await page.getByRole("combobox", { name: "Project", exact: true }).selectOption(project)
     await expect(page).toHaveURL(new RegExp(`/projects/${project}/traces`))
     await expect(page.getByRole("heading", { name: "Traces", exact: true })).toBeVisible()

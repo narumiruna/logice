@@ -47,12 +47,12 @@ export function ThemeProvider({
   return <ThemeContext value={{ theme, setTheme }}>{children}</ThemeContext>
 }
 
-export function ThemeSelect() {
+export function ThemeSelect({ label = "Theme" }: { label?: string }) {
   const context = useContext(ThemeContext)
   if (!context) throw new Error("ThemeSelect requires ThemeProvider")
   return (
     <label className="theme-select">
-      <span>Theme</span>
+      <span>{label}</span>
       <select
         value={context.theme}
         onChange={(event) => {
