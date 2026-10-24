@@ -59,15 +59,18 @@ func TestRealTelemetryAlertDelivery(t *testing.T) {
 		_, err = pool.Exec(s.ctx, "INSERT INTO alert_rules(id,project_id,destination_id,name,kind,threshold,min_population,created_at,next_at) VALUES($1,$2,$3,'Errors','error_ratio','0.1',1,$4,$5)", rule, project, dest, now.Add(-time.Hour), now.Add(-time.Minute))
 		s.must("rule fixture", err)
 	}
-	var notifications atomic.Int32
+	var notifications, recoveries atomic.Int32
 	receiver := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var event struct {
 			EventID    string `json:"eventId"`
 			ProjectID  string `json:"projectId"`
 			Transition string `json:"transition"`
 		}
-		if json.NewDecoder(r.Body).Decode(&event) != nil || event.EventID != r.Header.Get("X-Logice-Event-ID") || event.ProjectID != fixtureProject || event.Transition != "firing" {
+		if json.NewDecoder(r.Body).Decode(&event) != nil || event.EventID != r.Header.Get("X-Logice-Event-ID") || event.ProjectID != fixtureProject || (event.Transition != "firing" && event.Transition != "resolved") {
 			t.Error("wrong notification identity or project")
+		}
+		if event.Transition == "resolved" {
+			recoveries.Add(1)
 		}
 		notifications.Add(1)
 		w.WriteHeader(204)
@@ -104,5 +107,42 @@ func TestRealTelemetryAlertDelivery(t *testing.T) {
 	s.must("empty project rule", pool.QueryRow(s.ctx, "SELECT state FROM alert_rules WHERE project_id=$1", other).Scan(&unknown))
 	if unknown != "unknown" {
 		t.Fatal("empty population treated as healthy or borrowed another project's data", unknown)
+	}
+	// A failed native reader must preserve the active incident, not claim
+	// recovery or mistake the storage failure for a healthy empty window.
+	s.must("close storage connection", store.Close())
+	for n := 0; n < 2; n++ {
+		s.must("evaluate storage outage", worker.Tick(s.ctx, now.Add(3*time.Minute)))
+	}
+	var active bool
+	s.must("outage incident state", pool.QueryRow(s.ctx, "SELECT state,incident_active FROM alert_rules WHERE project_id=$1", fixtureProject).Scan(&unknown, &active))
+	if unknown != "unknown" || !active || notifications.Load() != 1 {
+		t.Fatal("native storage outage resolved an active incident")
+	}
+	recovered, err := query.Open(s.ports["clickhouse"], s.secrets[1])
+	s.must("reopen storage", err)
+	defer recovered.Close()
+	worker.Reader = recovered
+	healthy := f.span("alert-recovered", f.childID, nil)
+	healthy.StartTimeUnixNano = uint64(now.Add(7 * time.Minute).UnixNano())
+	healthy.EndTimeUnixNano = healthy.StartTimeUnixNano + 1_000_000
+	healthy.Status = &trace.Status{Code: trace.Status_STATUS_CODE_UNSET}
+	s.exportHTTP("/v1/traces", traceRequest(healthy), &collectortrace.ExportTraceServiceResponse{})
+	s.waitCount(db, "otel_traces", fmt.Sprintf("%x", f.traceID), 2)
+	for _, minute := range []int{8, 9} {
+		for n := 0; n < 2; n++ {
+			s.must("evaluate real recovery", worker.Tick(s.ctx, now.Add(time.Duration(minute)*time.Minute)))
+		}
+	}
+	if recoveries.Load() != 1 || notifications.Load() != 2 {
+		t.Fatal("healthy Collector data did not deliver recovery", recoveries.Load(), notifications.Load())
+	}
+	_, err = pool.Exec(s.ctx, "UPDATE projects SET deleted_at=now() WHERE id=$1", fixtureProject)
+	s.must("remove project", err)
+	for n := 0; n < 2; n++ {
+		s.must("tick removed project", worker.Tick(s.ctx, now.Add(10*time.Minute)))
+	}
+	if notifications.Load() != 2 {
+		t.Fatal("removed project delivered a new notification")
 	}
 }

@@ -186,6 +186,37 @@ test("shared views restore typed filters and reject stale updates", async ({ pag
   await expect(page.locator("#audit")).not.toContainText("workflow-service")
 })
 
+test("Dashboard statistics fail explicitly, retry, and keep range and service in trend links", async ({
+  page,
+}) => {
+  const id = workspace().project.id
+  await page.route("**/overview?*", (route) =>
+    route.fulfill({ status: 503, json: { error: { code: "unavailable" } } }),
+  )
+  await page.goto(`/projects/${id}/dashboard`)
+  const stats = page.getByRole("region", { name: "Full-window telemetry statistics" })
+  await expect(stats.getByRole("alert")).toContainText("No sample or partial count is substituted")
+  await expect(stats.locator("strong")).toHaveCount(0)
+  await page.unroute("**/overview?*")
+  await page.getByRole("button", { name: "Retry statistics", exact: true }).click()
+  await expect(stats.getByText("Stored traces", { exact: true })).toBeVisible()
+  await page.getByLabel("Dashboard time range", { exact: true }).selectOption("15m")
+  await page.getByLabel("Dashboard service", { exact: true }).fill("scope-not-present")
+  await page.getByRole("button", { name: "Apply dashboard service", exact: true }).click()
+  await expect(stats.getByText("Stored traces", { exact: true })).toBeVisible()
+  await stats.locator("summary").click()
+  const href = await stats.locator("tbody a").first().getAttribute("href")
+  const link = new URL(href ?? "", page.url())
+  expect(link.pathname).toBe(`/projects/${id}/traces`)
+  expect(link.searchParams.get("service")).toBe("scope-not-present")
+  expect(
+    Date.parse(link.searchParams.get("to") ?? "") - Date.parse(link.searchParams.get("from") ?? ""),
+  ).toBe(15_000)
+  await expect(
+    stats.getByText("Error trace proportion", { exact: true }).locator("..").locator("strong"),
+  ).toHaveText("—")
+})
+
 test("backup Passkey enrollment requires reauthentication and removed credentials lose access", async ({
   browser,
   context,
@@ -278,6 +309,14 @@ test("backup Passkey enrollment requires reauthentication and removed credential
     expect(
       (await memberContext.request.get(`/api/projects/${workspace().project.id}/events`)).status(),
     ).toBe(403)
+    // The remaining independent authenticator must establish a new session,
+    // not merely keep using the session rotated by removal.
+    await page.getByRole("button", { name: "Sign out", exact: true }).click()
+    await page.getByRole("button", { name: "Sign in with a passkey", exact: true }).click()
+    await expect(page.getByRole("button", { name: "Sign out", exact: true })).toBeVisible()
+    expect((await (await memberContext.request.get("/api/auth/session")).json()).user.id).toBe(
+      subject,
+    )
     const stalePage = await staleContext.newPage()
     const device = await authenticator(stalePage)
     for (const credential of originalCredentials.credentials)
@@ -300,13 +339,18 @@ for (const theme of ["classic", "studio"] as const) {
     test(`${theme} new workflow pages fit a ${width}px viewport`, async ({ page }) => {
       await page.setViewportSize({ width, height: 1000 })
       await page.addInitScript((theme) => localStorage.setItem("logice.theme", theme), theme)
-      for (const path of ["setup", "views", "alerts"]) {
+      for (const path of ["setup", "views", "alerts", "dashboard", "settings"]) {
         await page.goto(`/projects/${workspace().project.id}/${path}`)
         await expect(page.getByRole("heading", { level: 1 })).toBeVisible()
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
           true,
         )
       }
+      await page.goto("/account")
+      await expect(page.locator("#passkeys")).toBeVisible()
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+        true,
+      )
     })
   }
 }

@@ -72,6 +72,21 @@ Only the current project Owner can read `/api/projects/{id}/events` or **Project
 
 The reader accepts UTC/action filters for at most 30 days, returns at most 100 rows, and uses descending bigint event IDs with a first-page high-water mark. IDs and cursors retain decimal-string precision. Every page rechecks ownership; cursors do not confer access. Actor display names are current names, not immutable historical identities. Operator-recovery events have actor kind `operator` and no account actor UUID; their target identifies the recovered subject. The command did not record an operator identity, and the reader does not invent one. Legacy non-UUID targets are redacted rather than exposed as arbitrary data.
 
+The event inventory is:
+
+| Successful change | Action | Safe target |
+| --- | --- | --- |
+| Project creation, rename, deletion | `create`, `patch`, `delete` | Project UUID |
+| Member addition, role change, removal | `member_post`, `member_patch`, `member_delete` | Account UUID |
+| Ownership transfer | `transfer_owner` | New Owner UUID |
+| Token creation, first revocation | `create_token`, `revoke_token` | Token record UUID, never the secret |
+| Operator account recovery | `operator_account_recovery` | Recovered account UUID; operator identity unknown |
+| Saved View creation, update, deletion | `create_view`, `view_PATCH`, `view_DELETE` | View UUID, never its definition |
+| Destination creation, update/disable, test request | `create_alert_destination`, `change_alert_destination`, `test_alert_destination` | Destination UUID, never its URL |
+| Rule creation, update/disable | `create_alert_rule`, `change_alert_rule` | Rule UUID |
+
+Repeated token revocation does not add another successful-change event. Failed transactions add no event. Worker incident transitions belong to incident history, not an invented human audit actor. Older rows do not prove that all prior activity was recorded; missing history and operator identities are not reconstructed.
+
 Events record successful mutations in the same transaction. Targets contain identifiers only, not tokens, searches, Webhook URLs, or payloads. Existing historical gaps are not backfilled. Project events have no new automatic deletion policy. Application writes are append-only, but a database operator can change rows; this is not tamper-proof compliance storage. Deleted projects are not readable through the ordinary project API.
 
 ## Migration and Rollback
