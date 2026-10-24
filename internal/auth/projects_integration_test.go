@@ -261,7 +261,11 @@ func TestProjectCreationAndTokenQuotas(t *testing.T) {
 		}
 	}
 	call := func(path string) *httptest.ResponseRecorder {
-		r := authRequest(s, "POST", path, `{"name":"quota"}`).WithContext(ctx)
+		body := `{"name":"quota"}`
+		if strings.HasSuffix(path, "/revoke") {
+			body = `{}`
+		}
+		r := authRequest(s, "POST", path, body).WithContext(ctx)
 		r.AddCookie(&http.Cookie{Name: s.cookieName("session"), Value: session})
 		w := httptest.NewRecorder()
 		s.Wrap(http.NotFoundHandler()).ServeHTTP(w, r)
@@ -316,5 +320,32 @@ func TestProjectCreationAndTokenQuotas(t *testing.T) {
 	}
 	if success != 1 {
 		t.Fatal("token quota race")
+	}
+	// Revocation and creation share the project lock. Either ordering is valid,
+	// but the quota must hold and creation cannot restore the revoked credential.
+	var revokedID string
+	if err := pool.QueryRow(ctx, "SELECT id::text FROM project_tokens WHERE project_id=$1 LIMIT 1", id).Scan(&revokedID); err != nil {
+		t.Fatal(err)
+	}
+	codes = make(chan int, 2)
+	wg.Go(func() { codes <- call(path).Code })
+	wg.Go(func() { codes <- call(path + "/" + revokedID + "/revoke").Code })
+	wg.Wait()
+	close(codes)
+	revoked := 0
+	for code := range codes {
+		if code == 200 {
+			revoked++
+		} else if code != 201 && code != 409 {
+			t.Fatal("create/revoke race", code)
+		}
+	}
+	var active int
+	var isRevoked bool
+	if err := pool.QueryRow(ctx, "SELECT count(*) FROM project_tokens WHERE project_id=$1 AND revoked_at IS NULL", id).Scan(&active); err != nil || active < 99 || active > 100 {
+		t.Fatal("quota exceeded after concurrent revocation", err)
+	}
+	if err := pool.QueryRow(ctx, "SELECT revoked_at IS NOT NULL FROM project_tokens WHERE id=$1", revokedID).Scan(&isRevoked); err != nil || !isRevoked || revoked != 1 {
+		t.Fatal("revocation lost to concurrent creation", err)
 	}
 }

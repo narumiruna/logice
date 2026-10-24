@@ -82,4 +82,6 @@ Membership, role, deletion, and token changes apply to new authorization decisio
 7. Before release, use disposable accounts to prove restored Owner access and token revocation. Verify a real HTTPS Passkey and the intended public HTTP ingestion route separately. Local tests do not verify Cloudflare Tunnel compatibility or live Kubernetes enforcement.
 8. If validation fails, disable access and ingestion first. Keep additive tables and backups. Never restore an old unscoped reader while multi-project data is exposed. Restore only a tested compatible configuration or restore the backup while access remains stopped. Do not automatically drop project tables or delete ClickHouse data.
 
+A stale PostgreSQL restore can reactivate revoked tokens or deleted projects. Before reopening access, reconcile project state and revoke potentially restored project tokens; issue replacement application credentials. Account recovery alone does not revoke project tokens.
+
 No deployment or production-data mutation is part of the implementation tests.

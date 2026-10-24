@@ -113,17 +113,17 @@ flowchart LR
 
 ## Plan
 
-- [ ] Validate trusted metadata propagation and bounded OTLP proxy behavior with the pinned Collector. Acceptance: a disposable integration test proves that forged or missing project identity cannot write into another project.
-- [ ] Add PostgreSQL project, membership, token, and event tables with an additive versioned migration. Update readiness checks. Acceptance: concurrent migration, retry, constraint, and old-schema startup tests pass.
-- [ ] Implement project creation, member roles, ownership transfer, deletion, and audit transactions. Acceptance: role-matrix tests include platform administrators without membership and concurrent ownership/member changes.
-- [ ] Implement project token creation, metadata listing, expiry, and revocation. Acceptance: plaintext appears only in the creation response; tokens remain valid after creator removal and fail after revocation, expiry, or project deletion.
-- [ ] Add session-protected management APIs with CSRF checks and scoped object lookups. Acceptance: Owner/Developer/Viewer, anonymous, bearer-only, cross-project token IDs, malformed UUIDs, quotas, and pagination tests pass.
-- [ ] Add authorized project context and parameterized scope to all telemetry queries. Update live identity generation in SQL and Go. Acceptance: missing-scope reads fail; two projects with identical trace/span IDs cannot share records, counts, context, or identities.
-- [ ] Add the OTLP/HTTP authentication proxy and trusted Collector enrichment. Acceptance: actual HTTP protobuf exports reach the token's project; spoofing, invalid tokens, storage outages, queue/size limits, and upstream partial-success tests pass.
-- [ ] Update Compose, Helm, Nginx, development proxy, and startup configuration. Acceptance: both deployments route public OTLP through Go, Collector has no ordinary host/public endpoint, and deployment checks cover internal credentials and network controls.
-- [ ] Add project navigation and role-aware member/token views. Acceptance: component and browser tests prove project-switch cancellation, copied/deep links, one-time secret display, role failures, and session expiry behavior.
-- [ ] Migrate Python examples, browser fixtures, integration fixtures, and validation scripts to create real projects and project tokens. Acceptance: application-facing examples use Go ingress, not the infrastructure Collector credential.
-- [ ] Update README, local telemetry, live telemetry, authentication, Helm, and operator documentation. Acceptance: routes, roles, token lifecycle, migration steps, and unsupported gRPC behavior match executable tests.
+- [x] Validate trusted metadata propagation and bounded OTLP proxy behavior with the pinned Collector. Acceptance: a disposable integration test proves that forged or missing project identity cannot write into another project.
+- [x] Add PostgreSQL project, membership, token, and event tables with an additive versioned migration. Update readiness checks. Acceptance: concurrent migration, retry, constraint, and old-schema startup tests pass.
+- [x] Implement project creation, member roles, ownership transfer, deletion, and audit transactions. Acceptance: role-matrix tests include platform administrators without membership and concurrent ownership/member changes.
+- [x] Implement project token creation, metadata listing, expiry, and revocation. Acceptance: plaintext appears only in the creation response; tokens remain valid after creator removal and fail after revocation, expiry, or project deletion.
+- [x] Add session-protected management APIs with CSRF checks and scoped object lookups. Acceptance: Owner/Developer/Viewer, anonymous, bearer-only, cross-project token IDs, malformed UUIDs, quotas, and pagination tests pass.
+- [x] Add authorized project context and parameterized scope to all telemetry queries. Update live identity generation in SQL and Go. Acceptance: missing-scope reads fail; two projects with identical trace/span IDs cannot share records, counts, context, or identities.
+- [x] Add the OTLP/HTTP authentication proxy and trusted Collector enrichment. Acceptance: actual HTTP protobuf exports reach the token's project; spoofing, invalid tokens, storage outages, queue/size limits, and upstream partial-success tests pass.
+- [x] Update Compose, Helm, Nginx, development proxy, and startup configuration. Acceptance: both deployments route public OTLP through Go, Collector has no ordinary host/public endpoint, and deployment checks cover internal credentials and network controls.
+- [x] Add project navigation and role-aware member/token views. Acceptance: component and browser tests prove project-switch cancellation, copied/deep links, one-time secret display, role failures, and session expiry behavior.
+- [x] Migrate Python examples, browser fixtures, integration fixtures, and validation scripts to create real projects and project tokens. Acceptance: application-facing examples use Go ingress, not the infrastructure Collector credential.
+- [x] Update README, local telemetry, live telemetry, authentication, Helm, and operator documentation. Acceptance: routes, roles, token lifecycle, migration steps, and unsupported gRPC behavior match executable tests.
 
 ## Migration and Rollback / Recovery
 
@@ -135,15 +135,26 @@ flowchart LR
 6. If checks fail, disable ingestion and project access before restoring prior images or configuration. A previous single-project reader must not run against exposed multi-project data. Keep additive tables and backups; do not drop them as an automatic rollback.
 7. Ownership loss requires a documented operator recovery process with an audit event, not an implicit platform-admin bypass. Test restored ownership and token revocation before reopening access.
 
+## Verification Evidence
+
+- Pinned Collector tests passed with gzip, multiple resources, duplicate/case-variant headers, duplicate reserved resource/span/log keys, and missing metadata. The regression test rejects the former cross-project duplicate-key behavior.
+- Go format/vet/unit/build checks passed with Go 1.26.10. Full race-enabled integration passed in 205 seconds; authentication tests passed in 51 seconds. The additional concurrent create/revoke quota test passed in 9 seconds.
+- Web CI passed: 267 unit tests, type checks, lint, and production build. Chromium passed all 90 workflows, including project roles, scope switching, one-time secrets, page-hide clearing, and existing explorer regressions.
+- Helm lint/render/network-policy checks and five locked Python example tests passed.
+- Go module verification, Go vulnerability analysis (no affected call sites), and npm audit passed. The Go scan reports one unused module advisory, not an affected call path.
+- Frontend layout validation and the committed-checkout hook validation passed, including all eight injected failures. E2E TypeScript also passed a separate type check.
+- Complete diff review covered authorization, duplicate attributes, inactive-member removal, request/response bounds, token and project lifecycle, query parameters, client cancellation, legacy route cutover, deployment controls, and unrelated-work preservation.
+- Live Kubernetes/CNI enforcement, public Tunnel compatibility, and real production Passkeys remain operator release gates. No deployment, package publication, version tag, or release workflow was performed.
+
 ## Completion Checklist
 
-- [ ] `sh scripts/check-go.sh` passes, including format, vet, unit tests, and build.
-- [ ] `npm --prefix web run ci` passes.
-- [ ] `uv run charts/logice/tests/check.py` passes with the updated deployment contract.
-- [ ] `go test -race -tags=integration -count=1 -timeout=8m ./tests/integration/... ./internal/auth/...` passes; include new authorization package integration tests in this command if responsibilities move to a new package.
-- [ ] `sh scripts/validate-compose-web.sh` passes with real project-scoped OTLP exports and Chromium workflows for all three roles and two isolated projects.
-- [ ] Tests cover cross-project trace/log/detail/live/histogram reads, project/token object substitution, forged ingestion identity, missing authorization scope, and authorization-store outages.
-- [ ] Tests cover role changes, membership removal, concurrent ownership transfer, token creation/revocation races, project deletion, and creator removal without implicit project-token revocation.
-- [ ] No tests or examples depend on an automatic `validation` fallback or expose internal Collector credentials to applications.
-- [ ] Operator runbook includes backup, cutover, restricted Collector access, rollback, and legacy-data handling; deployment and any public Tunnel compatibility remain unclaimed until separately verified.
+- [x] `sh scripts/check-go.sh` passes, including format, vet, unit tests, and build.
+- [x] `npm --prefix web run ci` passes.
+- [x] `uv run charts/logice/tests/check.py` passes with the updated deployment contract.
+- [x] `go test -race -tags=integration -count=1 -timeout=8m ./tests/integration/... ./internal/auth/...` passes; include new authorization package integration tests in this command if responsibilities move to a new package.
+- [x] `sh scripts/validate-compose-web.sh` passes with real project-scoped OTLP exports and Chromium workflows for all three roles and two isolated projects.
+- [x] Tests cover cross-project trace/log/detail/live/histogram reads, project/token object substitution, forged ingestion identity, missing authorization scope, and authorization-store outages.
+- [x] Tests cover role changes, membership removal, concurrent ownership transfer, token creation/revocation races, project deletion, and creator removal without implicit project-token revocation.
+- [x] No tests or examples depend on an automatic `validation` fallback or expose internal Collector credentials to applications.
+- [x] Operator runbook includes backup, cutover, restricted Collector access, rollback, and legacy-data handling; deployment and any public Tunnel compatibility remain unclaimed until separately verified.
 - [ ] All implementation tasks and required checks above are complete. Delete this plan only after completion evidence is recorded and no required checks remain open.
