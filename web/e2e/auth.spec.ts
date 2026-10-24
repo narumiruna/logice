@@ -1,4 +1,4 @@
-import { authenticator, enroll, expect, post, test } from "./auth-fixtures"
+import { authenticator, enroll, expect, post, projectHref, test } from "./auth-fixtures"
 
 test.use({ storageState: { cookies: [], origins: [] } })
 
@@ -19,7 +19,12 @@ test("passkey login, single-use challenges, logout, invitations, and authorizati
   await expect(page.getByLabel("Account", { exact: true })).toContainText("Browser administrator")
   await page.getByRole("button", { name: "Sign out" }).click()
   await expect(page.getByRole("heading", { name: "Sign in to Logice" })).toBeVisible()
-  for (const path of ["/api/traces", "/api/logs", "/api/live", "/api/auth/session"]) {
+  for (const path of [
+    projectHref("/api/traces"),
+    projectHref("/api/logs"),
+    projectHref("/api/live"),
+    "/api/auth/session",
+  ]) {
     expect((await page.context().request.get(path)).status()).toBe(401)
   }
 

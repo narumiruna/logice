@@ -1,5 +1,6 @@
 import type { FormEvent } from "react"
 import { useState } from "react"
+import { projectPath } from "./project-path"
 import {
   filterResetHref,
   type Range,
@@ -36,7 +37,7 @@ export function FilterForm({ route }: { route: Route }) {
     <form
       className="filter-form"
       aria-label={logs ? "Log filters" : "Trace filters"}
-      action={logs ? "/logs" : "/traces"}
+      action={projectPath(logs ? "/logs" : "/traces")}
       method="get"
       onSubmit={submit}
     >

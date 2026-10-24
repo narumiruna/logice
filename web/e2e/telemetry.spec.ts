@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto"
-import { expect, test } from "./auth-fixtures"
+import { encodeOTLP, expect, projectHref, test, workspace } from "./auth-fixtures"
 
 const traceId = randomBytes(16).toString("hex")
 const rootId = "1111111111111111"
@@ -31,7 +31,7 @@ test.beforeAll(async ({ request }) => {
   if (!/^logice-web-check-[a-f0-9]{16}$/.test(process.env.LOGICE_E2E_PROJECT ?? "")) {
     throw new Error("Browser tests require a disposable Compose project")
   }
-  const token = process.env.LOGICE_E2E_TOKEN
+  const token = workspace().ingestionToken
   if (!token) throw new Error("The disposable Collector token is required")
   const start = BigInt(Date.now() - 5_000) * 1_000_000n
   const resource = {
@@ -51,7 +51,7 @@ test.beforeAll(async ({ request }) => {
     status: { code: failed ? 2 : 1, message: failed ? "Inventory query failed" : "" },
     attributes: [{ key: "http.route", value: { stringValue: "/checkout" } }],
   })
-  const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
+  const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/x-protobuf" }
   const traces = {
     resourceSpans: [
       {
@@ -72,7 +72,12 @@ test.beforeAll(async ({ request }) => {
   await expect
     .poll(async () => {
       try {
-        return (await request.post(`${collector}/v1/traces`, { headers, data: traces })).status()
+        return (
+          await request.post(`${collector}/v1/traces`, {
+            headers,
+            data: encodeOTLP("traces", traces),
+          })
+        ).status()
       } catch {
         return 0
       }
@@ -80,7 +85,7 @@ test.beforeAll(async ({ request }) => {
     .toBe(200)
   const result = await request.post(`${collector}/v1/logs`, {
     headers,
-    data: {
+    data: encodeOTLP("logs", {
       resourceLogs: [
         {
           resource,
@@ -107,19 +112,19 @@ test.beforeAll(async ({ request }) => {
           ],
         },
       ],
-    },
+    }),
   })
   expect(result.status()).toBe(200)
   await expect
     .poll(async () => {
-      const response = await request.get(`/api/traces?service=${service}`)
+      const response = await request.get(projectHref(`/api/traces?service=${service}`))
       if (!response.ok()) return 0
       return (await response.json()).items.length
     })
     .toBe(2)
   await expect
     .poll(async () => {
-      const response = await request.get(`/api/logs?service=${service}`)
+      const response = await request.get(projectHref(`/api/logs?service=${service}`))
       if (!response.ok()) return 0
       return (await response.json()).items.length
     })
@@ -129,7 +134,7 @@ test.beforeAll(async ({ request }) => {
 test("search traces, open spans and correlated logs, and reload the deep link", async ({
   page,
 }, testInfo) => {
-  await page.goto("/traces")
+  await page.goto(projectHref("/traces"))
   await expect(page.getByRole("link", { name: "GET /checkout", exact: true })).toBeVisible()
   await page.getByLabel("Service", { exact: true }).fill(service)
   await page.getByLabel("Errors only").check()
@@ -137,7 +142,7 @@ test("search traces, open spans and correlated logs, and reload the deep link", 
   await expect(page.getByRole("link", { name: "GET /checkout", exact: true })).toBeVisible()
   await expect(page.getByRole("link", { name: "GET /health", exact: true })).toHaveCount(0)
   await page.getByRole("link", { name: "GET /checkout", exact: true }).click()
-  await expect(page).toHaveURL(new RegExp(`/traces/${traceId}\\?`))
+  await expect(page).toHaveURL(new RegExp(projectHref(`/traces/${traceId}\\?`)))
   await expect(page.getByText("SELECT inventory", { exact: true })).toBeVisible()
   await expect(page.getByText(body, { exact: true }).first()).toBeVisible()
   await page.locator("summary.span-summary").filter({ hasText: "GET /checkout" }).click()
@@ -155,7 +160,7 @@ test("search traces, open spans and correlated logs, and reload the deep link", 
 })
 
 test("filter logs, inspect attributes, and follow the correlated trace", async ({ page }) => {
-  await page.goto("/logs")
+  await page.goto(projectHref("/logs"))
   await expect(page.getByText("Worker ready", { exact: true }).first()).toBeVisible()
   await page.getByLabel("Minimum severity").selectOption("17")
   await page.getByLabel("Search", { exact: true }).fill("Inventory unavailable")
@@ -165,18 +170,20 @@ test("filter logs, inspect attributes, and follow the correlated trace", async (
   await page.getByText("Show log details", { exact: true }).first().click()
   await expect(page.getByText("error.type", { exact: true })).toBeVisible()
   await expect(page.getByText("InventoryError", { exact: true })).toBeVisible()
-  const traceLink = page.locator(`a[href^="/traces/${traceId}?"]`).first()
+  const traceLink = page
+    .locator(`a[href^="/projects/${workspace().project.id}/traces/${traceId}?"]`)
+    .first()
   await expect(traceLink).toBeVisible()
   await traceLink.click()
   await expect(page.getByText("SELECT inventory", { exact: true })).toBeVisible()
 })
 
 test("show an empty result, a storage error, and a bounded-result warning", async ({ page }) => {
-  await page.goto("/traces?service=not-an-ingested-service")
+  await page.goto(projectHref("/traces?service=not-an-ingested-service"))
   await expect(page.getByRole("heading", { name: "No traces in this window" })).toBeVisible()
-  await page.goto("/traces?limit=1")
+  await page.goto(projectHref("/traces?limit=1"))
   await expect(page.getByText("More records are available", { exact: true })).toBeVisible()
-  await page.route("**/api/traces?**", (route) =>
+  await page.route("**/api/projects/*/traces?**", (route) =>
     route.fulfill({
       status: 503,
       contentType: "application/json",
@@ -185,7 +192,7 @@ test("show an empty result, a storage error, and a bounded-result warning", asyn
       }),
     }),
   )
-  await page.goto("/traces")
+  await page.goto(projectHref("/traces"))
   await expect(page.getByRole("alert")).toContainText("Telemetry storage is unavailable.")
 })
 
@@ -193,12 +200,12 @@ test("retain usable filters on a narrow screen and show an unknown trace error",
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })
-  await page.goto("/logs")
+  await page.goto(projectHref("/logs"))
   await expect(page.getByLabel("Search", { exact: true })).toBeVisible()
   await expect(page.getByRole("button", { name: "Apply filters" })).toBeVisible()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   )
-  await page.goto(`/traces/${"f".repeat(32)}`)
+  await page.goto(projectHref(`/traces/${"f".repeat(32)}`))
   await expect(page.getByRole("alert")).toBeVisible()
 })

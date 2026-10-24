@@ -23,6 +23,7 @@ type LiveReader interface {
 }
 
 type LiveFilter struct {
+	project     string
 	From, To    time.Time
 	Service     string
 	Search      string

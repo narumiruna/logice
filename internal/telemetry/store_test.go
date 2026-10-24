@@ -116,15 +116,15 @@ func TestStoreEmptyAndMissingTables(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			store := testStore(t, query)
-			traces, err := store.Traces(context.Background(), testFilter())
+			traces, err := store.Traces(WithProject(context.Background(), "validation"), testFilter())
 			if err != nil || traces.Items == nil || len(traces.Items) != 0 || traces.HasMore {
 				t.Fatalf("traces = %+v, %v", traces, err)
 			}
-			logs, err := store.Logs(context.Background(), testFilter())
+			logs, err := store.Logs(WithProject(context.Background(), "validation"), testFilter())
 			if err != nil || logs.Items == nil || len(logs.Items) != 0 || logs.HasMore {
 				t.Fatalf("logs = %+v, %v", logs, err)
 			}
-			detail, err := store.Trace(context.Background(), traceID, testFilter())
+			detail, err := store.Trace(WithProject(context.Background(), "validation"), traceID, testFilter())
 			if !errors.Is(err, ErrNotFound) || detail.Spans == nil || detail.Logs == nil {
 				t.Fatalf("detail = %+v, %v", detail, err)
 			}
@@ -135,13 +135,13 @@ func TestStoreEmptyAndMissingTables(t *testing.T) {
 func TestStoreFailuresAreNotEmptyResults(t *testing.T) {
 	for _, failure := range []error{errors.New("network unavailable"), errors.New("Code: 60 textual only"), &clickhouse.Exception{Code: 516, Message: "bad password"}} {
 		store := testStore(t, func(context.Context, string, []driver.NamedValue) (driver.Rows, error) { return nil, failure })
-		if _, err := store.Traces(context.Background(), testFilter()); !errors.Is(err, failure) {
+		if _, err := store.Traces(WithProject(context.Background(), "validation"), testFilter()); !errors.Is(err, failure) {
 			t.Fatalf("trace list error = %v, want %v", err, failure)
 		}
-		if _, err := store.Logs(context.Background(), testFilter()); !errors.Is(err, failure) {
+		if _, err := store.Logs(WithProject(context.Background(), "validation"), testFilter()); !errors.Is(err, failure) {
 			t.Fatalf("log list error = %v, want %v", err, failure)
 		}
-		if _, err := store.Trace(context.Background(), traceID, testFilter()); !errors.Is(err, failure) {
+		if _, err := store.Trace(WithProject(context.Background(), "validation"), traceID, testFilter()); !errors.Is(err, failure) {
 			t.Fatalf("trace detail error = %v, want %v", err, failure)
 		}
 	}
@@ -159,7 +159,7 @@ func TestStoreScansAndTrimsLists(t *testing.T) {
 		}
 		return rows(logRow(), logRow()), nil
 	})
-	traces, err := store.Traces(context.Background(), f)
+	traces, err := store.Traces(WithProject(context.Background(), "validation"), f)
 	if err != nil || !traces.HasMore || len(traces.Items) != 1 {
 		t.Fatalf("trace result = %+v, %v", traces, err)
 	}
@@ -167,7 +167,7 @@ func TestStoreScansAndTrimsLists(t *testing.T) {
 	if trace.TraceID != traceID || trace.Name != "root" || trace.ServiceName != "api" || !trace.StartTime.Equal(f.From) || !trace.EndTime.Equal(f.From.Add(time.Second)) || trace.DurationNs != "1000000000" || trace.SpanCount != 2 || trace.ErrorCount != 1 {
 		t.Fatalf("summary data = %+v", trace)
 	}
-	logs, err := store.Logs(context.Background(), f)
+	logs, err := store.Logs(WithProject(context.Background(), "validation"), f)
 	if err != nil || !logs.HasMore || len(logs.Items) != 1 {
 		t.Fatalf("log result = %+v, %v", logs, err)
 	}
@@ -192,7 +192,7 @@ func TestStoreTraceCapsAndData(t *testing.T) {
 		}
 		return rows(data...), nil
 	})
-	detail, err := store.Trace(context.Background(), strings.ToUpper(traceID), testFilter())
+	detail, err := store.Trace(WithProject(context.Background(), "validation"), strings.ToUpper(traceID), testFilter())
 	if err != nil || detail.TraceID != traceID || len(detail.Spans) != 500 || len(detail.Logs) != 200 || !detail.SpansTruncated || !detail.LogsTruncated {
 		t.Fatalf("detail counts = %d, %d; truncated = %v, %v; err = %v", len(detail.Spans), len(detail.Logs), detail.SpansTruncated, detail.LogsTruncated, err)
 	}
@@ -218,7 +218,7 @@ func TestStoreTraceWithOnlyOneTable(t *testing.T) {
 				row[7], row[8] = map[string]string(nil), map[string]string(nil)
 				return rows(row), nil
 			})
-			detail, err := store.Trace(context.Background(), traceID, testFilter())
+			detail, err := store.Trace(WithProject(context.Background(), "validation"), traceID, testFilter())
 			if err != nil || len(detail.Spans)+len(detail.Logs) != 1 || detail.Spans == nil || detail.Logs == nil || detail.SpansTruncated || detail.LogsTruncated {
 				t.Fatalf("single-table detail = %+v, %v", detail, err)
 			}
@@ -233,7 +233,7 @@ func TestStoreTraceWithOnlyOneTable(t *testing.T) {
 }
 
 func TestStoreCancellationAndValidation(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(WithProject(context.Background(), "validation"))
 	defer cancel()
 	called := false
 	store := testStore(t, func(queryCtx context.Context, _ string, _ []driver.NamedValue) (driver.Rows, error) {
@@ -250,13 +250,13 @@ func TestStoreCancellationAndValidation(t *testing.T) {
 		t.Fatalf("cancellation error = %v, called = %v", err, called)
 	}
 	called = false
-	if _, err := store.Logs(context.Background(), Filter{}); err == nil || called {
+	if _, err := store.Logs(WithProject(context.Background(), "validation"), Filter{}); err == nil || called {
 		t.Fatalf("invalid filter reached DB: %v, called = %v", err, called)
 	}
-	if _, err := store.Trace(context.Background(), "", testFilter()); err == nil || called {
+	if _, err := store.Trace(WithProject(context.Background(), "validation"), "", testFilter()); err == nil || called {
 		t.Fatalf("invalid trace ID reached DB: %v, called = %v", err, called)
 	}
-	parent, parentCancel := context.WithTimeout(context.Background(), time.Second)
+	parent, parentCancel := context.WithTimeout(WithProject(context.Background(), "validation"), time.Second)
 	defer parentCancel()
 	queryCtx, queryCancel := queryContext(parent)
 	defer queryCancel()

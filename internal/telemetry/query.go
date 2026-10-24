@@ -2,14 +2,13 @@ package telemetry
 
 import "strings"
 
-// Project scope is fixed for the local, single-project proof. It cannot be
-// supplied by an HTTP parameter or a Filter.
-const scope = `ResourceAttributes['logice.project.id'] = 'validation'
+// Project scope is supplied only by the authorized server context.
+const scope = `ResourceAttributes['logice.project.id'] = ?
 AND toUnixTimestamp64Nano(Timestamp) >= ? AND toUnixTimestamp64Nano(Timestamp) < ?`
 
 func where(f Filter, logs bool) (string, []any) {
 	clauses := []string{scope}
-	args := []any{f.From.UnixNano(), f.To.UnixNano()}
+	args := []any{f.project, f.From.UnixNano(), f.To.UnixNano()}
 	if f.Service != "" {
 		clauses = append(clauses, "ServiceName = ?")
 		args = append(args, f.Service)

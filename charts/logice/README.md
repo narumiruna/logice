@@ -1,6 +1,6 @@
 # Logice Helm chart
 
-The chart runs web, API, private PostgreSQL, ClickHouse, and OpenTelemetry Collector workloads for one shared telemetry project. It does not provide high availability or multi-project authorization.
+The chart runs web, API, private PostgreSQL, ClickHouse, and OpenTelemetry Collector workloads with isolated projects and Owner/Developer/Viewer roles. It does not provide high availability. See [project roles and cutover](../../docs/project-access.md).
 
 **Do not deploy this wiring until matching authentication-capable API/web images are published and tested.** The defaults still use `latest`; older images cannot run the migration CLI or enforce authentication. Pre-create the new Secret keys before any approved sync. No live deployment is authorized or performed by the chart checks.
 
@@ -80,17 +80,11 @@ Preserve Cloudflare Access while application authentication is validated. Use th
 
 The web Service is `logice-tunnel`, with NodePort `30173` by default. This name creates no tunnel or authentication. **Direct node access can bypass Cloudflare Access.** Restrict node firewall access or set `web.service.type: ClusterIP` and use private tunnel routing. Only one release per namespace can use this fixed Service name. `web.service.nodePort` can change the port if required.
 
-API, PostgreSQL, ClickHouse, and Collector Services are ClusterIP. No public database, LoadBalancer, or Collector Ingress is created. Other cluster workloads can connect unless network policies restrict them. In-cluster database traffic is plaintext; use trusted cluster networking or separately managed TLS where required.
+API, PostgreSQL, ClickHouse, and Collector Services are ClusterIP. No public database, LoadBalancer, or Collector Ingress is created. The Collector NetworkPolicy permits HTTP ingestion only from this release\'s API pods. It requires a CNI that enforces NetworkPolicy; verify enforcement before release. Other service access requires separate network controls. In-cluster database traffic is plaintext; use trusted cluster networking or separately managed TLS where required.
 
-Nginx forwards `/api` to the API Service; the Go API must enforce sessions on real query routes. Static assets and process health probes need not require a session. Configuration changes trigger web rollouts. Health probes do not prove authenticated queries or credential validity.
+Nginx forwards `/api` and `/v1/` to the API Service; the Go API must enforce sessions on real query routes. Static assets and process health probes need not require a session. Configuration changes trigger web rollouts. Health probes do not prove authenticated queries or credential validity.
 
-For local diagnostic Collector access after approval:
-
-```sh
-kubectl -n logice port-forward service/logice-logice-collector 4318:4318
-```
-
-Send traces to `http://127.0.0.1:4318/v1/traces` and logs to `/v1/logs`, with `Authorization: Bearer <OTLP_TOKEN>`. In-cluster clients use `logice-logice-collector.logice.svc:4317` for gRPC or port `4318` for HTTP. Browser sessions and ingestion tokens are independent.
+Create a project token in **Project settings**. Send OTLP HTTP protobuf to the application origin at `/v1/traces` or `/v1/logs` with `Authorization: Bearer <PROJECT_TOKEN>`. In-cluster applications use the web or API Service HTTP endpoint, not Collector. The infrastructure `OTLP_TOKEN` is internal-only. No public project-token gRPC endpoint is provided. Browser sessions and ingestion tokens are independent.
 
 Optional Ingress requires `ingress.enabled`, a host matching `api.authOrigin`, the controller class, TLS, and separately configured edge access controls. The chart installs no Ingress controller, certificate manager, identity provider, or Cloudflare resources. HTTP localhost origins are development-only.
 

@@ -1,0 +1,7 @@
+# Disposable tests only. Never use this override for a normal deployment.
+services:
+  collector:
+    ports:
+      - "127.0.0.1::4317"
+      - "127.0.0.1::4318"
+      - "127.0.0.1::13133"

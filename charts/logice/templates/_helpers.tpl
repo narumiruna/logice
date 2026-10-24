@@ -10,6 +10,13 @@
     secretKeyRef:
       name: {{ .Values.existingSecret | quote }}
       key: CLICKHOUSE_PASSWORD
+- name: COLLECTOR_URL
+  value: http://{{ include "logice.name" . }}-collector:4318
+- name: OTLP_TOKEN
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.existingSecret | quote }}
+      key: OTLP_TOKEN
 - name: AUTH_ORIGIN
   value: {{ .Values.api.authOrigin | quote }}
 - name: ENCRYPTION_KEY

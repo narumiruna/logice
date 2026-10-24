@@ -1,4 +1,4 @@
-import { expect, test } from "./auth-fixtures"
+import { expect, projectHref, test } from "./auth-fixtures"
 import {
   advance,
   assertBuckets,
@@ -66,7 +66,7 @@ test("Live pauses the exact committed window, one-shot refreshes, resumes, and s
   const first = record(0)
   const second = record(1)
   const state = await control(page, snapshot([first]))
-  await page.goto("/live")
+  await page.goto(projectHref("/live"))
   await expect(row(page, first.id)).toBeVisible()
   expect(state.queries[0].get("range")).toBe("5m")
   await page.getByRole("button", { name: "Pause live updates" }).click()
@@ -110,7 +110,7 @@ test("Live unresolved pause makes no request until Refresh and pins its first re
   page,
 }) => {
   const state = await control(page, snapshot([]))
-  await page.goto("/live?mode=paused&range=5m")
+  await page.goto(projectHref("/live?mode=paused&range=5m"))
   await expect(page.getByText("Paused before first result", { exact: true })).toBeVisible()
   await page.clock.fastForward(60_000)
   expect(state.queries).toHaveLength(0)
@@ -126,7 +126,7 @@ test("Live URL reload, back and forward restore mode, filters and absolute nanos
   page,
 }) => {
   const state = await control(page)
-  await page.goto("/live?mode=live&range=1m&service=first")
+  await page.goto(projectHref("/live?mode=live&range=1m&service=first"))
   await expect(row(page, record(0).id)).toBeVisible()
   const historyLength = await page.evaluate(() => history.length)
   await advance(page, state)
@@ -156,7 +156,7 @@ test("Live histogram keyboard zoom never submits less than one second and explic
   page,
 }) => {
   const state = await control(page, snapshot([]))
-  await page.goto("/live?range=1m")
+  await page.goto(projectHref("/live?range=1m"))
   const bucket = page.getByRole("button", { name: /^Select bucket 1:/ })
   await expect(bucket).toBeVisible()
   await expect(page.getByText(/Minimum 1 second/)).toBeVisible()
@@ -194,7 +194,7 @@ test("Live late parents preserve selection, inspector tab and focus; duplicate c
   })
   const state = await control(page, snapshot([child]))
   await page.setViewportSize({ width: 1600, height: 1000 })
-  await page.goto("/live")
+  await page.goto(projectHref("/live"))
   await expect(row(page, child.id)).toContainText("Missing parent")
   await row(page, child.id)
     .getByRole("button", { name: "Inspect Initially orphaned child" })
@@ -240,7 +240,7 @@ test("Live renders only bounded virtual rows at the maximum valid snapshot and k
   page,
 }) => {
   await control(page, maximumSnapshot())
-  await page.goto("/live")
+  await page.goto(projectHref("/live"))
   const tree = page.getByRole("treegrid", { name: "Live telemetry events" })
   await expect(tree).toHaveAttribute("aria-rowcount", "1501")
   await expect(page.getByText(/Partial results:/)).toContainText(
@@ -284,7 +284,7 @@ test("Live scroll anchor drifts less than 3px after late-parent and earlier-row 
   })
   rows[25].parentSpanId = parent.spanId
   const state = await control(page, snapshot(rows))
-  await page.goto("/live")
+  await page.goto(projectHref("/live"))
   const pane = page.locator(".lv-scroll")
   await expect(page.getByRole("treegrid")).toHaveAttribute("aria-rowcount", "181")
   await page.clock.runFor(50)
@@ -338,7 +338,7 @@ test("Live tree arrows preserve manual collapse and expose error context without
   const parent = record(0, { name: "Healthy context", contextOnly: true, statusCode: "Ok" })
   const child = record(1, { name: "Error match", parentSpanId: parent.spanId, statusCode: "Error" })
   const state = await control(page, snapshot([parent, child]))
-  await page.goto("/live")
+  await page.goto(projectHref("/live"))
   await expect(row(page, parent.id)).toContainText("Context")
   await expect(page.getByRole("region", { name: "Stored event histogram" })).toContainText(
     "1 matching rows",
@@ -375,7 +375,7 @@ for (const failure of ["invalid JSON", "invalid schema", "503"] as const) {
     page,
   }) => {
     const state = await control(page)
-    await page.goto("/live")
+    await page.goto(projectHref("/live"))
     await expect(row(page, record(0).id)).toBeVisible()
     if (failure === "503") state.status = 503
     else
@@ -403,7 +403,7 @@ for (const failure of ["invalid JSON", "invalid schema", "503"] as const) {
 for (const status of [401, 403]) {
   test(`Live ${status} clears telemetry and selection and stops polling`, async ({ page }) => {
     const state = await control(page)
-    await page.goto("/live")
+    await page.goto(projectHref("/live"))
     await row(page, record(0).id).getByRole("button", { name: "Inspect Exported span 0" }).click()
     await expect(page.getByRole("dialog", { name: "Event details" })).toBeVisible()
     state.status = status
@@ -428,7 +428,7 @@ test("Live hidden and offline lifecycle suspends without changing URL mode and c
   context,
 }) => {
   const state = await control(page)
-  await page.goto("/live")
+  await page.goto(projectHref("/live"))
   await expect(row(page, record(0).id)).toBeVisible()
   const url = page.url()
   // Chromium headless has no reliable tab occlusion. Dispatch the browser visibility
@@ -469,7 +469,7 @@ test("Live mobile inspector is a native modal with inert background, contained f
   await page.setViewportSize({ width: 390, height: 844 })
   await page.emulateMedia({ reducedMotion: "reduce" })
   await control(page)
-  await page.goto("/live")
+  await page.goto(projectHref("/live"))
   const selected = row(page, record(0).id)
   await selected.getByRole("button", { name: "Inspect Exported span 0" }).click()
   const inspector = page.getByRole("dialog", { name: "Event details" })

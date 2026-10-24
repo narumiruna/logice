@@ -2,7 +2,7 @@
 
 ## Scope
 
-Open **http://127.0.0.1:5173/live** after building the local web/API services as described in [README](../README.md). Live reads actual OpenTelemetry exports from ClickHouse for the fixed `validation` project. `/preview` remains a separate simulated design preview; `/traces` and `/logs` retain their existing manual-refresh behavior.
+Sign in, select a project, and open `/projects/{projectID}/live` after building the services as described in [README](../README.md). Live reads only that authorized project. `/preview` remains a separate simulated design preview; project Traces and Logs retain their existing manual-refresh behavior. See [project access](project-access.md).
 
 This stack has no user authentication or dynamic project authorization. Keep it on loopback. Do not expose it through a public proxy or Tunnel. Live does not change Collector ingestion, telemetry schemas, credentials, or retention.
 
@@ -71,7 +71,7 @@ Intervals include `from` and exclude `to`. Live URLs use `range`; paused URLs us
 
 ## Bounds and API
 
-`GET /api/live` returns JSON with resolved `window`, `queriedAt`, applied `filters`, matching `spans` and `logs`, ancestor `context`, 60 `histogram` buckets, effective `limits`, four truncation flags, and `completeness: "unknown"`. Every response uses `Cache-Control: no-store`.
+`GET /api/projects/{projectID}/live` returns JSON with resolved `window`, `queriedAt`, applied `filters`, matching `spans` and `logs`, ancestor `context`, 60 `histogram` buckets, effective `limits`, four truncation flags, and `completeness: "unknown"`. Every response uses `Cache-Control: no-store`.
 
 Time parameters are either `range=1m|5m|15m` (default `5m`) or paired RFC3339Nano `from`/`to`. Fixed intervals must be from one second through fifteen minutes. Other parameters are `service`, `search`, `errorsOnly`, and `minSeverity`. Service/search each have a 200-byte UTF-8 limit; minimum severity is 0–24. Unknown/duplicate parameters, SQL, project overrides, and mixed time modes are rejected. Page URL `mode` is not an API parameter.
 

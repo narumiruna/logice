@@ -401,7 +401,22 @@
   font-size: 10px;
 }
 
+.auth-workspace {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+}
+.auth-workspace > .application-shell {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+}
+.auth-account > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 .auth-account {
+  flex-shrink: 0;
   display: flex;
   flex-wrap: wrap;
   align-items: center;

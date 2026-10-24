@@ -10,30 +10,28 @@ These examples send traces and standard-library logs to Logice through OTLP/HTTP
 | `telemetry.py` | Configure authenticated exporters, log correlation, and shutdown. |
 | `test_examples.py` | Check protobuf exports with a local test receiver. |
 
-## Prepare the Collector
+## Prepare the project
 
 Run these commands from the repository root. Create the protected `.env` first as described in the [main README](../../README.md).
 
 ```sh
 docker compose up --build --detach --wait --wait-timeout 120
-export OTEL_EXPORTER_OTLP_ENDPOINT="http://$(docker compose port collector 4318)"
+export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:5173
 ```
 
-Use the same Compose project for startup and port lookup. If you started with `--project-name logice-validation`, include that option in both commands.
+Sign in at the exact configured origin, create or select a project, and create an ingestion token in **Project settings** as Owner or Developer. Load it from protected storage into `LOGICE_PROJECT_TOKEN` and export that variable. Do not use the infrastructure `.env` `OTLP_TOKEN` for these examples.
 
-The endpoint is the Collector's random OTLP/HTTP port, not the web port `5173` or the API port `8080`. Do not append `/v1/traces` or `/v1/logs`; the shared setup adds the correct path for each signal.
-
-The commands below use `uv run --env-file` to read `OTLP_TOKEN` from the protected root `.env`. The token must match the running Collector. You can instead export `OTLP_TOKEN` in the process environment and omit `--env-file .env`. Do not put the token in source code or share it in logs.
+The endpoint is the application origin, not the private Collector. Do not append `/v1/traces` or `/v1/logs`; the shared setup adds each signal path. Use the same Compose project name for all lifecycle commands. Never put the token in source, URLs, shell history, or shared logs.
 
 ## Generate traces and logs
 
 ```sh
-uv run --project examples/python --locked --env-file .env python examples/python/send_telemetry.py
+uv run --project examples/python --locked python examples/python/send_telemetry.py
 ```
 
 One run generates two traces with four spans and seven logs. One checkout intentionally fails: its request and inventory spans have Error status, and its inventory log has ERROR severity. The other checkout succeeds. The final log has no trace ID.
 
-The command prints the service name `python-send-example` and the generated trace IDs as JSON. In `http://127.0.0.1:5173`:
+The command prints the service name `python-send-example` and the generated trace IDs as JSON. In the selected Logice project at `http://localhost:5173`:
 
 1. Open **Traces**, set **Service** to `python-send-example`, and select **Refresh**.
 2. Open a checkout trace and expand its spans or correlated logs.
@@ -43,22 +41,22 @@ Exporters flush before the process exits. Collector export batching can add a sh
 
 ## Generate multiple services
 
-After setting the Collector endpoint above, run:
+After setting the application endpoint and project token above, run:
 
 ```sh
-uv run --project examples/python --locked --env-file .env python examples/python/multi_service.py
+uv run --project examples/python --locked python examples/python/multi_service.py
 ```
 
 One run exports four traces, twenty spans, and thirty-six logs across `api`, `worker`, `postgres`, and `openai`. Each trace starts in `api`, continues in `worker` through W3C trace context, and includes database and completion spans. Two requests succeed; two have an intentional completion error with Error spans, ERROR logs, and WARN logs. Each service also emits one uncorrelated completion log.
 
-Open **http://127.0.0.1:5173/live** with the service filter empty to see all four services in the same hierarchy. Remove an existing service filter or select Reset view. Inspect a request to see its recorded IDs, service resources, and correlated logs.
+Open **Live** in the selected project with the service filter empty to see all four services in the same hierarchy. Remove an existing service filter or select Reset view. Inspect a request to see its recorded IDs, service resources, and correlated logs.
 
 These operations run in one local process and use short real delays. They do not connect to PostgreSQL or call OpenAI. Only the OTLP exports use the network. All spans are completed exports; there is no simulated Running status. The command prints the service names and trace IDs, then flushes exporters and exits.
 
 ## Run the HTTP server
 
 ```sh
-uv run --project examples/python --locked --env-file .env python examples/python/http_server.py
+uv run --project examples/python --locked python examples/python/http_server.py
 ```
 
 In another terminal:
@@ -78,7 +76,7 @@ curl -H 'traceparent: 00-1234567890abcdef1234567890abcdef-1234567890abcdef-01' \
 - The server binds only to `127.0.0.1`. Use `--port 8001` if port 8000 is occupied.
 - Press Ctrl-C to stop. Active request threads finish before providers flush and close.
 
-This is a development example, not a production HTTP server. It does not export request headers, raw query strings, or authentication tokens as telemetry. Resource attributes are examples, not access controls; the Collector assigns the fixed `validation` project.
+This is a development example, not a production HTTP server. It does not export request headers, raw query strings, or authentication tokens as telemetry. Resource attributes are examples, not access controls; the proxy and Collector assign the project authenticated by the token.
 
 ## Checks
 

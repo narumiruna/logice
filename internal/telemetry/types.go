@@ -1,4 +1,4 @@
-// Package telemetry reads the local validation project's exported telemetry.
+// Package telemetry reads exported telemetry within an authorized project.
 package telemetry
 
 import (
@@ -19,6 +19,7 @@ type Reader interface {
 }
 
 type Filter struct {
+	project     string
 	From, To    time.Time
 	Service     string
 	Search      string

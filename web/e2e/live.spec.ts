@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto"
 import type { LiveSnapshot } from "../src/live/api"
-import { expect, test } from "./auth-fixtures"
+import { encodeOTLP, expect, projectHref, test, workspace } from "./auth-fixtures"
 import { assertBuckets, testTarget } from "./live-fixtures"
 
 test("Live automatically shows real post-open Collector exports, freezes while paused, and discovers late context", async ({
@@ -10,7 +10,7 @@ test("Live automatically shows real post-open Collector exports, freezes while p
   test.setTimeout(110_000)
   testTarget(process.env.LOGICE_E2E_URL)
   const collector = testTarget(process.env.LOGICE_E2E_OTLP_URL)
-  const token = process.env.LOGICE_E2E_TOKEN
+  const token = workspace().ingestionToken
   if (!token) throw new Error("The disposable Collector token is required")
   const service = `logice-live-e2e-${randomBytes(8).toString("hex")}`
   const traceId = randomBytes(16).toString("hex")
@@ -58,8 +58,8 @@ test("Live automatically shows real post-open Collector exports, freezes while p
     try {
       const result = await fetch(`${collector}/v1/${path}`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/x-protobuf" },
+        body: new Uint8Array(encodeOTLP(path as "traces" | "logs", payload)),
         signal: AbortSignal.timeout(5000),
       })
       accepted = result.status === 200
@@ -75,7 +75,7 @@ test("Live automatically shows real post-open Collector exports, freezes while p
       .poll(
         async () => {
           const response = await request.get(
-            `/api/live?range=5m&service=${encodeURIComponent(service)}`,
+            projectHref(`/api/live?range=5m&service=${encodeURIComponent(service)}`),
             { timeout: 6000 },
           )
           if (!response.ok()) return false
@@ -95,7 +95,7 @@ test("Live automatically shows real post-open Collector exports, freezes while p
       .toBe(true)
   }
   await page.setViewportSize({ width: 1600, height: 1000 })
-  await page.goto(`/live?service=${encodeURIComponent(service)}`)
+  await page.goto(projectHref(`/live?service=${encodeURIComponent(service)}`))
   await expect(
     page.locator(".lp-empty").getByText("No matching events", { exact: true }),
   ).toBeVisible()
@@ -145,7 +145,7 @@ test("Live automatically shows real post-open Collector exports, freezes while p
   const pausedURL = page.url()
   const pauseRequests: string[] = []
   page.on("request", (value) => {
-    if (new URL(value.url()).pathname === "/api/live") pauseRequests.push(value.url())
+    if (new URL(value.url()).pathname === projectHref("/api/live")) pauseRequests.push(value.url())
   })
   await ingest(
     "traces",

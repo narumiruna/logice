@@ -63,6 +63,10 @@ func queryContext(ctx context.Context) (context.Context, context.CancelFunc) {
 
 func (s *Store) Traces(ctx context.Context, f Filter) (TraceList, error) {
 	result := TraceList{Items: []TraceSummary{}}
+	f.project = projectFrom(ctx)
+	if f.project == "" {
+		return result, ErrScope
+	}
 	if err := f.Validate(); err != nil {
 		return result, err
 	}
@@ -100,6 +104,10 @@ func (s *Store) Traces(ctx context.Context, f Filter) (TraceList, error) {
 
 func (s *Store) Logs(ctx context.Context, f Filter) (LogList, error) {
 	result := LogList{Items: []Log{}}
+	f.project = projectFrom(ctx)
+	if f.project == "" {
+		return result, ErrScope
+	}
 	if err := f.Validate(); err != nil {
 		return result, err
 	}
@@ -119,7 +127,10 @@ func (s *Store) Logs(ctx context.Context, f Filter) (LogList, error) {
 
 func (s *Store) Trace(ctx context.Context, traceID string, f Filter) (TraceDetail, error) {
 	// Detail reads accept only the time range and the path's trace identity.
-	f = Filter{From: f.From, To: f.To, TraceID: traceID}
+	f = Filter{From: f.From, To: f.To, TraceID: traceID, project: projectFrom(ctx)}
+	if f.project == "" {
+		return TraceDetail{}, ErrScope
+	}
 	result := TraceDetail{TraceID: strings.ToLower(traceID), Spans: []Span{}, Logs: []Log{}}
 	if traceID == "" {
 		return result, errors.New("trace ID is required")

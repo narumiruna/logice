@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test"
 import type { Log, Span, TraceSummary } from "../src/api"
-import { expect, test } from "./auth-fixtures"
+import { expect, projectHref, test, workspace } from "./auth-fixtures"
 import { control, record, snapshot } from "./live-fixtures"
 
 const traceId = "1234567890abcdef1234567890abcdef"
@@ -41,29 +41,34 @@ const log: Log = {
 
 async function mockTelemetry(page: Page) {
   await page.route("**/api/**", (route) =>
-    new URL(route.request().url()).pathname.startsWith("/api/auth/")
+    /^\/api\/(auth\/|projects(?:\/[^/]+)?$)/.test(new URL(route.request().url()).pathname)
       ? route.continue()
       : route.abort(),
   )
-  await page.route("**/api/traces?**", (route) =>
+  await page.route("**/api/projects/*/traces?**", (route) =>
     route.fulfill({ json: { items: [trace], hasMore: false } }),
   )
-  await page.route(`**/api/traces/${traceId}?**`, (route) =>
+  await page.route(`**/api/projects/*/traces/${traceId}?**`, (route) =>
     route.fulfill({
       json: { traceId, spans: [span], logs: [log], spansTruncated: false, logsTruncated: false },
     }),
   )
-  await page.route("**/api/logs?**", (route) =>
+  await page.route("**/api/projects/*/logs?**", (route) =>
     route.fulfill({ json: { items: [log], hasMore: false } }),
   )
   return control(page, snapshot([record(0, { name: "GET /checkout" })]))
 }
 
 const routes = [
-  { path: "/traces", heading: "Traces", name: "traces", ready: ".trace-table" },
-  { path: "/logs", heading: "Logs", name: "logs", ready: ".log-table" },
-  { path: `/traces/${traceId}`, heading: "Trace detail", name: "detail", ready: ".span-list" },
-  { path: "/live", heading: "Live", name: "live", ready: ".lv-event-row" },
+  { path: projectHref("/traces"), heading: "Traces", name: "traces", ready: ".trace-table" },
+  { path: projectHref("/logs"), heading: "Logs", name: "logs", ready: ".log-table" },
+  {
+    path: projectHref(`/traces/${traceId}`),
+    heading: "Trace detail",
+    name: "detail",
+    ready: ".span-list",
+  },
+  { path: projectHref("/live"), heading: "Live", name: "live", ready: ".lv-event-row" },
   { path: "/preview", heading: "Live", name: "preview", ready: ".lp-event-message" },
 ]
 
@@ -77,7 +82,7 @@ for (const theme of ["classic", "studio"] as const) {
       const errors: string[] = []
       page.on("pageerror", (error) => errors.push(error.message))
       for (const route of routes) {
-        await page.goto(route.path)
+        await page.goto(projectHref(route.path))
         await expect(page.getByRole("heading", { level: 1 })).toContainText(route.heading)
         await expect(page.locator(route.ready).first()).toBeVisible()
         const selector = page.getByRole("combobox", { name: "Theme", exact: true })
@@ -133,7 +138,7 @@ test("theme switches with the keyboard, survives reload, and follows navigation"
   page,
 }) => {
   await mockTelemetry(page)
-  await page.goto("/traces?service=checkout&errorsOnly=true")
+  await page.goto(projectHref("/traces?service=checkout&errorsOnly=true"))
   await expect(page.locator(".trace-table")).toBeVisible()
   const selector = page.getByRole("combobox", { name: "Theme", exact: true })
   await expect(selector).toHaveValue("classic")
@@ -165,11 +170,11 @@ test("theme switches with the keyboard, survives reload, and follows navigation"
 
 test("changing themes retains expanded log and span details", async ({ page }) => {
   await mockTelemetry(page)
-  await page.goto("/logs")
+  await page.goto(projectHref("/logs"))
   await page.getByText("Show log details", { exact: true }).click()
   await page.getByRole("combobox", { name: "Theme", exact: true }).selectOption("studio")
   await expect(page.locator(".log-expansion")).toHaveAttribute("open", "")
-  await page.goto(`/traces/${traceId}`)
+  await page.goto(projectHref(`/traces/${traceId}`))
   await page.locator(".span-summary").click()
   const before = page.url()
   await page.getByRole("combobox", { name: "Theme", exact: true }).selectOption("classic")
@@ -182,7 +187,7 @@ test("theme changes retain Live pause, draft filters, selection, and inspector t
 }) => {
   const state = await mockTelemetry(page)
   await page.setViewportSize({ width: 1600, height: 1000 })
-  await page.goto("/live")
+  await page.goto(projectHref("/live"))
   await expect(page.locator(".lv-event-row")).toBeVisible()
   await page.getByRole("button", { name: "Pause live updates" }).click()
   await page.getByRole("button", { name: "Inspect GET /checkout", exact: true }).click()
@@ -263,7 +268,7 @@ test("a storage write failure keeps the current theme usable", async ({ page }) 
       throw new DOMException("Storage full", "QuotaExceededError")
     }
   })
-  await page.goto("/traces")
+  await page.goto(projectHref("/traces"))
   const selector = page.getByRole("combobox", { name: "Theme", exact: true })
   await expect(selector).toHaveValue("studio")
   await selector.selectOption("classic")
@@ -275,13 +280,13 @@ test("a storage write failure keeps the current theme usable", async ({ page }) 
 test("invalid routes and API errors retain both themes and navigation", async ({ page }) => {
   await mockTelemetry(page)
   const cases = [
-    ["/live?range=2m", "Invalid Live query"],
-    ["/traces?limit=invalid", "Invalid query"],
-    ["/traces/not-a-trace", "Invalid query"],
-    ["/missing", "This page does not exist"],
+    [projectHref("/live?range=2m"), "Invalid Live query"],
+    [projectHref("/traces?limit=invalid"), "Invalid query"],
+    [projectHref("/traces/not-a-trace"), "Invalid query"],
+    [`/projects/${workspace().project.id}/missing`, "This page does not exist"],
   ]
   for (const [path, message] of cases) {
-    await page.goto(path)
+    await page.goto(projectHref(path))
     await expect(page.getByText(message, { exact: true })).toBeVisible()
     for (const theme of ["studio", "classic"]) {
       await page.getByRole("combobox", { name: "Theme", exact: true }).selectOption(theme)
@@ -291,8 +296,10 @@ test("invalid routes and API errors retain both themes and navigation", async ({
       ).toBeVisible()
     }
   }
-  await page.route("**/api/traces?**", (route) => route.fulfill({ status: 503, json: {} }))
-  await page.goto("/traces")
+  await page.route("**/api/projects/*/traces?**", (route) =>
+    route.fulfill({ status: 503, json: {} }),
+  )
+  await page.goto(projectHref("/traces"))
   await expect(page.getByRole("alert")).toContainText("Telemetry could not be loaded")
   await page.getByRole("combobox", { name: "Theme", exact: true }).selectOption("studio")
   await expect(page.getByRole("alert")).toContainText("Telemetry storage is unavailable")

@@ -1,4 +1,4 @@
-import { expect, test } from "./auth-fixtures"
+import { expect, projectHref, test } from "./auth-fixtures"
 import { advance, control, record, row, snapshot, testTarget } from "./live-fixtures"
 
 test.beforeEach(async ({ page }) => {
@@ -28,7 +28,7 @@ test("Live inspector shows exact summary fields and preserves attribute controls
   })
   const state = await control(page, snapshot([selected]))
   await page.setViewportSize({ width: 1600, height: 1000 })
-  await page.goto("/live")
+  await page.goto(projectHref("/live"))
   await row(page, selected.id).getByRole("button", { name: "Inspect Exported span 0" }).click()
   const inspector = page.getByRole("dialog", { name: "Event details" })
   await expect(inspector.locator("time")).toHaveText(selected.startTime)
@@ -38,7 +38,9 @@ test("Live inspector shows exact summary fields and preserves attribute controls
   await expect(inspector.locator(".lp-status-tag")).toHaveText("Error")
   await expect(inspector.getByRole("link", { name: selected.traceId })).toHaveAttribute(
     "href",
-    `/traces/${selected.traceId}?from=${encodeURIComponent(state.data.window.from)}&to=${encodeURIComponent(state.data.window.to)}`,
+    projectHref(
+      `/traces/${selected.traceId}?from=${encodeURIComponent(state.data.window.from)}&to=${encodeURIComponent(state.data.window.to)}`,
+    ),
   )
   await inspector.getByRole("button", { name: "Copy timestamp", exact: true }).click()
   await expect
@@ -92,7 +94,7 @@ test("Live inspector bounds JSON display but copies the complete stored projecti
 }) => {
   const selected = record(0, { stored: { Body: "x".repeat(90_000), sentinel: "stored-end" } })
   await control(page, snapshot([selected]))
-  await page.goto("/live")
+  await page.goto(projectHref("/live"))
   await row(page, selected.id).getByRole("button", { name: "Inspect Exported span 0" }).click()
   const inspector = page.getByRole("dialog", { name: "Event details" })
   await inspector.getByRole("tab", { name: "Stored record JSON", exact: true }).click()
@@ -138,7 +140,7 @@ test("Live log details show recorded severity and empty groups without span dura
     statusCode: "",
   })
   await control(page, snapshot([selected]))
-  await page.goto("/live")
+  await page.goto(projectHref("/live"))
   await row(page, selected.id).getByRole("button", { name: "Inspect Recorded warning" }).click()
   const inspector = page.getByRole("dialog", { name: "Event details" })
   await expect(inspector.locator(".lp-status-tag")).toHaveText("WARN")

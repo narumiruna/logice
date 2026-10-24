@@ -91,7 +91,7 @@ func (s *stack) post(path, token string, body []byte) (int, []byte) {
 	s.t.Helper()
 	ctx, cancel := context.WithTimeout(s.ctx, 10*time.Second)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://"+s.ports["http"]+path, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.applicationURL+path, bytes.NewReader(body))
 	s.must("create OTLP HTTP request", err)
 	req.Header.Set("Content-Type", "application/x-protobuf")
 	if token != "" {
@@ -109,7 +109,7 @@ func (s *stack) exportHTTP(path string, request, response proto.Message) {
 	s.t.Helper()
 	body, err := proto.Marshal(request)
 	s.must("encode OTLP request", err)
-	status, data := s.post(path, s.secrets[2], body)
+	status, data := s.post(path, s.applicationToken, body)
 	if status != http.StatusOK {
 		s.t.Fatalf("authenticated OTLP %s returned HTTP %d", path, status)
 	}
@@ -148,7 +148,7 @@ func (s *stack) authChecks(db *sql.DB) {
 				s.t.Fatalf("unauthorized %s returned HTTP %d, expected 401 or 403", target.path, status)
 			}
 		}
-		status, _ := s.post(target.path, s.secrets[2], []byte{0xff})
+		status, _ := s.post(target.path, s.applicationToken, []byte{0xff})
 		if status < 400 || status >= 500 {
 			s.t.Fatalf("malformed authenticated %s returned HTTP %d, expected 4xx", target.path, status)
 		}
@@ -208,7 +208,7 @@ func (s *stack) exportGRPC(f telemetry) string {
 	defer conn.Close()
 	ctx, cancel := context.WithTimeout(s.ctx, 10*time.Second)
 	defer cancel()
-	ctx = metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+s.secrets[2])
+	ctx = metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+s.secrets[2], "x-logice-project-id", fixtureProject)
 	result, err := collectortrace.NewTraceServiceClient(conn).Export(ctx, traceRequest(f.span("grpc-proof", id, f.parentID)))
 	s.must("export actual OTLP gRPC span", err)
 	if result.GetPartialSuccess().GetRejectedSpans() != 0 {
@@ -245,10 +245,10 @@ func checkAttrs(t *testing.T, attrs map[string]string, resourceAttrs bool) {
 	}
 	project, exists := attrs["logice.project.id"]
 	if resourceAttrs {
-		if project != "validation" || attrs["validation.resource"] != "custom-resource" || attrs["service.name"] != "logice-validation" {
+		if project != fixtureProject || attrs["validation.resource"] != "custom-resource" || attrs["service.name"] != "logice-validation" {
 			t.Error("trusted resource identity or custom resource attribute was not preserved")
 		}
-	} else if exists && project != "validation" {
+	} else if exists && project != fixtureProject {
 		t.Error("untrusted project identity survived in record attributes")
 	}
 }

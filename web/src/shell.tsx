@@ -1,5 +1,6 @@
 import type { ReactNode } from "react"
 import { Glyph, type GlyphName } from "./preview/icons"
+import { projectPath } from "./project-path"
 import { ThemeSelect } from "./theme"
 import "./styles.css"
 import "./shell.css"
@@ -9,8 +10,8 @@ type Page = "live" | "traces" | "logs" | "preview"
 export function AppShell({
   page,
   contentId = "main",
-  tracesHref = "/traces",
-  logsHref = "/logs",
+  tracesHref = projectPath("/traces"),
+  logsHref = projectPath("/logs"),
   children,
 }: {
   page?: Page
@@ -21,7 +22,7 @@ export function AppShell({
 }) {
   const preview = page === "preview"
   const links: { page: Page; label: string; icon: GlyphName; href: string }[] = [
-    { page: "live", label: "Live", icon: "activity", href: "/live" },
+    { page: "live", label: "Live", icon: "activity", href: projectPath("/live") },
     { page: "traces", label: "Traces", icon: "layers", href: tracesHref },
     { page: "logs", label: "Logs", icon: "code", href: logsHref },
     { page: "preview", label: "Design preview", icon: "box", href: "/preview" },
@@ -41,14 +42,14 @@ export function AppShell({
       </a>
       <header className="shell-header">
         <span className="shell-workspace">
-          Workspace <span aria-hidden="true">/</span> <strong>Local validation</strong>
+          Workspace <span aria-hidden="true">/</span> <strong>Project workspace</strong>
         </span>
         <span className="shell-badge">
           {preview
             ? "DESIGN PREVIEW"
             : page === "live"
-              ? "REAL TELEMETRY · LOCAL ONLY"
-              : "Validation project only"}
+              ? "REAL TELEMETRY"
+              : "Project-scoped telemetry"}
         </span>
         <ThemeSelect />
       </header>
@@ -56,8 +57,8 @@ export function AppShell({
         <div className="shell-project">
           <Glyph name="box" size={20} />
           <div>
-            <strong>Local validation</strong>
-            <span>Single project · Local only</span>
+            <strong>Project workspace</strong>
+            <span>Project-scoped access</span>
           </div>
         </div>
         <span className="shell-nav-label">Explore</span>

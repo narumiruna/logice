@@ -1,4 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
+
+vi.mock("./project-path", async (original) => ({
+  ...(await original<typeof import("./project-path")>()),
+  projectApi: (path: string) => `/api/projects/11111111-1111-1111-1111-111111111111${path}`,
+}))
+
 import type { ListFilters } from "./api"
 import { ApiError, fetchList, fetchTrace, listParams, requestJSON } from "./api"
 
@@ -58,7 +64,9 @@ describe("API query encoding", () => {
     expect(await fetchTrace(filters.traceId, filters, signal)).toEqual(data)
     const [path, options] = fetcher.mock.calls[0]
     const url = new URL(path, "http://local")
-    expect(url.pathname).toBe(`/api/traces/${filters.traceId}`)
+    expect(url.pathname).toBe(
+      `/api/projects/11111111-1111-1111-1111-111111111111/traces/${filters.traceId}`,
+    )
     expect([...url.searchParams.keys()]).toEqual(["from", "to"])
     expect(options.signal).toBe(signal)
     expect(options.headers).toEqual({ Accept: "application/json" })

@@ -1,5 +1,6 @@
 import type { ListFilters, Span, TimeWindow } from "./api"
 import { listParams, windowParams } from "./api"
+import { localProjectPath, projectPath } from "./project-path"
 
 export const ranges = {
   "15m": { label: "Last 15 minutes", ms: 15 * 60_000 },
@@ -52,7 +53,7 @@ export function timestampNs(value: string): bigint | null {
 
 export function parseRoute(href: string, now = Date.now()): Route {
   const url = new URL(href, "http://local")
-  const path = url.pathname.replace(/\/$/, "") || "/"
+  const path = localProjectPath(href).replace(/\/$/, "") || "/"
   const detail = /^\/traces\/([^/]+)$/.exec(path)
   const page: Page =
     path === "/" || path === "/traces"
@@ -124,11 +125,11 @@ export function parseRoute(href: string, now = Date.now()): Route {
 }
 
 export function traceHref(traceId: string, window: TimeWindow): string {
-  return `/traces/${encodeURIComponent(traceId)}?${windowParams(window)}`
+  return `${projectPath(`/traces/${encodeURIComponent(traceId)}`)}?${windowParams(window)}`
 }
 
 export function listHref(page: "traces" | "logs", window: TimeWindow): string {
-  return `/${page}?${windowParams(window)}`
+  return `${projectPath(`/${page}`)}?${windowParams(window)}`
 }
 
 export function routeHref(route: Route, refresh = false, now = Date.now()): string {
@@ -141,7 +142,7 @@ export function routeHref(route: Route, refresh = false, now = Date.now()): stri
   if (route.page === "detail") return traceHref(route.traceId, filters)
   const params = listParams(route.page === "logs" ? "logs" : "traces", filters)
   if (route.range !== "fixed") params.set("range", route.range)
-  return `/${route.page === "logs" ? "logs" : "traces"}?${params}`
+  return `${projectPath(`/${route.page === "logs" ? "logs" : "traces"}`)}?${params}`
 }
 
 export function filterResetHref(route: Route): string | undefined {

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { TimeWindow } from "../api"
 import { Glyph } from "../preview/icons"
+import { projectPath } from "../project-path"
 import { AppShell } from "../shell"
 import { LiveApiError, type LiveRecord, type LiveSnapshot } from "./api"
 import { Histogram } from "./histogram"
@@ -43,7 +44,8 @@ export function LivePage() {
           <main id="live-content" className="lv-invalid" tabIndex={-1}>
             <h1>Invalid Live query</h1>
             <p>{location.error}</p>
-            <a href="/live">Reset Live view</a> · <a href="/traces">Open traces</a>
+            <a href={projectPath("/live")}>Reset Live view</a> ·{" "}
+            <a href={projectPath("/traces")}>Open traces</a>
           </main>
         )}
       </div>
@@ -155,7 +157,7 @@ function LiveWorkspace({
   useEffect(() => {
     if (
       state.error instanceof LiveApiError &&
-      (state.error.status === 401 || state.error.status === 403)
+      (state.error.status === 401 || state.error.status === 403 || state.error.status === 404)
     ) {
       setSelected(null)
       setExpanded(new Set())

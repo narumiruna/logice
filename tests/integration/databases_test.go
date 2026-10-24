@@ -96,10 +96,10 @@ func (s *stack) checkPersistence(pg, ch *sql.DB) {
 	if name != "Stack validation" || value != "persistent" {
 		s.t.Fatal("database values did not persist")
 	}
-	// PostgreSQL contains only the application fixture and Goose bookkeeping.
+	// PostgreSQL contains authentication/project metadata and Goose fixtures, not telemetry.
 	var tables int
 	s.must("check PostgreSQL metadata-only schema", pg.QueryRowContext(ctx, "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'").Scan(&tables))
-	if tables != 2 {
+	if tables != 14 {
 		s.t.Fatalf("expected application metadata and Goose tables only, got %d", tables)
 	}
 }

@@ -146,7 +146,7 @@ func TestStoreIntegration(t *testing.T) {
 		if err := Migrate(ctx, pool); err != nil {
 			t.Fatal(err)
 		}
-		if count("auth_schema_versions") != 1 {
+		if count("auth_schema_versions") != 2 {
 			t.Fatal("duplicate schema version")
 		}
 		// Retrying initialization upgrades an earlier sessions table in place.

@@ -368,6 +368,10 @@ export function AccountPanel({
       <span>
         Account: <strong>{user.name}</strong>
         {user.admin ? " (Administrator)" : ""}
+        <span>
+          {" "}
+          · Account UUID: <code>{user.id}</code>
+        </span>
       </span>
       <button type="button" onClick={onLogout} disabled={busy}>
         Sign out
@@ -525,7 +529,7 @@ export function SessionGate({ children }: { children: ReactNode }) {
   return (
     <SessionView state={state} onRetry={() => setRetry((value) => value + 1)}>
       {state.status === "authenticated" ? (
-        <>
+        <div className="auth-workspace">
           {message && (
             <p className="auth-message" role="alert">
               {message}
@@ -539,7 +543,7 @@ export function SessionGate({ children }: { children: ReactNode }) {
             onInvite={invite}
           />
           {children}
-        </>
+        </div>
       ) : (
         <AuthLayout>
           {message && (

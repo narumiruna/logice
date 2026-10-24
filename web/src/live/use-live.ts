@@ -257,7 +257,7 @@ export class LiveController {
         ? error
         : new LiveApiError("Cannot reach the Live API. Try again.", 0, "network_error")
     const status = safeError.status
-    if (status === 401 || status === 403) {
+    if (status === 401 || status === 403 || status === 404) {
       this.blocked = true
       this.frozenWindow = null
       this.update({ snapshot: null, lastSuccess: null, error: safeError, status: "unavailable" })

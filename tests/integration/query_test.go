@@ -29,7 +29,7 @@ func TestTelemetryQueries(t *testing.T) {
 	store, err := query.Open(s.ports["clickhouse"], s.secrets[1])
 	s.must("open application query store", err)
 	t.Cleanup(func() { _ = store.Close() })
-	server := httptest.NewServer(httpapi.NewServer(store).Handler)
+	server := httptest.NewServer(scopedHandler(httpapi.NewServer(store).Handler))
 	t.Cleanup(server.Close)
 	get := func(path string, result any) int {
 		t.Helper()
@@ -146,7 +146,7 @@ func TestTelemetryQueries(t *testing.T) {
 		t.Fatal("trace detail lost spans/logs or included a foreign project")
 	}
 	for _, span := range detail.Spans {
-		if span.StartTime != fixture.start.Format(time.RFC3339Nano) || span.DurationNS != "25000000" || span.ResourceAttributes["logice.project.id"] != "validation" || span.Attributes["validation.int"] != "42" {
+		if span.StartTime != fixture.start.Format(time.RFC3339Nano) || span.DurationNS != "25000000" || span.ResourceAttributes["logice.project.id"] != fixtureProject || span.Attributes["validation.int"] != "42" {
 			t.Fatal("trace detail lost nanoseconds or attributes")
 		}
 		if span.SpanID == hex.EncodeToString(fixture.childID) && (span.ParentSpanID != hex.EncodeToString(fixture.parentID) || span.StatusCode != "Error") {
@@ -167,7 +167,7 @@ func TestTelemetryQueries(t *testing.T) {
 	if get(path("/api/logs", url.Values{"search": {"%"}, "minSeverity": {"17"}, "traceId": {id}}), &records) != 200 || len(records.Items) != 1 || records.Items[0].Body != "literal ' % _ search" || records.Items[0].SeverityNumber != 17 {
 		t.Fatal("log search must treat percent as literal text and retain severity/correlation")
 	}
-	if item := records.Items[0]; item.Timestamp != fixture.start.Add(20*time.Millisecond).Format(time.RFC3339Nano) || item.ResourceAttributes["logice.project.id"] != "validation" || item.Attributes["validation.bool"] != "true" {
+	if item := records.Items[0]; item.Timestamp != fixture.start.Add(20*time.Millisecond).Format(time.RFC3339Nano) || item.ResourceAttributes["logice.project.id"] != fixtureProject || item.Attributes["validation.bool"] != "true" {
 		t.Fatal("log detail lost time or attributes")
 	}
 	// A one-nanosecond window includes the span start and excludes later logs.
@@ -191,10 +191,10 @@ func TestTelemetryQueries(t *testing.T) {
 	// Server-side detail caps apply even when a trace has more stored records.
 	cappedID := randomHex(t, 16)
 	_, err = db.ExecContext(s.ctx, `INSERT INTO logice.otel_traces (Timestamp, TraceId, SpanId, SpanName, ServiceName, Duration, ResourceAttributes)
-SELECT fromUnixTimestamp64Nano(?), ?, leftPad(toString(number), 16, '0'), 'bounded', 'caps', toUInt64(1), map('logice.project.id', 'validation') FROM numbers(501)`, fixture.start.UnixNano(), cappedID)
+SELECT fromUnixTimestamp64Nano(?), ?, leftPad(toString(number), 16, '0'), 'bounded', 'caps', toUInt64(1), map('logice.project.id', '11111111-1111-4111-8111-111111111111') FROM numbers(501)`, fixture.start.UnixNano(), cappedID)
 	s.must("insert bounded span fixture", err)
 	_, err = db.ExecContext(s.ctx, `INSERT INTO logice.otel_logs (Timestamp, TraceId, Body, ResourceAttributes)
-SELECT fromUnixTimestamp64Nano(?), ?, 'bounded log', map('logice.project.id', 'validation') FROM numbers(201)`, fixture.start.UnixNano(), cappedID)
+SELECT fromUnixTimestamp64Nano(?), ?, 'bounded log', map('logice.project.id', '11111111-1111-4111-8111-111111111111') FROM numbers(201)`, fixture.start.UnixNano(), cappedID)
 	s.must("insert bounded log fixture", err)
 	if get(path("/api/traces/"+cappedID, nil), &detail) != 200 || len(detail.Spans) != 500 || len(detail.Logs) != 200 || !detail.SpansTruncated || !detail.LogsTruncated {
 		t.Fatal("trace detail must cap and flag excessive span/log results")

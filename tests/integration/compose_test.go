@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	query "github.com/narumiruna/logice/internal/telemetry"
 	"net"
 	"net/http"
 	"os"
@@ -21,15 +22,18 @@ import (
 )
 
 type stack struct {
-	t       *testing.T
-	ctx     context.Context
-	root    string
-	project string
-	env     []string
-	secrets []string
-	ports   map[string]string
-	http    *http.Client
-	started bool
+	t                  *testing.T
+	ctx                context.Context
+	root               string
+	project            string
+	env                []string
+	secrets            []string
+	ports              map[string]string
+	http               *http.Client
+	started            bool
+	applicationURL     string
+	applicationToken   string
+	applicationSession string
 }
 
 func randomHex(t *testing.T, size int) string {
@@ -66,7 +70,7 @@ func newStack(t *testing.T) *stack {
 	}
 	ctx, cancel := context.WithDeadline(context.Background(), deadline)
 	s := &stack{
-		t: t, ctx: ctx, root: filepath.Clean(filepath.Join(filepath.Dir(source), "../..")),
+		t: t, ctx: query.WithProject(ctx, fixtureProject), root: filepath.Clean(filepath.Join(filepath.Dir(source), "../..")),
 		project: "logice-validation-" + randomHex(t, 8),
 		secrets: []string{randomHex(t, 24), randomHex(t, 24), randomHex(t, 24), randomHex(t, 32)},
 		ports:   make(map[string]string), http: &http.Client{Timeout: 5 * time.Second},
@@ -124,6 +128,7 @@ func newStack(t *testing.T) *stack {
 		}
 		return nil
 	})
+	s.setupProjects()
 	return s
 }
 
@@ -158,7 +163,7 @@ func (s *stack) compose(ctx context.Context, args ...string) (string, error) {
 }
 
 func (s *stack) composeEnv(ctx context.Context, env []string, args ...string) (string, error) {
-	args = append([]string{"compose", "--project-name", s.project, "--file", filepath.Join(s.root, "compose.yaml")}, args...)
+	args = append([]string{"compose", "--project-name", s.project, "--file", filepath.Join(s.root, "compose.yaml"), "--file", filepath.Join(s.root, "tests/integration/collector-ports.yaml")}, args...)
 	cmd := exec.CommandContext(ctx, "docker", args...)
 	cmd.Dir, cmd.Env, cmd.WaitDelay = s.root, env, 5*time.Second
 	var output bytes.Buffer

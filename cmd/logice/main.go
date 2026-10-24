@@ -57,6 +57,9 @@ func run(address string) error {
 	if err != nil {
 		return err
 	}
+	if err := accounts.ConfigureIngestion(os.Getenv("COLLECTOR_URL"), os.Getenv("OTLP_TOKEN")); err != nil {
+		return err
+	}
 	// Cleanup is bounded and joined on shutdown; request-time expiry remains authoritative.
 	cleanupCtx, cleanupCancel := context.WithCancel(ctx)
 	cleanupDone := make(chan struct{})

@@ -110,7 +110,7 @@ func TestLiveContractAndLimits(t *testing.T) {
 	t.Run("canonical minimum matching independent of insertion order", func(t *testing.T) {
 		id := randomHex(t, 16)
 		for _, name := range []string{"z matching", "a excluded", "b matching"} {
-			exec(`INSERT INTO logice.otel_traces (Timestamp,TraceId,SpanId,SpanName,ServiceName,ResourceAttributes) VALUES (fromUnixTimestamp64Nano(?),?,'1111111111111111',?,'canonical',map('logice.project.id','validation'))`, f.start.UnixNano(), id, name)
+			exec(`INSERT INTO logice.otel_traces (Timestamp,TraceId,SpanId,SpanName,ServiceName,ResourceAttributes) VALUES (fromUnixTimestamp64Nano(?),?,'1111111111111111',?,'canonical',map('logice.project.id','11111111-1111-4111-8111-111111111111'))`, f.start.UnixNano(), id, name)
 		}
 		selected := filter
 		selected.Search = "matching"
@@ -120,7 +120,7 @@ func TestLiveContractAndLimits(t *testing.T) {
 			t.Fatal("not canonical minimum matching")
 		}
 		for _, name := range []string{"b matching", "a excluded", "z matching"} {
-			exec(`INSERT INTO logice.otel_traces (Timestamp,TraceId,SpanId,SpanName,ServiceName,ResourceAttributes) VALUES (fromUnixTimestamp64Nano(?),?,'1111111111111111',?,'canonical',map('logice.project.id','validation'))`, f.start.UnixNano(), id, name)
+			exec(`INSERT INTO logice.otel_traces (Timestamp,TraceId,SpanId,SpanName,ServiceName,ResourceAttributes) VALUES (fromUnixTimestamp64Nano(?),?,'1111111111111111',?,'canonical',map('logice.project.id','11111111-1111-4111-8111-111111111111'))`, f.start.UnixNano(), id, name)
 		}
 		r = read(selected)
 		if len(r.Spans) != 1 || r.Spans[0].Name != "b matching" || r.Spans[0].Occurrences != "6" {
@@ -129,7 +129,7 @@ func TestLiveContractAndLimits(t *testing.T) {
 	})
 	t.Run("delimiter maps and raw severity", func(t *testing.T) {
 		for _, attrs := range []string{`map('a|b','c','a','b|c')`, `map('a','b|c','a|b','c')`, `map('a|b','c|d')`, `map('a','b|c|d')`} {
-			exec(`INSERT INTO logice.otel_logs (Timestamp,Body,ServiceName,SeverityNumber,LogAttributes,ResourceAttributes) VALUES (fromUnixTimestamp64Nano(?),'a|b:c<>','delimiter',255,`+attrs+`,map('logice.project.id','validation'))`, f.start.UnixNano())
+			exec(`INSERT INTO logice.otel_logs (Timestamp,Body,ServiceName,SeverityNumber,LogAttributes,ResourceAttributes) VALUES (fromUnixTimestamp64Nano(?),'a|b:c<>','delimiter',255,`+attrs+`,map('logice.project.id','11111111-1111-4111-8111-111111111111'))`, f.start.UnixNano())
 		}
 		selected := filter
 		selected.Service = "delimiter"
@@ -148,7 +148,7 @@ func TestLiveContractAndLimits(t *testing.T) {
 		width := int64(1000000001)
 		id := randomHex(t, 16)
 		for i := int64(0); i <= 60; i++ {
-			exec(`INSERT INTO logice.otel_logs (Timestamp,TraceId,Body,ServiceName,SeverityNumber,ResourceAttributes) VALUES (fromUnixTimestamp64Nano(?),?,'boundary','boundaries',17,map('logice.project.id','validation'))`, start.UnixNano()+i*width/60, id)
+			exec(`INSERT INTO logice.otel_logs (Timestamp,TraceId,Body,ServiceName,SeverityNumber,ResourceAttributes) VALUES (fromUnixTimestamp64Nano(?),?,'boundary','boundaries',17,map('logice.project.id','11111111-1111-4111-8111-111111111111'))`, start.UnixNano()+i*width/60, id)
 		}
 		selected := query.LiveFilter{From: start, To: start.Add(time.Duration(width)), Service: "boundaries", Search: "BOUNDARY", ErrorsOnly: true, MinSeverity: 9}
 		r := read(selected)
@@ -163,8 +163,8 @@ func TestLiveContractAndLimits(t *testing.T) {
 	})
 	t.Run("independent grouped feed caps before limit", func(t *testing.T) {
 		id := randomHex(t, 16)
-		exec(`INSERT INTO logice.otel_traces (Timestamp,TraceId,SpanId,SpanName,ServiceName,ResourceAttributes) SELECT fromUnixTimestamp64Nano(?),?,leftPad(hex(number+1),16,'0'),'cap','caps',map('logice.project.id','validation') FROM numbers(501)`, f.start.UnixNano(), id)
-		exec(`INSERT INTO logice.otel_logs (Timestamp,TraceId,Body,ServiceName,ResourceAttributes) SELECT fromUnixTimestamp64Nano(?),?,toString(number),'caps',map('logice.project.id','validation') FROM numbers(501)`, f.start.UnixNano(), id)
+		exec(`INSERT INTO logice.otel_traces (Timestamp,TraceId,SpanId,SpanName,ServiceName,ResourceAttributes) SELECT fromUnixTimestamp64Nano(?),?,leftPad(hex(number+1),16,'0'),'cap','caps',map('logice.project.id','11111111-1111-4111-8111-111111111111') FROM numbers(501)`, f.start.UnixNano(), id)
+		exec(`INSERT INTO logice.otel_logs (Timestamp,TraceId,Body,ServiceName,ResourceAttributes) SELECT fromUnixTimestamp64Nano(?),?,toString(number),'caps',map('logice.project.id','11111111-1111-4111-8111-111111111111') FROM numbers(501)`, f.start.UnixNano(), id)
 		for _, table := range []string{"otel_traces", "otel_logs"} {
 			exec(`INSERT INTO logice.`+table+` SELECT * FROM logice.`+table+` WHERE TraceId=? LIMIT 101`, id)
 		}
@@ -177,9 +177,9 @@ func TestLiveContractAndLimits(t *testing.T) {
 	})
 	t.Run("fair context no recursive queries", func(t *testing.T) {
 		wide, small := randomHex(t, 16), randomHex(t, 16)
-		exec(`INSERT INTO logice.otel_traces (Timestamp,TraceId,SpanId,ParentSpanId,SpanName,ServiceName,ResourceAttributes) SELECT fromUnixTimestamp64Nano(?),?,leftPad(hex(number+1),16,'0'),if(number=0,'',leftPad(hex(number),16,'0')),'ancestor','context',map('logice.project.id','validation') FROM numbers(1000)`, f.start.UnixNano(), wide)
+		exec(`INSERT INTO logice.otel_traces (Timestamp,TraceId,SpanId,ParentSpanId,SpanName,ServiceName,ResourceAttributes) SELECT fromUnixTimestamp64Nano(?),?,leftPad(hex(number+1),16,'0'),if(number=0,'',leftPad(hex(number),16,'0')),'ancestor','context',map('logice.project.id','11111111-1111-4111-8111-111111111111') FROM numbers(1000)`, f.start.UnixNano(), wide)
 		for _, spec := range []struct{ id, span, parent, name string }{{wide, "0000000000001000", "00000000000003E8", "needle"}, {small, "1111111111111111", "", "ancestor"}, {small, "2222222222222222", "1111111111111111", "needle"}} {
-			exec(`INSERT INTO logice.otel_traces (Timestamp,TraceId,SpanId,ParentSpanId,SpanName,ServiceName,ResourceAttributes) VALUES (fromUnixTimestamp64Nano(?),?,?,?,?,'context',map('logice.project.id','validation'))`, f.start.UnixNano(), spec.id, spec.span, spec.parent, spec.name)
+			exec(`INSERT INTO logice.otel_traces (Timestamp,TraceId,SpanId,ParentSpanId,SpanName,ServiceName,ResourceAttributes) VALUES (fromUnixTimestamp64Nano(?),?,?,?,?,'context',map('logice.project.id','11111111-1111-4111-8111-111111111111'))`, f.start.UnixNano(), spec.id, spec.span, spec.parent, spec.name)
 		}
 		selected := filter
 		selected.Service = "context"
@@ -220,7 +220,7 @@ func TestLiveContractAndLimits(t *testing.T) {
 	})
 	t.Run("deterministic 10k performance HTTP", func(t *testing.T) {
 		liveSeed10k(t, s, db, f.start)
-		server := httptest.NewServer(httpapi.NewServer(store).Handler)
+		server := httptest.NewServer(scopedHandler(httpapi.NewServer(store).Handler))
 		defer server.Close()
 		params := url.Values{"from": {filter.From.Format(time.RFC3339Nano)}, "to": {filter.To.Format(time.RFC3339Nano)}, "service": {"performance"}}
 		endpoint := server.URL + "/api/live?" + params.Encode()
@@ -262,8 +262,8 @@ func TestLiveContractAndLimits(t *testing.T) {
 	t.Run("actual Live resource settings and cancellation", func(t *testing.T) { liveNativeSettingsAndCancellation(t, s, db, f.start) })
 	t.Run("native case identity and epoch-zero rank", func(t *testing.T) { liveNativeEpochAndCase(t, s, db, store, f.start) })
 	t.Run("oversized API error and outage health", func(t *testing.T) {
-		exec(`INSERT INTO logice.otel_logs (Timestamp,Body,ServiceName,ResourceAttributes) VALUES (fromUnixTimestamp64Nano(?),repeat('xxxxx',440000),'oversized',map('logice.project.id','validation'))`, f.start.UnixNano())
-		server := httptest.NewServer(httpapi.NewServer(store).Handler)
+		exec(`INSERT INTO logice.otel_logs (Timestamp,Body,ServiceName,ResourceAttributes) VALUES (fromUnixTimestamp64Nano(?),repeat('xxxxx',440000),'oversized',map('logice.project.id','11111111-1111-4111-8111-111111111111'))`, f.start.UnixNano())
+		server := httptest.NewServer(scopedHandler(httpapi.NewServer(store).Handler))
 		defer server.Close()
 		params := url.Values{"from": {filter.From.Format(time.RFC3339Nano)}, "to": {filter.To.Format(time.RFC3339Nano)}, "service": {"oversized"}}
 		response, err := s.http.Get(server.URL + "/api/live?" + params.Encode())
@@ -337,9 +337,9 @@ func liveSeed10k(t *testing.T, s *stack, db *sql.DB, start time.Time) {
 	t.Helper()
 	// 5,000 spans: a 1,000-deep chain, a wide trace, and 198 other traces.
 	_, err := db.ExecContext(s.ctx, `INSERT INTO logice.otel_traces (Timestamp,TraceId,SpanId,ParentSpanId,SpanName,ServiceName,Duration,StatusCode,ResourceAttributes)
- SELECT fromUnixTimestamp64Nano(?+toInt64(number)),leftPad(hex(if(number<1000,1,if(number<2000,2,3+number%198))),32,'0'),leftPad(hex(number+1),16,'0'),if(number>0 AND number<1000,leftPad(hex(number),16,'0'),''),concat('span-',toString(number)),'performance',toUInt64(1000),if(number%10=0,'Error','Ok'),map('logice.project.id','validation') FROM numbers(5000)`, start.UnixNano())
+ SELECT fromUnixTimestamp64Nano(?+toInt64(number)),leftPad(hex(if(number<1000,1,if(number<2000,2,3+number%198))),32,'0'),leftPad(hex(number+1),16,'0'),if(number>0 AND number<1000,leftPad(hex(number),16,'0'),''),concat('span-',toString(number)),'performance',toUInt64(1000),if(number%10=0,'Error','Ok'),map('logice.project.id','11111111-1111-4111-8111-111111111111') FROM numbers(5000)`, start.UnixNano())
 	s.must("seed 5000 spans", err)
 	_, err = db.ExecContext(s.ctx, `INSERT INTO logice.otel_logs (Timestamp,TraceId,SpanId,Body,ServiceName,SeverityNumber,ResourceAttributes)
- SELECT fromUnixTimestamp64Nano(?+toInt64(number)),if(number%5=0,'',leftPad(hex(1+number%200),32,'0')),'',concat('log-',toString(number)),'performance',toUInt8(if(number%10=0,17,9)),map('logice.project.id','validation') FROM numbers(5000)`, start.UnixNano())
+ SELECT fromUnixTimestamp64Nano(?+toInt64(number)),if(number%5=0,'',leftPad(hex(1+number%200),32,'0')),'',concat('log-',toString(number)),'performance',toUInt8(if(number%10=0,17,9)),map('logice.project.id','11111111-1111-4111-8111-111111111111') FROM numbers(5000)`, start.UnixNano())
 	s.must("seed 5000 logs", err)
 }

@@ -6,7 +6,7 @@ metadata:
     {{- include "logice.labels" . | nindent 4 }}
 data:
   config.yaml: |
-    # Single-project feasibility configuration. Do not expose it as a multi-project service.
+    # Private receiver: only the authenticated Go proxy sets project metadata.
     extensions:
       health_check:
         endpoint: 0.0.0.0:13133
@@ -18,10 +18,14 @@ data:
         protocols:
           grpc:
             endpoint: 0.0.0.0:4317
+            include_metadata: true
+            max_recv_msg_size_mib: 8
             auth:
               authenticator: bearertokenauth
           http:
             endpoint: 0.0.0.0:4318
+            include_metadata: true
+            max_request_body_size: 8388608
             auth:
               authenticator: bearertokenauth
 
@@ -30,11 +34,38 @@ data:
         check_interval: 1s
         limit_mib: 128
         spike_limit_mib: 32
+      # Remove all duplicate reserved keys, not just the first protobuf map entry.
+      transform/project:
+        error_mode: propagate
+        trace_statements:
+          - context: resource
+            statements:
+              - 'delete_matching_keys(attributes, "^logice[.]project[.]id$")'
+          - context: span
+            statements:
+              - 'delete_matching_keys(attributes, "^logice[.]project[.]id$")'
+        log_statements:
+          - context: resource
+            statements:
+              - 'delete_matching_keys(attributes, "^logice[.]project[.]id$")'
+          - context: log
+            statements:
+              - 'delete_matching_keys(attributes, "^logice[.]project[.]id$")'
       resource/project:
         attributes:
           - key: logice.project.id
-            action: upsert
-            value: validation
+            action: delete
+          - key: logice.project.id
+            action: insert
+            from_context: metadata.x-logice-project-id
+      filter/project:
+        error_mode: propagate
+        traces:
+          span:
+            - 'resource.attributes["logice.project.id"] == nil or resource.attributes["logice.project.id"] == ""'
+        logs:
+          log_record:
+            - 'resource.attributes["logice.project.id"] == nil or resource.attributes["logice.project.id"] == ""'
       attributes/project:
         actions:
           - key: logice.project.id
@@ -70,9 +101,9 @@ data:
       pipelines:
         traces:
           receivers: [otlp]
-          processors: [memory_limiter, resource/project, attributes/project]
+          processors: [memory_limiter, transform/project, resource/project, filter/project, attributes/project]
           exporters: [clickhouse]
         logs:
           receivers: [otlp]
-          processors: [memory_limiter, resource/project, attributes/project]
+          processors: [memory_limiter, transform/project, resource/project, filter/project, attributes/project]
           exporters: [clickhouse]

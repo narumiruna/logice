@@ -1,4 +1,5 @@
 import { ApiError, type TimeWindow } from "../api"
+import { projectApi } from "../project-path"
 import { isTraceId, timestampNs } from "../telemetry"
 import { type LiveRoute, liveQuery, validateWindow } from "./route"
 
@@ -330,7 +331,7 @@ export async function fetchLive(
   fetcher: typeof fetch = fetch,
 ): Promise<LiveSnapshot> {
   if (signal.aborted) throw new DOMException("Aborted", "AbortError")
-  const response = await fetcher(`/api/live?${liveQuery(route)}`, {
+  const response = await fetcher(`${projectApi("/live")}?${liveQuery(route)}`, {
     signal,
     headers: { Accept: "application/json" },
     cache: "no-store",
@@ -351,7 +352,7 @@ export async function fetchLive(
         : status === 422
           ? "response_too_large"
           : status === 404
-            ? "unsupported_endpoint"
+            ? "access_denied"
             : status === 401 || status === 403
               ? "access_denied"
               : status === 429
@@ -359,7 +360,7 @@ export async function fetchLive(
                 : "unavailable"
     throw new LiveApiError(
       status === 404
-        ? "This API does not support Live. Update the API and web application together."
+        ? "This project is unavailable or your access was removed."
         : `Live request failed (${status}).`,
       status,
       code,

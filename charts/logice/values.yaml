@@ -34,6 +34,7 @@ imagePullSecrets: []
 # - name: registry-credentials
 
 # Pre-create this Secret in the release namespace. No credentials are generated.
+# OTLP_TOKEN is internal-only; applications use project tokens through Go.
 # Required keys: CLICKHOUSE_PASSWORD, OTLP_TOKEN, POSTGRES_PASSWORD,
 # ENCRYPTION_KEY (exactly 64 hex characters).
 existingSecret: logice-secrets

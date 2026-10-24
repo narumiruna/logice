@@ -52,3 +52,40 @@ CREATE TABLE IF NOT EXISTS auth_events (
  occurred_at timestamptz NOT NULL DEFAULT now()
 );
 INSERT INTO auth_schema_versions(version) VALUES (1) ON CONFLICT DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS projects (
+ id uuid PRIMARY KEY,
+ name text NOT NULL CHECK (length(name) BETWEEN 1 AND 80),
+ owner_user_id uuid NOT NULL REFERENCES auth_users(id),
+ created_at timestamptz NOT NULL DEFAULT now(),
+ deleted_at timestamptz
+);
+CREATE INDEX IF NOT EXISTS projects_owner ON projects(owner_user_id) WHERE deleted_at IS NULL;
+CREATE TABLE IF NOT EXISTS project_members (
+ project_id uuid NOT NULL REFERENCES projects(id),
+ user_id uuid NOT NULL REFERENCES auth_users(id),
+ role text NOT NULL CHECK (role IN ('Developer','Viewer')),
+ created_at timestamptz NOT NULL DEFAULT now(),
+ PRIMARY KEY(project_id,user_id)
+);
+CREATE INDEX IF NOT EXISTS project_members_user ON project_members(user_id);
+CREATE TABLE IF NOT EXISTS project_tokens (
+ id uuid PRIMARY KEY,
+ project_id uuid NOT NULL REFERENCES projects(id),
+ name text NOT NULL CHECK (length(name) BETWEEN 1 AND 80),
+ token_hash bytea NOT NULL UNIQUE CHECK (octet_length(token_hash)=32),
+ creator_user_id uuid NOT NULL REFERENCES auth_users(id),
+ created_at timestamptz NOT NULL DEFAULT now(),
+ expires_at timestamptz,
+ revoked_at timestamptz
+);
+CREATE INDEX IF NOT EXISTS project_tokens_project ON project_tokens(project_id);
+CREATE TABLE IF NOT EXISTS project_events (
+ id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+ project_id uuid NOT NULL REFERENCES projects(id),
+ actor_user_id uuid NOT NULL REFERENCES auth_users(id),
+ action text NOT NULL,
+ target text NOT NULL,
+ occurred_at timestamptz NOT NULL DEFAULT now()
+);
+INSERT INTO auth_schema_versions(version) VALUES (2) ON CONFLICT DO NOTHING;

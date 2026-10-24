@@ -1,4 +1,10 @@
 import { readFileSync } from "node:fs"
+
+vi.mock("../project-path", async (original) => ({
+  ...(await original<typeof import("../project-path")>()),
+  projectApi: (path: string) => `/api/projects/11111111-1111-1111-1111-111111111111${path}`,
+}))
+
 import { describe, expect, it, vi } from "vitest"
 import { timestampNs } from "../telemetry"
 import {

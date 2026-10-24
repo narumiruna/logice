@@ -163,7 +163,7 @@ export async function control(page: Page, data = snapshot([record(0)])): Promise
   const state: ControlledLive = { data, status: 200, malformed: null, queries: [] }
   await page.clock.install({ time: now })
   await page.clock.pauseAt(now)
-  await page.route("**/api/live?**", async (route) => {
+  await page.route("**/api/projects/*/live?**", async (route) => {
     const query = new URL(route.request().url()).searchParams
     state.queries.push(query)
     if (state.status !== 200) {

@@ -1,6 +1,6 @@
 apiVersion: v2
 name: logice
-description: Private, single-project Logice deployment with ClickHouse and OTLP ingestion
+description: Private, project-scoped Logice deployment with ClickHouse and OTLP ingestion
 type: application
 version: 0.1.1
 kubeVersion: ">=1.26.0-0"

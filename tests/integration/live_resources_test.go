@@ -47,7 +47,7 @@ func liveNativeSettingsAndCancellation(t *testing.T, s *stack, db *sql.DB, start
 	}
 	// The heavy fixture uses a separate window, so it cannot affect other reads.
 	heavy := start.Add(time.Minute)
-	_, err = db.ExecContext(s.ctx, `INSERT INTO logice.otel_traces (Timestamp,TraceId,SpanId,SpanName,ServiceName,ResourceAttributes) SELECT fromUnixTimestamp64Nano(?),'dddddddddddddddddddddddddddddddd',leftPad(hex(number+1),16,'0'),concat('heavy-',toString(number)),'heavy',map('logice.project.id','validation') FROM numbers(500000)`, heavy.UnixNano())
+	_, err = db.ExecContext(s.ctx, `INSERT INTO logice.otel_traces (Timestamp,TraceId,SpanId,SpanName,ServiceName,ResourceAttributes) SELECT fromUnixTimestamp64Nano(?),'dddddddddddddddddddddddddddddddd',leftPad(hex(number+1),16,'0'),concat('heavy-',toString(number)),'heavy',map('logice.project.id','11111111-1111-4111-8111-111111111111') FROM numbers(500000)`, heavy.UnixNano())
 	s.must("seed actual Live memory fixture", err)
 	filter = query.LiveFilter{From: heavy.Add(-time.Second), To: heavy.Add(time.Second), Service: "heavy"}
 	ctx, cancel := context.WithTimeout(s.ctx, 3*time.Second)
@@ -76,7 +76,7 @@ func liveNativeEpochAndCase(t *testing.T, s *stack, db *sql.DB, store *query.Sto
 			span = strings.ToUpper(span)
 			parent = strings.ToUpper(parent)
 		}
-		_, err := db.ExecContext(s.ctx, `INSERT INTO logice.otel_traces (Timestamp,TraceId,SpanId,ParentSpanId,SpanName,ServiceName,ResourceAttributes) VALUES (fromUnixTimestamp64Nano(?),?,?,?,'case','case',map('logice.project.id','validation'))`, start.UnixNano(), trace, span, parent)
+		_, err := db.ExecContext(s.ctx, `INSERT INTO logice.otel_traces (Timestamp,TraceId,SpanId,ParentSpanId,SpanName,ServiceName,ResourceAttributes) VALUES (fromUnixTimestamp64Nano(?),?,?,?,'case','case',map('logice.project.id','11111111-1111-4111-8111-111111111111'))`, start.UnixNano(), trace, span, parent)
 		s.must("insert case-normalized identity", err)
 	}
 	r, err := store.Live(s.ctx, query.LiveFilter{From: start.Add(-time.Second), To: start.Add(time.Second), Service: "case"})
@@ -89,10 +89,10 @@ func liveNativeEpochAndCase(t *testing.T, s *stack, db *sql.DB, store *query.Sto
 	_, err = db.ExecContext(s.ctx, "ALTER TABLE logice.otel_traces REMOVE TTL")
 	s.must("disable disposable span TTL for epoch fixture", err)
 	for _, ns := range []int64{-500000000, 0} {
-		_, err = db.ExecContext(s.ctx, `INSERT INTO logice.otel_traces (Timestamp,TraceId,SpanId,SpanName,ServiceName,ResourceAttributes) VALUES (fromUnixTimestamp64Nano(?),'ffffffffffffffffffffffffffffffff','1111111111111111','epoch','epoch',map('logice.project.id','validation'))`, ns)
+		_, err = db.ExecContext(s.ctx, `INSERT INTO logice.otel_traces (Timestamp,TraceId,SpanId,SpanName,ServiceName,ResourceAttributes) VALUES (fromUnixTimestamp64Nano(?),'ffffffffffffffffffffffffffffffff','1111111111111111','epoch','epoch',map('logice.project.id','11111111-1111-4111-8111-111111111111'))`, ns)
 		s.must("insert epoch conflict", err)
 	}
-	_, err = db.ExecContext(s.ctx, `INSERT INTO logice.otel_traces (Timestamp,TraceId,SpanId,SpanName,ServiceName,ResourceAttributes) SELECT fromUnixTimestamp64Nano(toInt64(-100000000)),leftPad(hex(number+1),32,'0'),'1111111111111111','epoch','epoch',map('logice.project.id','validation') FROM numbers(100)`)
+	_, err = db.ExecContext(s.ctx, `INSERT INTO logice.otel_traces (Timestamp,TraceId,SpanId,SpanName,ServiceName,ResourceAttributes) SELECT fromUnixTimestamp64Nano(toInt64(-100000000)),leftPad(hex(number+1),32,'0'),'1111111111111111','epoch','epoch',map('logice.project.id','11111111-1111-4111-8111-111111111111') FROM numbers(100)`)
 	s.must("insert epoch group peers", err)
 	r, err = store.Live(s.ctx, query.LiveFilter{From: time.Unix(-1, 0), To: time.Unix(1, 0), Service: "epoch"})
 	s.must("epoch Live ranking", err)

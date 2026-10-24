@@ -22,7 +22,7 @@ var schema string
 
 var errDenied = errors.New("authentication denied")
 
-// User identifies an account in the single shared telemetry project.
+// User identifies an account. Platform administration does not grant project access.
 type User struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
@@ -77,7 +77,7 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 // Ready fails startup closed until the migration has been applied.
 func Ready(ctx context.Context, pool *pgxpool.Pool) error {
 	var version int
-	if err := pool.QueryRow(ctx, "SELECT max(version) FROM auth_schema_versions").Scan(&version); err != nil || version != 1 {
+	if err := pool.QueryRow(ctx, "SELECT max(version) FROM auth_schema_versions").Scan(&version); err != nil || version != 2 {
 		return errors.New("authentication schema unavailable; run logice migrate")
 	}
 	return nil
@@ -162,6 +162,9 @@ func Recover(ctx context.Context, pool *pgxpool.Pool, userID string) (Invitation
 	}
 	v, err := invite(ctx, tx, userID)
 	if err != nil {
+		return Invitation{}, err
+	}
+	if _, err = tx.Exec(ctx, "INSERT INTO project_events(project_id,actor_user_id,action,target) SELECT id,$1::uuid,'operator_account_recovery',$1::text FROM projects WHERE owner_user_id=$1::uuid AND deleted_at IS NULL", userID); err != nil {
 		return Invitation{}, err
 	}
 	if _, err = tx.Exec(ctx, "INSERT INTO auth_events(action,user_id) VALUES('operator_recovery',$1)", userID); err != nil {

@@ -1,3 +1,4 @@
+import { projectApi } from "./project-path"
 export interface TimeWindow {
   from: string
   to: string
@@ -136,7 +137,7 @@ export async function fetchList<T>(
   signal: AbortSignal,
 ): Promise<ListResult<T>> {
   const result = await requestJSON<ListResult<T>>(
-    `/api/${kind}?${listParams(kind, filters)}`,
+    `${projectApi(`/${kind}`)}?${listParams(kind, filters)}`,
     signal,
   )
   if (!result || !Array.isArray(result.items) || typeof result.hasMore !== "boolean") {
@@ -151,7 +152,7 @@ export async function fetchTrace(
   signal: AbortSignal,
 ): Promise<TraceDetail> {
   const result = await requestJSON<TraceDetail>(
-    `/api/traces/${encodeURIComponent(traceId)}?${windowParams(window)}`,
+    `${projectApi(`/traces/${encodeURIComponent(traceId)}`)}?${windowParams(window)}`,
     signal,
   )
   if (

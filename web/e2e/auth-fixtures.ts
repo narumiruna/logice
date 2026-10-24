@@ -1,7 +1,42 @@
-import { readFileSync } from "node:fs"
+import { execFileSync } from "node:child_process"
+import { existsSync, readFileSync } from "node:fs"
+import { fileURLToPath } from "node:url"
 import { type BrowserContext, test as base, expect, type Page } from "@playwright/test"
 
 export { expect }
+
+export function workspace(): { project: { id: string }; ingestionToken: string } {
+  const file = process.env.LOGICE_E2E_AUTH_FILE
+  if (!file) throw new Error("Run through the disposable validation script")
+  return JSON.parse(readFileSync(file, "utf8"))
+}
+
+export function encodeOTLP(signal: "traces" | "logs", data: unknown): Buffer {
+  return execFileSync(
+    "uv",
+    [
+      "run",
+      "--locked",
+      "--project",
+      fileURLToPath(new URL("../../examples/python", import.meta.url)),
+      "python",
+      fileURLToPath(new URL("../../tests/fixtures/telemetry/encode.py", import.meta.url)),
+      signal,
+    ],
+    { input: JSON.stringify(data), maxBuffer: 8 << 20, timeout: 30_000 },
+  )
+}
+
+export function projectHref(path: string): string {
+  // Playwright discovers modules before the setup project creates its private state file.
+  if (!process.env.LOGICE_E2E_AUTH_FILE || !existsSync(process.env.LOGICE_E2E_AUTH_FILE))
+    return path
+  if (/^\/api\/(traces|logs|live)([/?]|$)/.test(path))
+    return path.replace("/api/", `/api/projects/${workspace().project.id}/`)
+  if (/^\/(traces|logs|live)([/?]|$)/.test(path))
+    return `/projects/${workspace().project.id}${path}`
+  return path
+}
 
 export async function authenticator(page: Page) {
   const cdp = await page.context().newCDPSession(page)

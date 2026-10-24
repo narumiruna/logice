@@ -1,4 +1,4 @@
-import { expect, test } from "./auth-fixtures"
+import { expect, projectHref, test } from "./auth-fixtures"
 import { advance, control, record, snapshot, testTarget } from "./live-fixtures"
 
 test.beforeEach(() => {
@@ -50,7 +50,7 @@ test("Live presents a connected hierarchy with counts, stable service chips and 
   const rows = hierarchy()
   const state = await control(page, snapshot(rows))
   await page.setViewportSize({ width: 1600, height: 900 })
-  await page.goto("/live")
+  await page.goto(projectHref("/live"))
   const root = page.locator(`[data-event-id="${rows[0].id}"]`)
   const child = page.locator(`[data-event-id="${rows[1].id}"]`)
   const log = page.locator('[data-event-id="log:inventory-error"]')
@@ -97,7 +97,7 @@ test("Live columns toggle preserves selection and Reset view restores controls w
   const rows = hierarchy()
   const state = await control(page, snapshot(rows))
   await page.setViewportSize({ width: 1600, height: 900 })
-  await page.goto("/live")
+  await page.goto(projectHref("/live"))
   await page.getByRole("button", { name: "Inspect reserve_inventory", exact: true }).click()
   const selected = page.locator(`[data-event-id="${rows[1].id}"]`)
   await page.getByLabel("Columns", { exact: true }).uncheck()
@@ -127,7 +127,7 @@ test("Live marks new arrivals once, keeps explicit filter submission and service
 }) => {
   const first = record(0, { name: "First event", serviceName: "my-service" })
   const state = await control(page, snapshot([first]))
-  await page.goto("/live")
+  await page.goto(projectHref("/live"))
   await expect(page.locator(".lv-event-row")).toBeVisible()
   await expect(page.locator("#live-services option")).toHaveAttribute("value", "my-service")
   await page.keyboard.press("/")
@@ -187,7 +187,7 @@ test("Live follows the bottom through column, inspector and viewport size change
     snapshot(Array.from({ length: 100 }, (_, index) => record(index))),
   )
   await page.setViewportSize({ width: 1600, height: 1000 })
-  await page.goto("/live")
+  await page.goto(projectHref("/live"))
   await expect(page.getByRole("treegrid")).toHaveAttribute("aria-rowcount", "101")
   await page.getByRole("button", { name: "Pause live updates" }).click()
   const requests = state.queries.length
@@ -221,7 +221,7 @@ for (const theme of ["classic", "studio"]) {
   }, testInfo) => {
     await control(page, snapshot(hierarchy()))
     await page.setViewportSize({ width: 390, height: 844 })
-    await page.goto("/live")
+    await page.goto(projectHref("/live"))
     await page.getByRole("combobox", { name: "Theme", exact: true }).selectOption(theme)
     await expect(page.locator(".lv-event-row")).toHaveCount(4)
     await expect(page.getByLabel("Columns", { exact: true })).toBeVisible()
