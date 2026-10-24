@@ -4,6 +4,26 @@
 
 Validate the local trace/log workflow, Go API, frontend tooling, selected storage, Collector, native Go drivers, and migration behavior with disposable data. This is not a production deployment. Authentication, multi-project authorization, load targets, and public Cloudflare routing remain separate acceptance gates. Historical foundation evidence below applies to its recorded revision.
 
+## Workspace settings and Dashboard: 2026-10-24
+
+Implementation: `d4d8d41` on `narumi/feat/workspace-settings-dashboard`; [PR #18](https://github.com/narumiruna/logice/pull/18). Account Settings, project cards, Dashboard, and section-linked Project Settings now share the application shell. Usage and profile API rules are in [project access](project-access.md). Dashboard counts explicitly describe bounded samples, not project totals.
+
+| Check | Actual result |
+| --- | --- |
+| Frontend CI and commit hook | Biome, TypeScript, 273 unit tests, production build, and Go checks passed. |
+| `GOTOOLCHAIN=go1.26.10 sh scripts/check-go.sh` | Formatting, ordinary/tagged vet, unit tests, and build passed. |
+| Race-enabled PostgreSQL authentication suite | Passed in 63.683 seconds. The additional profile cases for regular and inactive accounts passed in a final focused race run. Checks cover Origin/CSRF, strict name-only input, stable identity/role/credentials/ownership, audit, persistence, and fail-closed storage errors. |
+| Full real-service stack integration suite | Passed in 188.495 seconds after serializing it with browser validation. An earlier concurrent run failed Collector startup readiness; that failed run is not acceptance evidence. |
+| `sh scripts/validate-compose-web.sh` | All 100 Chromium workflows passed in 59.6 seconds, followed by static/API checks, changed-IP proxy recovery, and disposable cleanup. |
+| New browser coverage | Profile persistence, registration-invitation restrictions, sign out, project search/pagination/empty states, API failure/retry, section links, Dashboard errors/refresh, and real two-project OTLP isolation passed. Both themes passed at 390px and 1440px without document overflow. |
+| E2E TypeScript, Python, Helm, Actionlint, and shell checks | Passed; five Python example tests passed. |
+| Module verification, npm audit, and Go vulnerability scan | Modules verified; zero npm vulnerabilities and zero called Go vulnerabilities. The scanner reports one module-level vulnerability outside imported packages. |
+| Frontend layout and clean-clone hook validation | Passed. The committed implementation passed Go-only checks without Node, hook setup, and all eight injected failure checks without source/index changes. |
+
+Review corrected two navigation regressions: the brand now accurately names its Projects destination, and Design Preview retains an explicitly selected project in its URL so navigation back to explorers does not lose scope. The first hosted browser run also found fractional mobile-header geometry clipping a log preview at the viewport edge. Follow-up `6dabecb` uses an integer header line height and log-preview scroll margins, with a header-geometry assertion; the full-visibility assertion is unchanged. Existing Live focus, lifecycle, virtualization, authorization, and secret-clearing assertions remain enabled and unchanged. Desktop/mobile screenshots were inspected under ignored `web/test-results/workspace-pages/`; no images, credentials, or generated telemetry are committed.
+
+These tests use disposable resources. They do not deploy images, apply a live migration, alter operator data, or establish public-production acceptance. Hosted CI results are recorded on PR #18 rather than inferred from local results.
+
 ## Live preview parity: 2026-10-23
 
 The real-data Live page now uses the preview's compact query row, service chips, connected hierarchy, direct-child counts, error cues, aligned timing grid, feed header/footer, and inspector layout. Added controls include Columns, Reset view, service suggestions, attribute filtering, field copy, and visible cancellable histogram selection. Existing explicit filter submission, URL history, bounded polling, retained selections, and stored-record semantics remain in use. No API, schema, dependency, or ingestion settings changed.
