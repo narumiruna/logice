@@ -107,6 +107,24 @@ class ReleaseTests(unittest.TestCase):
         self.assertEqual(self.version(), [])
         self.assertEqual(self.snapshot(), after)
 
+    def test_real_frontend_manifest_and_lockfile_keep_dependency_resolutions(self):
+        manifest = json.loads((ROOT / "web/package.json").read_text())
+        lock = json.loads((ROOT / "web/package-lock.json").read_text())
+        manifest["version"] = "0.0.0"
+        lock["version"] = "0.0.0"
+        lock["packages"][""]["version"] = "0.0.0"
+        dependencies = {name: data for name, data in lock["packages"].items() if name}
+        self.write("web/package.json", json.dumps(manifest, indent=2) + "\n")
+        self.write("web/package-lock.json", json.dumps(lock, indent=2) + "\n")
+        self.version()
+        released_manifest = json.loads((self.root / "web/package.json").read_text())
+        released_lock = json.loads((self.root / "web/package-lock.json").read_text())
+        manifest["version"] = "0.1.0"
+        self.assertEqual(released_manifest, manifest)
+        self.assertEqual(released_lock["version"], "0.1.0")
+        self.assertEqual(released_lock["packages"][""]["version"], "0.1.0")
+        self.assertEqual({name: data for name, data in released_lock["packages"].items() if name}, dependencies)
+
     def test_failed_npm_sync_rolls_back_all_release_files(self):
         self.write("bin/npm", "#!/bin/sh\nprintf 'release-test-npm-failure\\n' >&2\nexit 42\n")
         (self.root / "bin/npm").chmod(0o755)
@@ -116,10 +134,11 @@ class ReleaseTests(unittest.TestCase):
         self.assertEqual(self.snapshot(), before)
 
     def test_version_mismatch_and_unknown_notes_fail_without_writes(self):
-        self.write("VERSION", "0.2.0\n")
-        before = self.snapshot()
-        self.run_command(self.cli, "version", succeeds=False)
-        self.assertEqual(self.snapshot(), before)
+        for version in ("0.2.0", "not-semver", "0.1.0-beta.1"):
+            self.write("VERSION", version + "\n")
+            before = self.snapshot()
+            self.run_command(self.cli, "version", succeeds=False)
+            self.assertEqual(self.snapshot(), before)
         self.write("VERSION", "0.0.0\n")
         self.write(".changenote/feature.md", "---\nunknown: patch\n---\n\nInvalid package.\n")
         before = self.snapshot()
