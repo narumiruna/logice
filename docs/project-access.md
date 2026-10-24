@@ -2,9 +2,9 @@
 
 ## Use a project
 
-Sign in with a registered Passkey account. Open `/projects`, enter a project name, and select **Create project**. You become its Owner. Select a project to open its Traces, Logs, or Live page. Project UUIDs remain in navigation, copied links, and API URLs; browser tabs do not share a selected-project session setting.
+Sign in with a registered Passkey account. Open `/projects`, enter a project name, and select **Create project**. You become its Owner. Select a project to open its Dashboard, then open Traces, Logs, or Live. The project list shows your role and supports pagination and search within the current page. Project UUIDs remain in navigation, copied links, and API URLs; browser tabs do not share a selected-project session setting.
 
-Account registration remains invitation-only. A platform administrator can issue registration invitations but cannot read or manage a project without membership. Your account UUID appears in the Account panel. Give this UUID to a project Owner through a trusted channel; display names are not unique account identifiers.
+Account registration remains invitation-only. A platform administrator can issue registration invitations but cannot read or manage a project without membership. Open **Account settings** at `/account` to copy your account UUID, change your display name or theme, review session information, or sign out. Name changes do not change your UUID, Passkey, role, or project membership. Platform administrators issue one-time registration invitations from this page. Account settings remain available if the project API is unavailable. Give this UUID to a project Owner through a trusted channel; display names are not unique account identifiers.
 
 In **Project settings**, the Owner can add an existing active account by UUID, change its role, remove it, rename the project, transfer ownership, or delete the project. There is no account directory or invitation for an unregistered project member.
 
@@ -16,6 +16,16 @@ In **Project settings**, the Owner can add an existing active account by UUID, c
 | Transfer ownership; delete project | Yes | No | No |
 
 Each project has exactly one Owner. Transfer requires an active existing member and makes the previous Owner a Developer. Ordinary member operations cannot remove or demote the Owner. The Owner can remove or demote other members while their accounts are inactive during recovery.
+
+## Dashboard and settings
+
+`/projects/{id}` and `/projects/{id}/dashboard` show recent telemetry for that project. Choose a 15-minute, 1-hour, or 24-hour window and refresh explicitly. The displayed UTC bounds stay fixed until you change the window or refresh. Each sample contains at most five traces and five logs. A `+` means more results exist. Sample counts and error traces are not project-wide totals or an error rate. Explorer links retain the window.
+
+`/projects/{id}/settings` has General, Members, Tokens, and Danger zone sections. Links such as `#members` and `#tokens` open the corresponding section. Controls depend on the current role; the API always enforces authorization. Ownership transfer and deletion remain Owner-only operations.
+
+`POST /api/auth/profile` accepts only `{name}` for the current active account. It requires a browser session, the exact trusted Origin, JSON, and CSRF protection. Names use the same 1–80 character validation as project names. The update and `profile_updated` audit event commit together. Identity and administrator status cannot be changed through this endpoint. No additional database migration is needed.
+
+If the project list reports an unavailable API, deploy matching API/web versions and apply the required project migration. The UI does not substitute a shared or legacy project.
 
 ## Create an application credential
 

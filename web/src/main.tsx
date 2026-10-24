@@ -1,5 +1,6 @@
 import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
+import { AccountSettings } from "./account-settings"
 import { App } from "./app"
 import { SessionGate } from "./auth"
 import { LivePage } from "./live/page"
@@ -19,7 +20,9 @@ createRoot(root).render(
   <StrictMode>
     <ThemeProvider initialTheme={initialTheme}>
       <SessionGate>
-        {window.location.pathname.replace(/\/$/, "") === "/preview" ? (
+        {window.location.pathname.replace(/\/$/, "") === "/account" ? (
+          <AccountSettings />
+        ) : localProjectPath(window.location.href).replace(/\/$/, "") === "/preview" ? (
           <LivePreview />
         ) : (
           <ProjectGate>

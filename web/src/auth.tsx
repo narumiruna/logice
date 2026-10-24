@@ -1,4 +1,12 @@
-import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react"
+import {
+  createContext,
+  type FormEvent,
+  type ReactNode,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react"
 import { Glyph } from "./preview/icons"
 import { ThemeSelect } from "./theme"
 import "./styles.css"
@@ -8,6 +16,20 @@ export interface AuthUser {
   id: string
   name: string
   admin: boolean
+}
+
+export interface AccountActions {
+  user: AuthUser
+  busy: boolean
+  logout: () => void
+  invite: (name: string) => Promise<{ token: string; expiresAt: string } | undefined>
+  saveName: (name: string) => Promise<boolean>
+}
+export const AccountContext = createContext<AccountActions | null>(null)
+export function useAccount() {
+  const account = useContext(AccountContext)
+  if (!account) throw new Error("Account settings require a verified session.")
+  return account
 }
 
 export type SessionState =
@@ -344,76 +366,6 @@ export function SignIn({
   )
 }
 
-export function AccountPanel({
-  user,
-  busy,
-  onLogout,
-  onInvite,
-}: {
-  user: AuthUser
-  busy: boolean
-  onLogout: () => void
-  onInvite: (name: string) => Promise<{ token: string; expiresAt: string } | undefined>
-}) {
-  const [name, setName] = useState("")
-  const [invitation, setInvitation] = useState<{ token: string; expiresAt: string } | null>(null)
-  async function invite(event: FormEvent) {
-    event.preventDefault()
-    setInvitation(null)
-    const result = await onInvite(name.trim())
-    if (result) setInvitation(result)
-  }
-  return (
-    <aside className="auth-account" aria-label="Account">
-      <span>
-        Account: <strong>{user.name}</strong>
-        {user.admin ? " (Administrator)" : ""}
-        <span>
-          {" "}
-          · Account UUID: <code>{user.id}</code>
-        </span>
-      </span>
-      <button type="button" onClick={onLogout} disabled={busy}>
-        Sign out
-      </button>
-      {user.admin && (
-        <details>
-          <summary>Create an invitation</summary>
-          <form
-            onSubmit={(event) => {
-              void invite(event)
-            }}
-          >
-            <label htmlFor="invitation-name">Invitation name</label>
-            <input
-              id="invitation-name"
-              required
-              maxLength={80}
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              disabled={busy}
-            />
-            <button type="submit" disabled={busy || !name.trim()}>
-              Create invitation
-            </button>
-          </form>
-          {invitation && (
-            <div className="auth-invitation" role="status">
-              <p>Send this token through a secure channel. Do not put it in a URL.</p>
-              <label htmlFor="created-invitation">Invitation token</label>
-              <input id="created-invitation" readOnly value={invitation.token} />
-              <p>Expires: {invitation.expiresAt}</p>
-              <button type="button" onClick={() => setInvitation(null)}>
-                Dismiss token
-              </button>
-            </div>
-          )}
-        </details>
-      )}
-    </aside>
-  )
-}
-
 export function SessionView({
   state,
   children,
@@ -526,24 +478,44 @@ export function SessionGate({ children }: { children: ReactNode }) {
     })
   }
 
+  async function saveName(name: string): Promise<boolean> {
+    const result = await run(async () => {
+      const version = generation.current
+      const token = await csrf()
+      const user = userFrom(await authRequest("profile", { name }, token))
+      if (version !== generation.current) return false
+      setState({ status: "authenticated", user })
+      return true
+    })
+    return result === true
+  }
+
   return (
     <SessionView state={state} onRetry={() => setRetry((value) => value + 1)}>
       {state.status === "authenticated" ? (
-        <div className="auth-workspace">
-          {message && (
-            <p className="auth-message" role="alert">
-              {message}
-            </p>
-          )}
-          <AccountPanel
-            key={state.user.id}
-            user={state.user}
-            busy={busy}
-            onLogout={logout}
-            onInvite={invite}
-          />
-          {children}
-        </div>
+        <AccountContext value={{ user: state.user, busy, logout, invite, saveName }}>
+          <div className="auth-workspace">
+            {message && (
+              <p className="auth-message" role="alert">
+                {message}
+              </p>
+            )}
+            <aside className="account-bar" aria-label="Account">
+              <span className="account-avatar" aria-hidden="true">
+                {state.user.name.slice(0, 1).toUpperCase()}
+              </span>
+              <span>
+                <strong>{state.user.name}</strong>
+                <small>{state.user.admin ? "Administrator" : "Registered account"}</small>
+              </span>
+              <a href="/account">Account settings</a>
+              <button type="button" onClick={logout} disabled={busy}>
+                Sign out
+              </button>
+            </aside>
+            {children}
+          </div>
+        </AccountContext>
       ) : (
         <AuthLayout>
           {message && (

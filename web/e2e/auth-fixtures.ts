@@ -33,7 +33,7 @@ export function projectHref(path: string): string {
     return path
   if (/^\/api\/(traces|logs|live)([/?]|$)/.test(path))
     return path.replace("/api/", `/api/projects/${workspace().project.id}/`)
-  if (/^\/(traces|logs|live)([/?]|$)/.test(path))
+  if (/^\/(traces|logs|live|dashboard|settings)([/?#]|$)/.test(path))
     return `/projects/${workspace().project.id}${path}`
   return path
 }

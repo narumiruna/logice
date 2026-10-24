@@ -8,7 +8,6 @@ vi.mock("./project-path", async (original) => ({
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { requestJSON } from "./api"
 import {
-  AccountPanel,
   authErrorMessage,
   authenticateWithPasskey,
   creationOptions,
@@ -233,23 +232,6 @@ describe("session and authentication UI", () => {
     const pending = renderToStaticMarkup(<SignIn busy onAuthenticate={() => {}} />)
     expect(pending).toContain("disabled")
     expect(pending).toContain("Complete the passkey request")
-  })
-
-  it("shows account and logout, but invitations only for admins", () => {
-    const render = (admin: boolean) =>
-      renderToStaticMarkup(
-        <AccountPanel
-          user={{ ...user, admin }}
-          busy={false}
-          onLogout={() => {}}
-          onInvite={async () => undefined}
-        />,
-      )
-    expect(render(true)).toContain("Create an invitation")
-    expect(render(false)).not.toContain("Create an invitation")
-    expect(render(false)).toContain("Sign out")
-    expect(render(true)).not.toContain("<script>")
-    expect(render(true)).toContain("&lt;script&gt;")
   })
 
   it("accepts a valid session and sends same-origin no-store GET", async () => {

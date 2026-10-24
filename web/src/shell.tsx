@@ -1,11 +1,20 @@
 import type { ReactNode } from "react"
 import { Glyph, type GlyphName } from "./preview/icons"
-import { projectPath } from "./project-path"
+import { useProject } from "./project-context"
+import { projectId, projectPath } from "./project-path"
 import { ThemeSelect } from "./theme"
 import "./styles.css"
 import "./shell.css"
 
-type Page = "live" | "traces" | "logs" | "preview"
+type Page =
+  | "live"
+  | "traces"
+  | "logs"
+  | "preview"
+  | "projects"
+  | "dashboard"
+  | "settings"
+  | "account"
 
 export function AppShell({
   page,
@@ -20,19 +29,46 @@ export function AppShell({
   logsHref?: string
   children: ReactNode
 }) {
+  const context = useProject()
   const preview = page === "preview"
+  const project = context?.project
+  const scoped =
+    Boolean(project || projectId()) || page === "traces" || page === "logs" || page === "live"
   const links: { page: Page; label: string; icon: GlyphName; href: string }[] = [
-    { page: "live", label: "Live", icon: "activity", href: projectPath("/live") },
-    { page: "traces", label: "Traces", icon: "layers", href: tracesHref },
-    { page: "logs", label: "Logs", icon: "code", href: logsHref },
-    { page: "preview", label: "Design preview", icon: "box", href: "/preview" },
+    { page: "projects", label: "Projects", icon: "box", href: "/projects" },
+    ...(scoped
+      ? [
+          {
+            page: "dashboard" as const,
+            label: "Dashboard",
+            icon: "activity" as const,
+            href: projectPath("/dashboard"),
+          },
+          {
+            page: "live" as const,
+            label: "Live",
+            icon: "activity" as const,
+            href: projectPath("/live"),
+          },
+          { page: "traces" as const, label: "Traces", icon: "layers" as const, href: tracesHref },
+          { page: "logs" as const, label: "Logs", icon: "code" as const, href: logsHref },
+          {
+            page: "settings" as const,
+            label: "Project settings",
+            icon: "box" as const,
+            href: projectPath("/settings"),
+          },
+        ]
+      : []),
+    { page: "account", label: "Account", icon: "box", href: "/account" },
+    { page: "preview", label: "Design preview", icon: "box", href: projectPath("/preview") },
   ]
   return (
     <div className="application-shell">
       <a href={`#${contentId}`} className="skip-link">
         Skip to content
       </a>
-      <a className="shell-brand" href={tracesHref} aria-label="Logice — Open traces">
+      <a className="shell-brand" href="/projects" aria-label="Logice — Open projects">
         <span className="shell-brand-mark" aria-hidden="true">
           L
         </span>
@@ -41,15 +77,38 @@ export function AppShell({
         </span>
       </a>
       <header className="shell-header">
-        <span className="shell-workspace">
-          Workspace <span aria-hidden="true">/</span> <strong>Project workspace</strong>
-        </span>
+        {project && context ? (
+          <label className="shell-switcher">
+            <span>Project</span>
+            <select
+              aria-label="Project"
+              value={project.id}
+              onChange={(e) => window.location.assign(`/projects/${e.target.value}/traces`)}
+            >
+              {!context.projects.some((item) => item.id === project.id) && (
+                <option value={project.id}>{project.name}</option>
+              )}
+              {context.projects.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : (
+          <span className="shell-workspace">
+            Workspace <span aria-hidden="true">/</span>{" "}
+            <strong>{page === "account" ? "Your account" : "Project workspace"}</strong>
+          </span>
+        )}
         <span className="shell-badge">
           {preview
             ? "DESIGN PREVIEW"
-            : page === "live"
-              ? "REAL TELEMETRY"
-              : "Project-scoped telemetry"}
+            : project
+              ? project.role
+              : page === "live"
+                ? "REAL TELEMETRY"
+                : "Project-scoped telemetry"}
         </span>
         <ThemeSelect />
       </header>
@@ -57,11 +116,11 @@ export function AppShell({
         <div className="shell-project">
           <Glyph name="box" size={20} />
           <div>
-            <strong>Project workspace</strong>
-            <span>Project-scoped access</span>
+            <strong>{project?.name ?? "Project workspace"}</strong>
+            <span>{project ? `${project.role} access` : "Project-scoped access"}</span>
           </div>
         </div>
-        <span className="shell-nav-label">Explore</span>
+        <span className="shell-nav-label">Workspace</span>
         <nav>
           {links.map((link) => (
             <a
@@ -80,7 +139,7 @@ export function AppShell({
           <p>
             {preview
               ? "This preview does not read or write your telemetry."
-              : "Local trace and log inspection. OpenTelemetry data via Collector."}
+              : "Project-scoped traces and logs. Access is checked on every request."}
           </p>
         </div>
       </aside>

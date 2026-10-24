@@ -101,7 +101,7 @@ for (const theme of ["classic", "studio"] as const) {
           theme === "classic" ? "rgb(245, 247, 250)" : "rgb(250, 250, 251)",
         )
         expect(colors.heading).toBe(theme === "classic" ? "rgb(22, 40, 63)" : "rgb(59, 53, 70)")
-        await expect(page.getByRole("link", { name: "Logice — Open traces" })).toBeVisible()
+        await expect(page.getByRole("link", { name: "Logice — Open projects" })).toBeVisible()
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
           true,
         )

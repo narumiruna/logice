@@ -44,6 +44,7 @@ test("passkey login, single-use challenges, logout, invitations, and authorizati
     ).status(),
   ).toBe(403)
 
+  await page.goto("/account")
   await page.getByText("Create an invitation", { exact: true }).click()
   await page.getByLabel("Invitation name").fill("Browser member")
   await page.getByRole("button", { name: "Create invitation", exact: true }).click()
