@@ -69,6 +69,14 @@ sh scripts/validate-checks.sh
 
 `tests/release/check.py` uses the installed pinned CLI, local npm, disposable Git repositories without remotes, and PyYAML 6.0.3. It checks primary/additional version and lockfile synchronization, note consumption, no-op versioning, rollback on npm failure, mismatched versions, invalid notes, symlink denial, clean committed local tags, full-tree reconstruction, and workflow permissions/pins. Tags exist only inside disposable repositories. CI runs these tests in `release-checks`; Go/frontend hooks do not install Rust or the CLI.
 
+### Migration verification
+
+[CI run 40102871692](https://github.com/narumiruna/logice/actions/runs/40102871692) passed all eight jobs on migration revision `b59f02b`. This includes the pinned CLI build, all nine release tests, 287 frontend unit tests, 109 real-service browser tests, race-enabled native integration, Helm/layout checks, and clean-checkout failure checks. Local Actionlint, shell syntax, npm audit, and the eight injected hook/CI failures also passed. npm audit reported zero vulnerabilities.
+
+The first migration CI run hit the existing maximum-snapshot Live keyboard-focus failure. No Live code changed in this migration. The later complete run passed all 109 browser tests; the failed run is not counted as passing evidence.
+
+The completed execution plan `docs/plans/2026-10-24_changenote-migration-plan.md` was removed after verification and handoff in [PR #20](https://github.com/narumiruna/logice/pull/20). Live publication and production release gates remain unverified.
+
 ## Recovery and rollback
 
 Upgrade the CLI, Action pins, and schema pin together. Keep Node.js/npm compatible with the version used to generate each batch. Publication replays offline lockfile synchronization; the dependency cache must contain the release dependencies. If they are missing after later dependency changes, populate the cache from the selected release's parent lockfile in an isolated checkout before retrying. Do not use the hidden no-lockfile reconstruction option for new releases.
