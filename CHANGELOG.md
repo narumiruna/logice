@@ -2,6 +2,12 @@
 
 Release notes for the Go application and private React frontend. No application release has been published by this setup.
 
+## 0.1.1
+
+### Patch Changes
+
+- Build API and web Docker images for stable Git release tags. Publish both commit and version image tags without changing latest. Call the same Docker workflow after changenote publication so workflow-token tag pushes also produce release images.
+
 ## 0.1.0
 
 ### Minor Changes
