@@ -33,10 +33,10 @@ Use `--minor logice` for a feature or `--major logice` for a breaking change. Co
 
 `.github/workflows/release.yml` runs only on `main`. One concurrency group serializes release work and does not cancel an active run. Each job has a 15-minute deadline.
 
-1. A read-only job checks Go, the frontend, and release fixtures before any write job can run.
-2. On a `main` push, the Release PR Action opens or updates `narumi/chore/changenote-release-main` from pending notes. Reserve that branch for automation. It does not approve or merge the PR. Removing all pending notes closes its managed PR.
+1. A read-only job checks the triggering commit. The pinned preview Action then selects the latest verifiable release batch without remote writes. If a batch exists, the job checks out that exact commit and runs Go, frontend, and release checks on it. Only a successful job passes that immutable commit to publication.
+2. On a `main` push, the Release PR job uses tooling from the checked triggering commit. The pinned Action refreshes pending notes from `main` and opens or updates `narumi/chore/changenote-release-main`. Reserve that branch for automation. PR generation is not publication approval. Removing all pending notes closes its managed PR.
 3. Review the generated version files, lockfile, changelog, consumed notes, and saved batch. Complete CI on the exact PR head and all applicable operator release gates before merge.
-4. After validation, the publication Action inspects the latest batch-changing first-parent commit. It reconstructs the full release tree from that commit's parent notes before writing tags or GitHub Releases. New unrelated commits or pending notes do not change that release target. If no batch exists, publication makes no changes.
+4. Publication checks out only the selected, checked release commit. It invokes the pinned upstream `publish.sh` with that expected commit because the composite publication Action has no expected-commit input. The script fetches `main`, reconstructs the latest batch, and compares its commit with the expected value before any tag or Release write. A new batch stops publication and requires a new validation run. Unrelated commits or pending notes do not change the selected target. No batch means no publication job.
 5. Existing matching tags and Releases remain unchanged. A partial failure can be retried without moving a tag or replacing release notes.
 
 Publication also runs on ordinary `main` pushes to recover the latest validated batch. It can recover an earlier batch if Release PR management fails, but it cannot run after validation fails or the workflow is cancelled. It does not publish an unmerged release PR. Full-tree validation rejects manually edited release batches or release commits with unrelated source changes.
@@ -59,6 +59,14 @@ Check the resulting run against the version PR head. Do not bypass required chec
 ## Validation
 
 ```sh
+tools=$(mktemp -d)
+git init "$tools/source"
+git -C "$tools/source" fetch --depth=1 --no-tags https://github.com/narumiruna/changenote \
+  66afe581b2f7b19f96188a1f217518c41aaaf77d
+git -C "$tools/source" checkout --detach FETCH_HEAD
+cargo install --path "$tools/source" --locked --root "$tools"
+export PATH="$tools/bin:$PATH"
+export CHANGENOTE_ACTION_PATH="$tools/source"
 npm --prefix web ci
 changenote status
 uv run tests/release/check.py
@@ -67,7 +75,7 @@ actionlint .github/workflows/*.yml
 sh scripts/validate-checks.sh
 ```
 
-`tests/release/check.py` uses the installed pinned CLI, local npm, disposable Git repositories without remotes, and PyYAML 6.0.3. It checks primary/additional version and lockfile synchronization, note consumption, no-op versioning, rollback on npm failure, mismatched versions, invalid notes, symlink denial, clean committed local tags, full-tree reconstruction, and workflow permissions/pins. Tags exist only inside disposable repositories. CI runs these tests in `release-checks`; Go/frontend hooks do not install Rust or the CLI.
+`tests/release/check.py` uses the pinned CLI and Action source, local npm, disposable Git repositories, and PyYAML 6.0.3. It checks version/lockfile synchronization, note consumption, no-op runs, rollback, invalid input, symlink denial, local tags, reconstruction, and workflow contracts. Two Linux-only tests run the real pinned publisher against local bare remotes and a mock `gh`: a newer batch must produce no tag or Release write, while unrelated `main` changes must retain the checked target. They do not contact GitHub. Other platforms skip only these Action-platform tests; CI must run both on Linux. Remove the temporary `$tools` directory after local checks. Go/frontend hooks do not install Rust or the CLI.
 
 ### Migration verification
 

@@ -24,11 +24,14 @@ concurrency:
 jobs:
   validate:
     if: github.ref == 'refs/heads/main'
+    outputs:
+      publication-commit: ${{ steps.preview.outputs.release-commit }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@v7
@@ -49,6 +52,37 @@ jobs:
       - run: npm --prefix web run ci
       - run: uv run tests/release/check.py
       - run: changenote status
+      - name: Select the publication batch without write permissions
+        id: preview
+        if: github.event_name == 'push' || inputs.operation == 'retry-publication'
+        uses: narumiruna/changenote/preview@66afe581b2f7b19f96188a1f217518c41aaaf77d # v0.7.0
+        with:
+          base-branch: main
+      - name: Require a ready publication selection
+        if: steps.preview.outputs.release-commit != ''
+        env:
+          PREVIEW_READY: ${{ steps.preview.outputs.ready }}
+        run: test "$PREVIEW_READY" = true
+      - name: Check out the selected release commit
+        if: steps.preview.outputs.release-commit != ''
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.preview.outputs.release-commit }}
+          path: publication-source
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate the exact publication source
+        if: steps.preview.outputs.release-commit != ''
+        working-directory: publication-source
+        env:
+          EXPECTED_RELEASE_COMMIT: ${{ steps.preview.outputs.release-commit }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_RELEASE_COMMIT"
+          HUSKY=0 npm --prefix web ci --ignore-scripts
+          go mod verify
+          sh scripts/check-go.sh
+          npm --prefix web run ci
+          uv run tests/release/check.py
 
   release:
     needs: validate
@@ -61,7 +95,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: main
+          ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@v7
@@ -80,7 +114,7 @@ jobs:
 
   publish:
     needs: [validate, release]
-    if: ${{ !cancelled() && github.ref == 'refs/heads/main' && needs.validate.result == 'success' && (github.event_name == 'push' || inputs.operation == 'retry-publication') }}
+    if: ${{ !cancelled() && github.ref == 'refs/heads/main' && needs.validate.result == 'success' && needs.validate.outputs.publication-commit != '' && (github.event_name == 'push' || inputs.operation == 'retry-publication') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -88,7 +122,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: main
+          ref: ${{ needs.validate.outputs.publication-commit }}
           fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@v7
@@ -98,7 +132,11 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - run: HUSKY=0 npm --prefix web ci --ignore-scripts
       - uses: ./.github/actions/setup-changenote
-      - name: Publish or recover the latest validated release batch
-        uses: narumiruna/changenote/publish@66afe581b2f7b19f96188a1f217518c41aaaf77d # v0.7.0
-        with:
-          base-branch: main
+        id: changenote
+      - name: Publish only the validated release batch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_BASE_BRANCH: main
+          CHANGENOTE_SOURCE: ${{ steps.changenote.outputs.action-path }}
+          EXPECTED_RELEASE_COMMIT: ${{ needs.validate.outputs.publication-commit }}
+        run: bash "$CHANGENOTE_SOURCE/scripts/action/publish.sh" "$EXPECTED_RELEASE_COMMIT"

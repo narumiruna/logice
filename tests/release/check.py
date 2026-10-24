@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -185,6 +186,78 @@ class ReleaseTests(unittest.TestCase):
         self.assertNotIn("Later note.", notes)
 
 
+    def publication_race(self, newer_batch):
+        source = Path(os.environ["CHANGENOTE_ACTION_PATH"])
+        self.assertEqual(self.run_command("git", "-C", str(source), "rev-parse", "HEAD").stdout.strip(), PIN)
+        self.version()
+        self.commit("chore(release): validated batch")
+        validated = self.run_command("git", "rev-parse", "HEAD").stdout.strip()
+        with tempfile.TemporaryDirectory(prefix="logice-publication-race-") as directory:
+            side = Path(directory)
+            remote = side / "remote.git"
+            self.run_command("git", "init", "--bare", "--initial-branch=main", str(remote))
+            self.run_command("git", "remote", "add", "origin", str(remote))
+            self.run_command("git", "push", "origin", "main")
+            self.write(".changenote/later.md", "---\nlogice: patch\n---\n\nLater change.\n")
+            self.commit("test: main advances after validation")
+            if newer_batch:
+                self.version()
+                self.commit("chore(release): unvalidated newer batch")
+            newer = self.run_command("git", "rev-parse", "HEAD").stdout.strip()
+            self.run_command("git", "push", "origin", "main")
+            self.run_command("git", "checkout", "--detach", validated)
+            before = self.snapshot()
+            (side / "repo.json").write_text(json.dumps({"clone_url": str(remote), "default_branch": "main"}))
+            mock = side / "bin/gh"
+            mock.parent.mkdir()
+            mock.write_text('''#!/bin/sh
+printf '%s\\n' "$*" >> "$FIXTURE_CALLS"
+case "$*" in
+  'api repos/fixture/logice') cat "$FIXTURE_REPO" ;;
+  'api --paginate --slurp repos/fixture/logice/releases?per_page=100') printf '[[]]\\n' ;;
+  'release create v0.1.0 --repo fixture/logice --verify-tag --title v0.1.0 --notes-file '*)
+    printf '%s\\n' "$*" >> "$FIXTURE_WRITES"
+    for arg do last=$arg; done
+    cat "$last" > "$FIXTURE_NOTES" ;;
+  *) printf 'Unexpected mock GitHub command: %s\\n' "$*" >&2; exit 64 ;;
+esac
+''')
+            mock.chmod(0o755)
+            self.env.update({
+                "PATH": str(mock.parent) + os.pathsep + str(Path(self.cli).parent) + os.pathsep + self.env["PATH"],
+                "GH_TOKEN": "fixture-only-token",
+                "GITHUB_REPOSITORY": "fixture/logice",
+                "GITHUB_OUTPUT": str(side / "output"),
+                "INPUT_BASE_BRANCH": "main",
+                "FIXTURE_CALLS": str(side / "calls"),
+                "FIXTURE_REPO": str(side / "repo.json"),
+                "FIXTURE_WRITES": str(side / "writes"),
+                "FIXTURE_NOTES": str(side / "notes"),
+            })
+            result = self.run_command("bash", str(source / "scripts/action/publish.sh"), validated, succeeds=not newer_batch)
+            self.assertEqual(self.snapshot(), before)
+            self.assertEqual(self.run_command("git", "rev-parse", "HEAD").stdout.strip(), validated)
+            self.assertEqual(self.run_command("git", "--git-dir", str(remote), "rev-parse", "refs/heads/main").stdout.strip(), newer)
+            if newer_batch:
+                self.assertIn("Release batch changed after preview; use an explicit retry.", result.stderr)
+                self.assertFalse((side / "writes").exists())
+                self.assertEqual((side / "calls").read_text().splitlines(), ["api repos/fixture/logice"])
+                self.assertEqual(self.run_command("git", "--git-dir", str(remote), "tag", "--list").stdout.strip(), "")
+            else:
+                self.assertIn("release create v0.1.0", (side / "writes").read_text())
+                self.assertEqual(self.run_command("git", "--git-dir", str(remote), "rev-parse", "v0.1.0^{commit}").stdout.strip(), validated)
+                self.assertIn("Add the release fixture.", (side / "notes").read_text())
+                self.assertNotIn("Later change.", (side / "notes").read_text())
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "changenote Actions require Linux; CI runs this test.")
+    def test_new_release_batch_after_validation_cannot_write_remote_objects(self):
+        self.publication_race(newer_batch=True)
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "changenote Actions require Linux; CI runs this test.")
+    def test_unrelated_main_advance_keeps_the_validated_release_target(self):
+        self.publication_race(newer_batch=False)
+
+
 class RepositoryContractTests(unittest.TestCase):
     def test_repository_versions_and_removed_changesets(self):
         version = (ROOT / "VERSION").read_text().strip()
@@ -211,17 +284,33 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertIn("retry-publication", jobs["publish"]["if"])
         self.assertIn("needs.validate.result == 'success'", jobs["publish"]["if"])
         self.assertIn("!cancelled()", jobs["publish"]["if"])
-        expected = {"release": f"narumiruna/changenote@{PIN}", "publish": f"narumiruna/changenote/publish@{PIN}"}
+        self.assertEqual(jobs["validate"]["steps"][0]["with"]["ref"], "${{ github.sha }}")
+        self.assertEqual(jobs["release"]["steps"][0]["with"]["ref"], "${{ github.sha }}")
+        selected = "${{ needs.validate.outputs.publication-commit }}"
+        self.assertEqual(jobs["publish"]["steps"][0]["with"]["ref"], selected)
+        self.assertIn("needs.validate.outputs.publication-commit != ''", jobs["publish"]["if"])
+        preview = next(step for step in jobs["validate"]["steps"] if step.get("id") == "preview")
+        self.assertEqual(preview["uses"], f"narumiruna/changenote/preview@{PIN}")
+        self.assertEqual(jobs["validate"]["outputs"]["publication-commit"], "${{ steps.preview.outputs.release-commit }}")
+        validate_source = next(step for step in jobs["validate"]["steps"] if step.get("working-directory") == "publication-source")
+        self.assertEqual(validate_source["env"]["EXPECTED_RELEASE_COMMIT"], "${{ steps.preview.outputs.release-commit }}")
+        for command in ('git rev-parse HEAD', 'sh scripts/check-go.sh', 'npm --prefix web run ci', 'uv run tests/release/check.py'):
+            self.assertIn(command, validate_source["run"])
+        publish = jobs["publish"]["steps"][-1]
+        self.assertEqual(publish["env"]["EXPECTED_RELEASE_COMMIT"], selected)
+        self.assertEqual(publish["run"], 'bash "$CHANGENOTE_SOURCE/scripts/action/publish.sh" "$EXPECTED_RELEASE_COMMIT"')
+        self.assertEqual(jobs["release"]["steps"][-1]["uses"], f"narumiruna/changenote@{PIN}")
         for name, job in jobs.items():
             self.assertIn("github.ref == 'refs/heads/main'", job["if"])
             self.assertLessEqual(int(job["timeout-minutes"]), 15)
             checkout = job["steps"][0]
             self.assertEqual(checkout["with"]["persist-credentials"], "false")
-            if name in expected:
-                self.assertEqual(job["steps"][-1]["uses"], expected[name])
+            if name in ("release", "publish"):
                 self.assertTrue(any("npm --prefix web ci --ignore-scripts" in step.get("run", "") for step in job["steps"]))
         setup = (ROOT / ".github/actions/setup-changenote/action.yml").read_text()
-        self.assertIn(f"--rev {PIN} --locked", setup)
+        self.assertIn('git -C "$source_dir" checkout --detach FETCH_HEAD', setup)
+        self.assertIn(f'test "$(git -C "$source_dir" rev-parse HEAD)" = {PIN}', setup)
+        self.assertIn('cargo install --path "$CHANGENOTE_SOURCE" --locked', setup)
         self.assertIn("changenote 0.7.0", setup)
         config = json.loads((ROOT / ".changenote/config.json").read_text())
         self.assertIn(PIN, config["$schema"])
