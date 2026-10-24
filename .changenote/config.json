@@ -1,0 +1,11 @@
+{
+  "$schema": "https://raw.githubusercontent.com/narumiruna/changenote/66afe581b2f7b19f96188a1f217518c41aaaf77d/schema.json",
+  "packages": {
+    "logice": {
+      "path": ".",
+      "version_file": "VERSION",
+      "version_outputs": ["web/package.json"],
+      "tag_prefix": "v"
+    }
+  }
+}

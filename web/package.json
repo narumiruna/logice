@@ -13,12 +13,7 @@
     "test:e2e": "playwright test",
     "build": "vite build",
     "dev": "vite",
-    "ci": "npm run check && npm run typecheck && npm test && npm run test:release && npm run build",
-    "test:release": "node --test scripts/release.test.mjs",
-    "changeset": "changeset",
-    "version:release": "changeset version && npm install --package-lock-only --ignore-scripts",
-    "release:tag": "node scripts/release.mjs tag",
-    "release:github": "node scripts/release.mjs github",
+    "ci": "npm run check && npm run typecheck && npm test && npm run build",
     "prepare": "cd .. && husky"
   },
   "dependencies": {
@@ -28,7 +23,6 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",
-    "@changesets/cli": "3.0.3",
     "@playwright/test": "1.64.1",
     "@types/node": "26.6.5",
     "@types/react": "19.3.0",

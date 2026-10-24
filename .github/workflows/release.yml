@@ -5,6 +5,14 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      operation:
+        description: Manage the release PR or retry the latest validated publication
+        type: choice
+        default: manage-pr
+        options:
+          - manage-pr
+          - retry-publication
 
 permissions:
   contents: read
@@ -14,17 +22,15 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release:
+  validate:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    permissions:
-      contents: write
-      pull-requests: write
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: 26.11.1
@@ -35,24 +41,64 @@ jobs:
         with:
           go-version: 1.26.10
           cache: true
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      - uses: ./.github/actions/setup-changenote
       - run: HUSKY=0 npm --prefix web ci
       - run: go mod verify
       - run: sh scripts/check-go.sh
       - run: npm --prefix web run ci
-      - name: Create version PR or push release tag
-        id: changesets
-        uses: changesets/action@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
+      - run: uv run tests/release/check.py
+      - run: changenote status
+
+  release:
+    needs: validate
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.operation == 'manage-pr')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
         with:
-          cwd: web
-          version-script: npm run version:release
-          publish-script: npm run release:tag
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26.11.1
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: HUSKY=0 npm --prefix web ci --ignore-scripts
+      - uses: ./.github/actions/setup-changenote
+      - name: Create or update the release PR
+        uses: narumiruna/changenote@66afe581b2f7b19f96188a1f217518c41aaaf77d # v0.7.0
+        with:
+          base-branch: main
           commit-message: "chore(release): version Logice"
           pr-title: "chore(release): version Logice"
-          pr-draft: create
-          create-github-releases: false
-          push-git-tags: true
-      - name: Create GitHub release or recover an incomplete release
-        if: steps.changesets.outputs.has-changesets == 'false'
-        run: npm --prefix web run release:github
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish:
+    needs: [validate, release]
+    if: ${{ !cancelled() && github.ref == 'refs/heads/main' && needs.validate.result == 'success' && (github.event_name == 'push' || inputs.operation == 'retry-publication') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26.11.1
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: HUSKY=0 npm --prefix web ci --ignore-scripts
+      - uses: ./.github/actions/setup-changenote
+      - name: Publish or recover the latest validated release batch
+        uses: narumiruna/changenote/publish@66afe581b2f7b19f96188a1f217518c41aaaf77d # v0.7.0
+        with:
+          base-branch: main

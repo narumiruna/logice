@@ -1,0 +1,16 @@
+name: Set up changenote
+description: Install the reviewed changenote CLI revision without changing the source tree.
+runs:
+  using: composite
+  steps:
+    - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable action
+      with:
+        toolchain: 1.92.0
+    - name: Install pinned CLI
+      shell: bash
+      run: |
+        cargo install --git https://github.com/narumiruna/changenote \
+          --rev 66afe581b2f7b19f96188a1f217518c41aaaf77d --locked \
+          --root "$RUNNER_TEMP/changenote"
+        test "$("$RUNNER_TEMP/changenote/bin/changenote" --version)" = 'changenote 0.7.0'
+        echo "$RUNNER_TEMP/changenote/bin" >> "$GITHUB_PATH"
