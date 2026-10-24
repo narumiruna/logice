@@ -1,9 +1,12 @@
 import { type FormEvent, type ReactNode, useEffect, useState } from "react"
+import { ProjectAlerts } from "./project-alerts"
 import { type Page, type Project, projectRequest } from "./project-api"
 import { ProjectContext } from "./project-context"
 import { ProjectDashboard } from "./project-dashboard"
 import { localProjectPath, projectId } from "./project-path"
 import { ProjectSettings } from "./project-settings"
+import { ProjectSetup } from "./project-setup"
+import { SavedViews } from "./saved-views"
 import { AppShell } from "./shell"
 import "./projects.css"
 
@@ -56,7 +59,13 @@ export function ProjectGate({ children }: { children: ReactNode }) {
     return (
       <ProjectContext value={{ project: selected, projects: projects.items }}>
         <div key={id} className="project-content">
-          {local === "/settings" ? (
+          {local === "/alerts" ? (
+            <ProjectAlerts project={selected} />
+          ) : local === "/views" ? (
+            <SavedViews project={selected} />
+          ) : local === "/setup" ? (
+            <ProjectSetup project={selected} />
+          ) : local === "/settings" ? (
             <ProjectSettings project={selected} />
           ) : local === "/" || local === "/dashboard" ? (
             <ProjectDashboard project={selected} />
@@ -148,7 +157,7 @@ function ProjectList({
     try {
       const project = await projectRequest<Project>("", "POST", { name: name.trim() })
       if (!validProject(project)) throw new Error("Invalid project response.")
-      window.location.assign(`/projects/${project.id}/dashboard`)
+      window.location.assign(`/projects/${project.id}/setup`)
     } catch (error) {
       setError(error instanceof Error ? error.message : "Project creation failed.")
     } finally {

@@ -242,6 +242,21 @@ def main():
     web_service = next(item for item in documents if item["kind"] == "Service" and item["metadata"]["name"] == "logice-tunnel")
     assert web_service["spec"]["type"] == "ClusterIP"
     assert "nodePort" not in web_service["spec"]["ports"][0]
+    _, enabled = render({**VALUES, "alertsWorker.enabled": "true"})
+    worker = next(item for item in enabled if item["kind"] == "Deployment" and item["metadata"]["name"] == "test-logice-alerts-worker")
+    pod = worker["spec"]["template"]["spec"]
+    assert pod["automountServiceAccountToken"] is False
+    container = pod["containers"][0]
+    assert container["args"] == ["alerts-worker"]
+    assert container["securityContext"]["readOnlyRootFilesystem"] is True
+    assert "ports" not in container
+    env = {item["name"]: item for item in container["env"]}
+    assert "OTLP_TOKEN" not in env and "AUTH_ORIGIN" not in env and "COLLECTOR_URL" not in env
+    assert env["ENCRYPTION_KEY"]["valueFrom"]["secretKeyRef"]["name"] == "test-secret"
+    policy = next(item for item in enabled if item["kind"] == "NetworkPolicy" and item["metadata"]["name"] == "test-logice-alerts-worker")
+    assert policy["spec"]["ingress"] == []
+    assert policy["spec"]["policyTypes"] == ["Ingress", "Egress"]
+    assert policy["spec"]["egress"][-1]["ports"] == [{"protocol": "TCP", "port": 443}]
     print("Helm lint and chart render checks passed")
 
 

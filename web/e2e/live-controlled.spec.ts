@@ -4,6 +4,7 @@ import {
   assertBuckets,
   control,
   empty,
+  expectClockFocus,
   maximumSnapshot,
   ns,
   record,
@@ -258,17 +259,21 @@ test("Live renders only bounded virtual rows at the maximum valid snapshot and k
     await tree.focus()
     await page.keyboard.press("Home")
     await page.clock.runFor(50)
+    await expectClockFocus(page, tree.locator('[data-event-id][aria-rowindex="2"]'))
     await expect(tree.locator('[data-event-id][aria-rowindex="2"]')).toBeFocused()
     await page.keyboard.press("End")
     await page.clock.runFor(50)
+    await expectClockFocus(page, tree.locator('[data-event-id][aria-rowindex="1501"]'))
     await expect(tree.locator('[data-event-id][aria-rowindex="1501"]')).toBeFocused()
     await page.keyboard.press("ArrowUp")
     await page.clock.runFor(50)
+    await expectClockFocus(page, tree.locator('[data-event-id][aria-rowindex="1500"]'))
     await expect(tree.locator('[data-event-id][aria-rowindex="1500"]')).toBeFocused()
     await page.keyboard.press("Enter")
     await expect(page.getByRole("dialog", { name: "Event details" })).toBeVisible()
     await page.keyboard.press("Escape")
     await page.clock.runFor(50)
+    await expectClockFocus(page, tree.locator('[data-event-id][aria-rowindex="1500"]'))
     await expect(tree.locator('[data-event-id][aria-rowindex="1500"]')).toBeFocused()
   }
 })

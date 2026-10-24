@@ -133,7 +133,7 @@ func (s *Service) projectRoute(w http.ResponseWriter, r *http.Request, u *User, 
 		unavailable(w)
 		return
 	}
-	if len(parts) >= 3 && (parts[2] == "traces" || parts[2] == "logs" || parts[2] == "live") {
+	if len(parts) >= 3 && (parts[2] == "traces" || parts[2] == "logs" || parts[2] == "live" || parts[2] == "overview") {
 		if err = tx.Commit(r.Context()); err != nil {
 			unavailable(w)
 			return
@@ -193,6 +193,16 @@ func (s *Service) projectRoute(w http.ResponseWriter, r *http.Request, u *User, 
 		return
 	}
 	switch parts[2] {
+	case "alerts":
+		s.projectAlerts(w, r, tx, p, u, parts[3:])
+	case "views":
+		s.projectViews(w, r, tx, p, u, parts[3:])
+	case "events":
+		if len(parts) != 3 {
+			projectMissing(w)
+			return
+		}
+		s.projectEvents(w, r, tx, p)
 	case "members":
 		s.projectMembers(w, r, tx, p, u, parts[3:])
 	case "owner":
@@ -513,13 +523,26 @@ func (s *Service) projectTokens(w http.ResponseWriter, r *http.Request, tx pgx.T
 			projectInvalid(w)
 			return
 		}
-		tag, err := tx.Exec(r.Context(), "UPDATE project_tokens SET revoked_at=coalesce(revoked_at,now()) WHERE project_id=$1 AND id=$2", p.ID, tail[0])
+		tag, err := tx.Exec(r.Context(), "UPDATE project_tokens SET revoked_at=now() WHERE project_id=$1 AND id=$2 AND revoked_at IS NULL", p.ID, tail[0])
 		if err != nil {
 			unavailable(w)
 			return
 		}
 		if tag.RowsAffected() != 1 {
-			projectMissing(w)
+			var exists bool
+			if tx.QueryRow(r.Context(), "SELECT EXISTS(SELECT 1 FROM project_tokens WHERE project_id=$1 AND id=$2)", p.ID, tail[0]).Scan(&exists) != nil {
+				unavailable(w)
+				return
+			}
+			if !exists {
+				projectMissing(w)
+				return
+			}
+			if tx.Commit(r.Context()) != nil {
+				unavailable(w)
+				return
+			}
+			response(w, 200, map[string]string{"status": "ok"})
 			return
 		}
 		err = projectAudit(r.Context(), tx, p.ID, u.ID, "revoke_token", tail[0])

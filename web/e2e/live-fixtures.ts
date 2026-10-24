@@ -1,6 +1,19 @@
 import { readFileSync } from "node:fs"
-import { expect, type Page } from "@playwright/test"
+import { expect, type Locator, type Page } from "@playwright/test"
 import type { LiveRecord, LiveSnapshot } from "../src/live/api"
+
+// A frozen clock must advance while waiting for virtual rows to mount after resize.
+// This observes actual focus; it never moves focus or extends the assertion deadline.
+export async function expectClockFocus(page: Page, locator: Locator) {
+  await expect
+    .poll(async () => {
+      await page.clock.runFor(50)
+      return locator.evaluateAll((elements) =>
+        elements.some((element) => element === document.activeElement),
+      )
+    })
+    .toBe(true)
+}
 
 export const now = new Date("2026-10-23T00:05:00Z")
 export const empty = JSON.parse(

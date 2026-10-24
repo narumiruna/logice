@@ -17,6 +17,13 @@ import (
 )
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "alerts-worker" {
+		if err := alertWorkerCommand(os.Args[2:]); err != nil {
+			log.Print(err)
+			os.Exit(1)
+		}
+		return
+	}
 	if len(os.Args) > 1 && (os.Args[1] == "migrate" || os.Args[1] == "bootstrap" || os.Args[1] == "recover" || os.Args[1] == "users") {
 		if err := accountCommand(os.Args[1], os.Args[2:]); err != nil {
 			log.Print(err)

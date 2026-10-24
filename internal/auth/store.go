@@ -20,6 +20,15 @@ import (
 //go:embed schema.sql
 var schema string
 
+//go:embed workspace-schema.sql
+var workspaceSchema string
+
+//go:embed passkey-schema.sql
+var passkeySchema string
+
+//go:embed alerts-schema.sql
+var alertsSchema string
+
 var errDenied = errors.New("authentication denied")
 
 // User identifies an account. Platform administration does not grant project access.
@@ -71,6 +80,15 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	if _, err = tx.Exec(ctx, schema); err != nil {
 		return err
 	}
+	if _, err = tx.Exec(ctx, workspaceSchema); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, passkeySchema); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, alertsSchema); err != nil {
+		return err
+	}
 	return tx.Commit(ctx)
 }
 
@@ -79,6 +97,9 @@ func Ready(ctx context.Context, pool *pgxpool.Pool) error {
 	var version int
 	if err := pool.QueryRow(ctx, "SELECT max(version) FROM auth_schema_versions").Scan(&version); err != nil || version != 2 {
 		return errors.New("authentication schema unavailable; run logice migrate")
+	}
+	if err := pool.QueryRow(ctx, "SELECT max(version) FROM workspace_schema_versions").Scan(&version); err != nil || version != 3 {
+		return errors.New("workspace schema unavailable; run logice migrate")
 	}
 	return nil
 }

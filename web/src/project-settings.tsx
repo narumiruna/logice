@@ -8,6 +8,7 @@ import {
   projectRequest,
   type Token,
 } from "./project-api"
+import { ProjectAudit } from "./project-audit"
 import { AppShell } from "./shell"
 
 export function ProjectSettings({ project }: { project: Project }) {
@@ -37,7 +38,7 @@ export function ProjectSettings({ project }: { project: Project }) {
     const change = () => setSection(window.location.hash || "#general")
     // The project gate mounts this page after the browser's initial anchor lookup.
     const id = window.location.hash.slice(1)
-    if (["general", "members", "tokens", "danger"].includes(id))
+    if (["general", "members", "tokens", "danger", "audit"].includes(id))
       document.getElementById(id)?.scrollIntoView()
     window.addEventListener("hashchange", change)
     return () => window.removeEventListener("hashchange", change)
@@ -128,6 +129,7 @@ export function ProjectSettings({ project }: { project: Project }) {
             </a>
           )}
         </nav>
+        {owner && <a href="#audit">Audit history</a>}
         <section id="general" className="settings-card">
           <div className="settings-card-heading">
             <h2>Project identity</h2>
@@ -137,6 +139,8 @@ export function ProjectSettings({ project }: { project: Project }) {
             Project ID: <code>{project.id}</code>
           </p>
           <p>Your role: {project.role}</p>
+          <a href={`/projects/${project.id}/setup`}>Connect an application to this project</a> ·{" "}
+          <a href={`/projects/${project.id}/alerts`}>Manage alerts</a>
         </section>
         {error && (
           <div className="workspace-error" role="alert">
@@ -379,6 +383,7 @@ export function ProjectSettings({ project }: { project: Project }) {
             </button>
           </section>
         )}
+        {owner && <ProjectAudit project={project} />}
         {owner && (
           <section id="danger" className="settings-card danger-card">
             <h2>Delete project</h2>

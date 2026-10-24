@@ -67,7 +67,7 @@ describe("workspace page structure and permissions", () => {
       )
       expect(html).toContain("Loading dashboard")
       expect(html).toContain("Up to 5 most recent")
-      expect(html).toContain("Not a project-wide error rate")
+      expect(html).toContain("Sample counts are not a project-wide error rate")
       expect(html).not.toContain("No traces in this window")
       expect(fetcher).not.toHaveBeenCalled()
     } finally {

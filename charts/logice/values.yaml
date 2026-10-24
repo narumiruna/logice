@@ -14,6 +14,10 @@ api:
     limits:
       memory: 128Mi
 
+# A separate worker; enable only after migration, key backup, and egress validation.
+alertsWorker:
+  enabled: false
+
 web:
   # Restrict node access: NodePort can bypass Cloudflare Access.
   service:

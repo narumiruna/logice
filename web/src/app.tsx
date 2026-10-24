@@ -5,6 +5,7 @@ import { Notice, WindowLabel } from "./components"
 import { FilterForm } from "./filters"
 import { LogList, TraceList } from "./lists"
 import { projectPath } from "./project-path"
+import { SaveViewButton } from "./save-view-button"
 import { AppShell } from "./shell"
 import { filterResetHref, listHref, parseRoute, routeHref } from "./telemetry"
 import { TraceDetail } from "./trace-detail"
@@ -117,6 +118,7 @@ export function App() {
             </button>
           )}
         </div>
+        {valid && !detail && <SaveViewButton />}
         {route.page === "not-found" ? (
           <Notice title="This page does not exist" tone="error">
             <a href={listHref("traces", route.filters)}>Open traces</a> or{" "}

@@ -1,6 +1,7 @@
 import { type FormEvent, useEffect, useState } from "react"
 import { flushSync } from "react-dom"
 import { useAccount } from "./auth"
+import { PasskeySettings } from "./passkey-settings"
 import { AppShell } from "./shell"
 import { ThemeSelect } from "./theme"
 import "./projects.css"
@@ -51,6 +52,7 @@ export function AccountSettings() {
             <a href="#profile">Profile</a>
             <a href="#appearance">Appearance</a>
             <a href="#security">Security</a>
+            <a href="#passkeys">Passkeys</a>
             {user.admin && <a href="#invitations">Invitations</a>}
           </nav>
           <div className="settings-panels">
@@ -146,6 +148,7 @@ export function AccountSettings() {
                 Sign out of this browser
               </button>
             </section>
+            <PasskeySettings />
             {user.admin && (
               <section className="settings-card" id="invitations">
                 <div className="settings-card-heading">

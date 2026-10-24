@@ -384,3 +384,38 @@ The complete diff was reviewed for correctness, security, lifecycle safety, comp
 - Queue saturation, restart loss, retry exhaustion, duplicate delivery under ambiguous insert failures, request/decompression limits, load/latency targets, retention expiry, and backup/restore remain release tests.
 - The operator's hostname, tunnel, credentials, and recovery key are not selected or changed here. The public deployment cannot be claimed ready without them.
 - Final user acceptance of the recommended library choices and validation targets remains open. Preserve the tracked plan and do not claim end-to-end plan completion until that gate is accepted.
+
+## Project workflows verification (2026-10-24)
+
+[PR #19](https://github.com/narumiruna/logice/pull/19) implements project onboarding, shared Saved Views, Dashboard aggregates, Alerts/Webhooks, self-service Passkeys, and Owner-only project audit history. The previous sections describe earlier snapshots; they are not current authentication or project-access specifications. See [Project Workflows](project-workflows.md) for the implemented contracts and rollback rules.
+
+Verification uses Go 1.26.10 and Node.js 26.11.1/npm 11.20.0. Hosted [run 40081810368](https://github.com/narumiruna/logice/actions/runs/40081810368) passed all seven jobs on `fab8f4c`, including race-enabled PostgreSQL/ClickHouse integration, real-service browser tests, clean-checkout failure propagation, and frontend layout validation. Later test additions have their own local evidence below; the PR checks identify the final hosted revision. A complete local `go test -race -tags=integration -count=1 -timeout=8m -v ./internal/... ./tests/integration/...` also passed: native stack tests in 253.472 seconds and authentication tests in 102.415 seconds.
+
+| Area | Observed evidence |
+| --- | --- |
+| Ordinary Go and frontend | `sh scripts/check-go.sh` and `npm --prefix web run ci` passed. The frontend has 287 unit tests. E2E TypeScript compilation passed separately. |
+| Complete browser workflow | `sh scripts/validate-compose-web.sh` passed with 109 Chromium tests, including receipt isolation, denied clipboard fallback, Saved View revision conflicts, Dashboard unavailable/retry/trend scope, backup registration and new-session sign-in after removal, removed-key denial, and Viewer restrictions. Classic/Studio checks cover 390px and 1440px. The script also proved API address replacement and removed its disposable stack. |
+| Aggregate populations | Native tests cover deduplication, cross-project identical IDs, conflicts, malformed IDs, multiple roots, half-open nanosecond boundaries, late arrival, null empty populations, and exact quantiles. Counts are independent of explorer row limits. |
+| Aggregate limits and benchmark | 5,000 spans and 5,000 logs; two warmups and 30 reads. Latest focused local p50 51.882333ms, p95 59.612209ms, maximum 68.118542ms, below the two-second local target. Query logs prove two reads with unchanged readonly/5s/128MiB/8MiB limits. Native progress cancellation and memory-limit failure passed. This is not a production capacity claim. |
+| Durable notifications | Real Collector input, native aggregates, PostgreSQL worker/outbox, and a controlled HTTPS receiver passed firing, native-reader outage without false recovery, healthy-data recovery, two-project isolation, and project deletion. Separate worker tests passed concurrent claims, lease expiry/restart, duplicate-window denial, stable event-ID replay, and retry exhaustion. |
+| Authorization and migrations | Native tests passed role/scope checks, revision conflicts, finite quotas, migration repeatability, authentication-v2 compatibility, audit atomicity, bigint/high-water pagination, operator attribution, ownership transfer, and indexed bounded audit reads. |
+| Passkey proof boundaries | Race-enabled native tests passed signed missing-UV, wrong Origin/RP/challenge, wrong session/account, stale account/browser generation, expired and replayed proof, and successful removal. An injected audit failure preserved both keys and the original session. Concurrent verified removal retained one key and one committed audit event. Additional registration/removal tests passed registration-first, removal-first, concurrent, duplicate-credential, registration-audit-failure, and operator-recovery cases using valid WebAuthn registration data. |
+| Dependency and deployment checks | `go mod verify`, Helm render/chart checks, five Python example tests, Actionlint, shell syntax, and diff checks passed. npm audit reported zero vulnerabilities. Govulncheck reported no called or imported-package vulnerabilities; one existing unused module-level advisory remains outside the called graph. |
+
+Review covered correctness, security, lifecycle safety, compatibility, regressions, and scope. In particular: all project reads remain scoped; mutation authorization is rechecked under locks; missing storage cannot become healthy no-data; proof consumption is single-use outside the user-lock transaction; session/browser state is checked before credential changes; destination changes cancel pending work; and queue backpressure does not prevent delivery drain. Webhook DNS, reserved-address, rebinding, mixed-answer, TLS, redirect, and encryption/AAD tests passed. This evidence is not a full production penetration test.
+
+Failed attempts remain part of the record. An initial full native run found an obsolete exact table-inventory assertion; it now checks all twenty metadata tables, including the six additive workspace tables. A later local run encountered Collector readiness EOF and then exhausted the suite work budget; it did not pass. Hosted complete runs passed without extending the eight-minute suite deadline. A local browser rerun hit an intermittent existing maximum-snapshot Live keyboard-focus assertion; the next complete run passed all 109 tests. The controlled-clock helper observes actual focus and does not set focus or relax row/scroll bounds. No failing run is counted as passing evidence.
+
+The five completed execution plans were removed after automated verification and PR handoff. Their deleted paths are:
+
+- `docs/plans/2026-10-24_project-onboarding-plan.md`
+- `docs/plans/2026-10-24_saved-views-plan.md`
+- `docs/plans/2026-10-24_dashboard-aggregates-plan.md`
+- `docs/plans/2026-10-24_alerting-webhooks-plan.md`
+- `docs/plans/2026-10-24_project-audit-log-plan.md`
+
+### Remaining release gate
+
+The physical-authenticator requirement remains open in `plans/2026-10-24_passkey-management-plan.md`. On the intended HTTPS origin, an authorized operator must add an independent user-verifying backup, sign out and sign in with it, remove the original, confirm original-key denial and last-key protection, and check other-session revocation. Record the browser/platform, origin, UTC date, and outcomes without credential material. Virtual Chromium authenticators are not physical-device evidence.
+
+Production migration, backup/restore, CNI enforcement, live Webhook delivery, and load capacity were not exercised or authorized. The worker remains disabled by default. No live credentials, production resources, package publication, version tags, or release workflows were changed.
