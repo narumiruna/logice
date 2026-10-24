@@ -20,14 +20,18 @@ import (
 	"github.com/google/uuid"
 )
 
-func managementProof(t *testing.T, private *ecdsa.PrivateKey, id []byte, user, challenge, origin, rpID string, flags byte) string {
+func managementProof(t *testing.T, private *ecdsa.PrivateKey, id []byte, user, challenge, origin, rpID string, flags byte, counters ...uint32) string {
 	t.Helper()
 	client, _ := json.Marshal(map[string]any{"type": "webauthn.get", "challenge": challenge, "origin": origin, "crossOrigin": false})
 	rp := sha256.Sum256([]byte(rpID))
 	data := append([]byte{}, rp[:]...)
 	data = append(data, flags)
 	counter := make([]byte, 4)
-	binary.BigEndian.PutUint32(counter, 1)
+	value := uint32(1)
+	if len(counters) > 0 {
+		value = counters[0]
+	}
+	binary.BigEndian.PutUint32(counter, value)
 	data = append(data, counter...)
 	clientHash := sha256.Sum256(client)
 	signed := append(append([]byte{}, data...), clientHash[:]...)

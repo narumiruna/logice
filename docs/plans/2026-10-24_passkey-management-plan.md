@@ -20,20 +20,26 @@ Let an authenticated account add a backup Passkey, name its credentials, and rem
 
 ## Plan
 
-- [ ] Specify the credential metadata, management IDs, reauthentication contract, session invalidation policy, and finite credential quota; acceptance: reviewed request/response fixtures expose no credential material and cover legacy rows without invented dates.
-- [ ] Add transactional migration and self-only list/rename operations; acceptance: real PostgreSQL tests prove ownership checks, strict input validation, metadata limits, audit atomicity, and migration retry safety.
-- [ ] Implement operation-bound reauthentication and backup registration ceremonies; acceptance: authenticators with wrong RP/Origin/challenge, missing UV, stale generation, duplicate credential, expired/reused proof, or another account's session are rejected.
-- [ ] Implement locked removal and session rotation; acceptance: race tests prove last-credential protection, simultaneous add/remove safety, recovery serialization, session revocation, and rollback on audit/storage failure.
-- [ ] Add credential list, naming, add/remove confirmation, cancellation, and error UI; acceptance: Classic/Studio, keyboard, mobile, unsupported authenticators, cancelled browser prompts, and interrupted ceremonies remain usable without exposing secrets.
-- [ ] Add browser workflows with independent authenticators; acceptance: a backup signs in after the original is removed, the removed credential cannot sign in, the last credential cannot be removed, and existing enrollment/login/recovery tests remain enabled.
-- [ ] Update operator/user recovery guidance; acceptance: docs distinguish naming, account removal, synced credentials, sign out, and operator recovery.
+- [x] Specify the credential metadata, management IDs, reauthentication contract, session invalidation policy, and finite credential quota; acceptance: reviewed request/response fixtures expose no credential material and cover legacy rows without invented dates.
+- [x] Add transactional migration and self-only list/rename operations; acceptance: real PostgreSQL tests prove ownership checks, strict input validation, metadata limits, audit atomicity, and migration retry safety.
+- [x] Implement operation-bound reauthentication and backup registration ceremonies; acceptance: authenticators with wrong RP/Origin/challenge, missing UV, stale generation, duplicate credential, expired/reused proof, or another account's session are rejected.
+- [x] Implement locked removal and session rotation; acceptance: race tests prove last-credential protection, simultaneous add/remove safety, recovery serialization, session revocation, and rollback on audit/storage failure.
+- [x] Add credential list, naming, add/remove confirmation, cancellation, and error UI; acceptance: Classic/Studio, keyboard, mobile, unsupported authenticators, cancelled browser prompts, and interrupted ceremonies remain usable without exposing secrets.
+- [x] Add browser workflows with independent authenticators; acceptance: a backup signs in after the original is removed, the removed credential cannot sign in, the last credential cannot be removed, and existing enrollment/login/recovery tests remain enabled.
+- [x] Update operator/user recovery guidance; acceptance: docs distinguish naming, account removal, synced credentials, sign out, and operator recovery.
 
 ## Completion Checklist
 
-- [ ] `GOTOOLCHAIN=go1.26.10 sh scripts/check-go.sh`, `GOTOOLCHAIN=go1.26.10 go test -race -tags=integration -count=1 -timeout=8m ./internal/auth/...`, `npm --prefix web run ci`, and `sh scripts/validate-compose-web.sh` pass with negative WebAuthn cases.
+- [x] `GOTOOLCHAIN=go1.26.10 sh scripts/check-go.sh`, `GOTOOLCHAIN=go1.26.10 go test -race -tags=integration -count=1 -timeout=8m ./internal/auth/...`, `npm --prefix web run ci`, and `sh scripts/validate-compose-web.sh` pass with negative WebAuthn cases.
 - [ ] Verify the flow with a real user-verifying authenticator on the intended HTTPS origin before production release; virtual authenticators alone are not that evidence.
-- [ ] Review session/proof replay, account binding, transaction failure, metadata privacy, and concurrent last-key removal.
-- [ ] Deliver a verified PR and clearly identify any pending physical-authenticator release gate; delete this plan only after required checks/handoff are complete.
+- [x] Review session/proof replay, account binding, transaction failure, metadata privacy, and concurrent last-key removal.
+- [x] Deliver a verified PR and clearly identify any pending physical-authenticator release gate; delete this plan only after required checks/handoff are complete.
+
+## Verification and Remaining Gate
+
+Automated evidence is recorded in [validation](../validation.md#project-workflows-verification-2026-10-24). [PR #19](https://github.com/narumiruna/logice/pull/19) contains the implementation and recovery guidance. Native signed WebAuthn tests cover proof rejection/replay, concurrent last-key removal, registration/removal orderings, duplicate credentials, audit rollback, and operator recovery. Browser tests establish a new session with the backup after removal and reject the removed original. No real account or production credential was changed.
+
+The physical-authenticator checkbox remains open. An authorized operator must run the flow on the intended HTTPS origin and record browser/platform, origin, UTC date, and outcomes without secrets. This is a release blocker, not evidence that virtual-authenticator tests failed. Retain this plan until that evidence is supplied; do not infer completion from green CI.
 
 ## Rollback / Recovery
 
