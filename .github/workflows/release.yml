@@ -114,6 +114,10 @@ jobs:
 
   publish:
     needs: [validate, release]
+    outputs:
+      release-commit: ${{ steps.publish.outputs.release-commit }}
+      published: ${{ steps.publish.outputs.published }}
+      image-tag: ${{ steps.image.outputs.tag }}
     if: ${{ !cancelled() && github.ref == 'refs/heads/main' && needs.validate.result == 'success' && needs.validate.outputs.publication-commit != '' && (github.event_name == 'push' || inputs.operation == 'retry-publication') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -134,9 +138,30 @@ jobs:
       - uses: ./.github/actions/setup-changenote
         id: changenote
       - name: Publish only the validated release batch
+        id: publish
         env:
           GH_TOKEN: ${{ github.token }}
           INPUT_BASE_BRANCH: main
           CHANGENOTE_SOURCE: ${{ steps.changenote.outputs.action-path }}
           EXPECTED_RELEASE_COMMIT: ${{ needs.validate.outputs.publication-commit }}
         run: bash "$CHANGENOTE_SOURCE/scripts/action/publish.sh" "$EXPECTED_RELEASE_COMMIT"
+      - name: Set release image tag
+        id: image
+        if: steps.publish.outputs.release-commit != ''
+        env:
+          RELEASE_COMMIT: ${{ steps.publish.outputs.release-commit }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
+          IFS= read -r version < VERSION
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+
+  docker:
+    needs: publish
+    if: ${{ !cancelled() && github.ref == 'refs/heads/main' && needs.publish.result == 'success' && needs.publish.outputs.release-commit != '' && (needs.publish.outputs.published == 'true' || (github.event_name == 'workflow_dispatch' && inputs.operation == 'retry-publication')) }}
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/docker.yml
+    with:
+      revision: ${{ needs.publish.outputs.release-commit }}
+      version-tag: ${{ needs.publish.outputs.image-tag }}
