@@ -1,4 +1,5 @@
 import { type FormEvent, type ReactNode, useEffect, useState } from "react"
+import { flushSync } from "react-dom"
 import { localProjectPath, projectId } from "./project-path"
 import { ThemeSelect } from "./theme"
 import "./projects.css"
@@ -226,6 +227,12 @@ function ProjectSettings({ project }: { project: Project }) {
   const [memberOffset, setMemberOffset] = useState(0)
   const [tokenOffset, setTokenOffset] = useState(0)
   const [revision, setRevision] = useState(0)
+  useEffect(() => {
+    // Remove the secret before a page can enter the browser back/forward cache.
+    const clearSecret = () => flushSync(() => setSecret(""))
+    window.addEventListener("pagehide", clearSecret)
+    return () => window.removeEventListener("pagehide", clearSecret)
+  }, [])
   const owner = project.role === "Owner"
   const manageTokens = canManageTokens(project.role)
   const base = `/${project.id}`

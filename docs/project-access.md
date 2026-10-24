@@ -15,11 +15,11 @@ In **Project settings**, the Owner can add an existing active account by UUID, c
 | Manage members and roles; rename project | Yes | No | No |
 | Transfer ownership; delete project | Yes | No | No |
 
-Each project has exactly one Owner. Transfer requires an active existing member and makes the previous Owner a Developer. Ordinary member operations cannot remove or demote the Owner.
+Each project has exactly one Owner. Transfer requires an active existing member and makes the previous Owner a Developer. Ordinary member operations cannot remove or demote the Owner. The Owner can remove or demote other members while their accounts are inactive during recovery.
 
 ## Create an application credential
 
-Owners and Developers can create ingestion tokens in **Project settings**. Set a name and, optionally, an expiry in UTC. Copy the complete token when it appears: it is shown only once. Store it in the application's secret store. The database contains its SHA-256 hash, not the secret. List responses expose only metadata and status.
+Owners and Developers can create ingestion tokens in **Project settings**. Set a name and, optionally, an expiry in UTC. Copy the complete token when it appears: it is shown only once. Leaving the page clears the displayed secret before the browser can cache that page for Back/Forward navigation. Store it in the application's secret store. The database contains its SHA-256 hash, not the secret. List responses expose only metadata and status.
 
 Tokens belong to projects, not people. The creator UUID is audit metadata. Removing or demoting the creator does **not** revoke a token. An Owner or Developer can revoke any project token. Revocation is permanent through the API. Rotate a credential by creating a replacement, switching applications, and revoking the old token.
 

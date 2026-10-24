@@ -153,7 +153,11 @@ func TestProjectAccessAndTokenLifecycle(t *testing.T) {
 	w = httptest.NewRecorder()
 	s.Wrap(http.NotFoundHandler()).ServeHTTP(w, r)
 	check(w, 401)
+	// Account recovery must not prevent the Owner from removing a membership.
+	exec("UPDATE auth_users SET active=false WHERE id=$1", users["developer"])
+	check(call("owner", "PATCH", base+"/members/"+users["developer"], `{"role":"Viewer"}`), 200)
 	check(call("owner", "DELETE", base+"/members/"+users["developer"], `{}`), 200)
+	exec("UPDATE auth_users SET active=true WHERE id=$1", users["developer"])
 	check(call("developer", "GET", base+"/traces", ""), 404)
 	check(ingest(created.Token, nil), 202)
 	check(call("owner", "POST", "/api/projects/"+foreign.ID+"/tokens/"+created.ID+"/revoke", `{}`), 404)

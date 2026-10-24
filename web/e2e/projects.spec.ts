@@ -54,7 +54,8 @@ test("project roles, one-time tokens, membership removal, ownership and project 
         await member.getByLabel("Token name", { exact: true }).fill("Developer application")
         await member.getByRole("button", { name: "Create token", exact: true }).click()
         await expect(member.getByRole("note", { name: "New ingestion token" })).toBeVisible()
-        await member.getByRole("button", { name: "Dismiss token" }).click()
+        await member.evaluate(() => window.dispatchEvent(new PageTransitionEvent("pagehide")))
+        await expect(member.getByRole("note", { name: "New ingestion token" })).toHaveCount(0)
         await page.reload()
         await expect(page.locator("li").filter({ hasText: "Developer application" })).toBeVisible()
         const row = page
@@ -100,18 +101,21 @@ test("project roles, one-time tokens, membership removal, ownership and project 
     await expect(page.getByText("Your role: Developer", { exact: true })).toBeVisible()
     await expect(page.getByRole("button", { name: "Delete project", exact: true })).toHaveCount(0)
   } finally {
-    for (const context of contexts) {
-      let timer: ReturnType<typeof setTimeout> | undefined
-      try {
-        await Promise.race([
-          context.close(),
-          new Promise<void>((resolve) => {
-            timer = setTimeout(resolve, 5000)
-          }),
-        ])
-      } finally {
-        clearTimeout(timer)
-      }
-    }
+    for (const context of contexts) await context.close()
   }
+})
+
+test("unknown unscoped URLs do not select a default project", async ({ page }) => {
+  const reads: string[] = []
+  page.on("request", (request) => {
+    if (/\/api\/projects\/[^/]+\/(traces|logs|live)/.test(request.url())) reads.push(request.url())
+  })
+  await page.goto("/missing")
+  await expect(page.getByRole("heading", { name: "This page does not exist" })).toBeVisible()
+  await expect(page.getByRole("link", { name: "Choose a project" })).toHaveAttribute(
+    "href",
+    "/projects",
+  )
+  await expect(page.getByRole("combobox", { name: "Theme", exact: true })).toBeVisible()
+  expect(reads).toEqual([])
 })

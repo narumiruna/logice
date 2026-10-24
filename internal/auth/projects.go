@@ -348,15 +348,20 @@ func (s *Service) projectMembers(w http.ResponseWriter, r *http.Request, tx pgx.
 		projectInvalid(w)
 		return
 	}
-	var active bool
-	err := tx.QueryRow(r.Context(), "SELECT active FROM auth_users WHERE id=$1", in.UserID).Scan(&active)
-	if errors.Is(err, pgx.ErrNoRows) || (err == nil && !active) {
-		projectInvalid(w)
-		return
-	}
-	if err != nil {
-		unavailable(w)
-		return
+	var err error
+	// New membership requires an active account. An Owner must still be able
+	// to remove or demote an existing member during that account's recovery.
+	if r.Method == http.MethodPost && len(tail) == 0 {
+		var active bool
+		err = tx.QueryRow(r.Context(), "SELECT active FROM auth_users WHERE id=$1", in.UserID).Scan(&active)
+		if errors.Is(err, pgx.ErrNoRows) || (err == nil && !active) {
+			projectInvalid(w)
+			return
+		}
+		if err != nil {
+			unavailable(w)
+			return
+		}
 	}
 	var tagRows int64
 	switch {
@@ -452,7 +457,7 @@ func (s *Service) projectOwner(w http.ResponseWriter, r *http.Request, tx pgx.Tx
 }
 
 func (s *Service) projectTokens(w http.ResponseWriter, r *http.Request, tx pgx.Tx, p Project, u *User, tail []string) {
-	if p.Role == "Viewer" {
+	if p.Role != "Owner" && p.Role != "Developer" {
 		projectForbidden(w)
 		return
 	}
