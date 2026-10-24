@@ -11,7 +11,7 @@ run() { timeout --kill-after=5s 300 "$@"; }
 run git clone --quiet --no-hardlinks -- "$repo" "$work/repo"
 cd "$work/repo"
 
-for path in package.json package-lock.json biome.json tsconfig.json vitest.config.mts src/hello.ts src/index.ts tests/index.test.ts .changeset .github/workflows/publish.yml; do
+for path in package.json package-lock.json biome.json tsconfig.json vitest.config.mts src/hello.ts src/index.ts tests/index.test.ts .changeset web/.changeset .github/workflows/publish.yml; do
   test ! -e "$path" || { printf 'Unexpected template path: %s\n' "$path" >&2; exit 1; }
 done
 test ! -e node_modules
@@ -33,7 +33,15 @@ HUSKY= run npm --prefix web ci
 test "$(git config --get core.hooksPath)" = .husky/_
 run node -e '
 const p = require("./web/package.json");
-if (p.private !== true || p.name !== "logice-web" || p.scripts.release || p.scripts.changeset || p.devDependencies["@changesets/cli"]) process.exit(1);
+const c = require("./.changenote/config.json").packages.logice;
+const version = require("node:fs").readFileSync("VERSION", "utf8").trim();
+const lock = require("./web/package-lock.json");
+if (p.private !== true || p.name !== "logice-web" || p.scripts.release || p.scripts.publish ||
+    p.scripts.changeset || p.devDependencies["@changesets/cli"] ||
+    p.scripts["release:tag"] || p.scripts["release:github"] ||
+    c.path !== "." || c.version_file !== "VERSION" || c.tag_prefix !== "v" ||
+    JSON.stringify(c.version_outputs) !== JSON.stringify(["web/package.json"]) ||
+    version !== p.version || lock.version !== version || lock.packages[""].version !== version) process.exit(1);
 '
 
 snapshot() {

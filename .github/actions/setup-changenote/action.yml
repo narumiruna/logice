@@ -1,0 +1,32 @@
+name: Set up changenote
+description: Install the reviewed changenote CLI and expose its pinned Action scripts.
+outputs:
+  action-path:
+    description: Absolute path to the pinned changenote source and Action scripts.
+    value: ${{ steps.source.outputs.path }}
+runs:
+  using: composite
+  steps:
+    - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable action
+      with:
+        toolchain: 1.92.0
+    - name: Fetch pinned source
+      id: source
+      shell: bash
+      run: |
+        source_dir="$RUNNER_TEMP/changenote-source"
+        git init "$source_dir"
+        git -C "$source_dir" fetch --depth=1 --no-tags https://github.com/narumiruna/changenote \
+          66afe581b2f7b19f96188a1f217518c41aaaf77d
+        git -C "$source_dir" checkout --detach FETCH_HEAD
+        test "$(git -C "$source_dir" rev-parse HEAD)" = 66afe581b2f7b19f96188a1f217518c41aaaf77d
+        echo "path=$source_dir" >> "$GITHUB_OUTPUT"
+        echo "CHANGENOTE_ACTION_PATH=$source_dir" >> "$GITHUB_ENV"
+    - name: Install pinned CLI
+      shell: bash
+      env:
+        CHANGENOTE_SOURCE: ${{ steps.source.outputs.path }}
+      run: |
+        cargo install --path "$CHANGENOTE_SOURCE" --locked --root "$RUNNER_TEMP/changenote"
+        test "$("$RUNNER_TEMP/changenote/bin/changenote" --version)" = 'changenote 0.7.0'
+        echo "$RUNNER_TEMP/changenote/bin" >> "$GITHUB_PATH"

@@ -32,6 +32,7 @@ Open [the live explorer preview](http://localhost:5173/preview) after building t
 - [Passkey deployment, backup, and recovery](docs/passkey-operations.md)
 - [Dependency-ordered implementation sequence](docs/implementation.md)
 - [Validation commands, evidence, and limitations](docs/validation.md)
+- [changenote and GitHub releases](docs/releases.md)
 - [Current tracked plan](docs/plans/2026-10-18_logice-stack-plan.md)
 
 ## Verify the stack
@@ -135,4 +136,4 @@ git diff --check
 
 Go checks need neither Node.js nor frontend assets. `scripts/validate-checks.sh` clones the committed revision into a temporary checkout, verifies independent Go checks with no Node.js on PATH, installs hooks, and verifies that injected Go/web formatting and test failures are rejected without source/index edits. It does not test uncommitted changes.
 
-The frontend-layout script installs a separate locked compatibility fixture into a temporary directory. It collects Playwright tests but does not run a browser. CI retains this proof separately from the application frontend checks and real-service integration tests. Hooks run read-only checks with web-local tools; they do not rewrite source files. There is no npm publishing or replacement release pipeline.
+The frontend-layout script installs a separate locked compatibility fixture into a temporary directory. It collects Playwright tests but does not run a browser. CI retains this proof separately from the application frontend checks and real-service integration tests. Hooks run read-only checks with web-local tools; they do not rewrite source files. changenote and `.github/workflows/release.yml` create version PRs and GitHub source releases. Root `VERSION` also updates the private frontend version. The Docker workflow is unchanged. See [release operation](docs/releases.md).
