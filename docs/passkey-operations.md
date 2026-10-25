@@ -4,7 +4,7 @@
 
 This is an operator runbook, not authorization to deploy. No live cluster changes are part of the deployment-wiring work.
 
-1. Wait for API and web images from the same authentication-capable commit and for authentication tests to pass. The chart still defaults to `latest`; older images do not implement these commands or enforce authentication. Pin both tags to the same full commit SHA before deployment.
+1. Wait for API and web images from the same authentication-capable commit and for authentication tests to pass. The chart still defaults to `latest`; older images do not implement these commands or enforce authentication. Pin both image digests from the same tested release before deployment. See [deployment promotion and recovery](deployment.md); source tags can be rebuilt.
 2. Back up PostgreSQL and ClickHouse before schema upgrades. Back up the encryption key separately. Test restoration with disposable data.
 3. Pre-create the new `ENCRYPTION_KEY` and `POSTGRES_PASSWORD` keys in the namespace-local `logice-secrets` Secret. Preserve its existing `CLICKHOUSE_PASSWORD` and `OTLP_TOKEN` values. Do not replace the Secret with an object that omits those keys.
 4. Keep Cloudflare Access and private routing enabled. During the initial transition, stop or isolate the old unauthenticated API before permitting traffic to the new release. Do not rely on a rolling update to remove that exposure.

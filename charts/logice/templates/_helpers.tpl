@@ -2,6 +2,19 @@
 {{- printf "%s-logice" .Release.Name | trunc 48 | trimSuffix "-" -}}
 {{- end -}}
 
+{{/* Digest overrides tag. The same helper serves the API, migration, and worker. */}}
+{{- define "logice.image" -}}
+{{- $repository := required (printf "%s.image.repository is required" .name) .image.repository -}}
+{{- if .image.digest -}}
+{{- if not (regexMatch "^sha256:[0-9a-f]{64}$" .image.digest) -}}
+{{- fail (printf "%s.image.digest must be a sha256 digest" .name) -}}
+{{- end -}}
+{{- printf "%s@%s" $repository .image.digest -}}
+{{- else -}}
+{{- printf "%s:%s" $repository (required (printf "%s.image.tag is required without a digest" .name) .image.tag) -}}
+{{- end -}}
+{{- end -}}
+
 {{- define "logice.apiEnv" -}}
 - name: CLICKHOUSE_ADDR
   value: {{ include "logice.name" . }}-clickhouse:9000

@@ -1,10 +1,11 @@
-# Use the latest images published from main.
-# Restart API/web deployments after publishing to pull updated images.
+# Defaults support local rendering. For GitOps, promote a tested API/web digest pair.
+# Changing a registry tag does not trigger an Argo CD rollout.
 # Private packages require a namespace-local imagePullSecret.
 api:
   authOrigin: https://logice.narumi.dev
   image:
     repository: ghcr.io/narumiruna/logice-api
+    digest: "" # sha256:<64 hex>; overrides tag when set
     tag: latest
     pullPolicy: Always
   resources:
@@ -25,6 +26,7 @@ web:
     nodePort: 30173
   image:
     repository: ghcr.io/narumiruna/logice-web
+    digest: "" # sha256:<64 hex>; overrides tag when set
     tag: latest
     pullPolicy: Always
   resources:

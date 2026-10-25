@@ -2,6 +2,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "logice.name" . }}-web
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
   labels:
     {{- include "logice.labels" . | nindent 4 }}
     app.kubernetes.io/component: web
@@ -28,7 +30,7 @@ spec:
       {{- end }}
       containers:
         - name: web
-          image: {{ printf "%s:%s" .Values.web.image.repository .Values.web.image.tag | quote }}
+          image: {{ include "logice.image" (dict "name" "web" "image" .Values.web.image) | quote }}
           imagePullPolicy: {{ .Values.web.image.pullPolicy }}
           volumeMounts:
             - name: config

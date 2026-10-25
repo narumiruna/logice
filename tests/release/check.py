@@ -335,7 +335,7 @@ class DockerWorkflowTests(unittest.TestCase):
         self.assertEqual(job["steps"][0]["with"]["ref"], "${{ inputs.revision || github.sha }}")
         self.assertEqual(self.image["env"]["CALLED"], '${{ contains(toJSON(inputs), \'"revision"\') }}')
         self.assertIn("inputs.version-tag", self.image["env"]["VERSION_TAG"])
-        build = job["steps"][-1]["with"]
+        build = next(step for step in job["steps"] if step.get("id") == "build")["with"]
         self.assertEqual(build["tags"], "${{ steps.image.outputs.tags }}")
         self.assertIn("steps.image.outputs.revision", build["labels"])
         self.assertEqual(build["platforms"], "linux/amd64,linux/arm64")
@@ -406,7 +406,7 @@ class RepositoryContractTests(unittest.TestCase):
             self.assertIn("github.ref == 'refs/heads/main'", job["if"])
             if name == "docker":
                 self.assertEqual(job["uses"], "./.github/workflows/docker.yml")
-                self.assertEqual(job["permissions"], {"contents": "read", "packages": "write"})
+                self.assertEqual(job["permissions"], {"contents": "read", "packages": "write", "actions": "read"})
                 self.assertEqual(job["with"], {
                     "revision": "${{ needs.publish.outputs.release-commit }}",
                     "version-tag": "${{ needs.publish.outputs.image-tag }}",

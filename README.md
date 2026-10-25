@@ -114,7 +114,7 @@ go run ./cmd/logice
 npm --prefix web run dev
 ```
 
-Go defaults to `127.0.0.1:8080`; Compose explicitly uses `-listen 0.0.0.0:8080` inside the API container. `GET /api/healthz` reports process liveness, not database or application readiness. Vite listens on `127.0.0.1:5173` and forwards `/api` and `/v1` to Go. Browse with `http://localhost:5173` to match `AUTH_ORIGIN`. A port conflict fails instead of selecting another port. Go does not yet serve frontend assets. Do not expose these development servers publicly.
+Go defaults to `127.0.0.1:8080`; Compose explicitly uses `-listen 0.0.0.0:8080` inside the API container. `GET /api/healthz` reports process liveness. `GET /api/readyz` checks PostgreSQL/schema and configured ClickHouse access without exposing data. Neither replaces authenticated application acceptance. See [GitOps deployment and recovery](docs/deployment.md). Vite listens on `127.0.0.1:5173` and forwards `/api` and `/v1` to Go. Browse with `http://localhost:5173` to match `AUTH_ORIGIN`. A port conflict fails instead of selecting another port. Go does not yet serve frontend assets. Do not expose these development servers publicly.
 
 ## Repository checks
 

@@ -3,6 +3,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "logice.name" . }}-alerts-worker
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
   labels:
     {{- include "logice.labels" . | nindent 4 }}
     app.kubernetes.io/component: alerts-worker
@@ -29,7 +31,7 @@ spec:
       {{- end }}
       containers:
         - name: alerts-worker
-          image: {{ printf "%s:%s" .Values.api.image.repository .Values.api.image.tag | quote }}
+          image: {{ include "logice.image" (dict "name" "api" "image" .Values.api.image) | quote }}
           imagePullPolicy: {{ .Values.api.image.pullPolicy }}
           args: ["alerts-worker"]
           securityContext:

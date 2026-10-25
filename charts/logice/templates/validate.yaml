@@ -3,7 +3,5 @@
 {{- if not (regexMatch `^https://[a-zA-Z0-9.-]+(:[0-9]+)?$|^http://localhost(:[0-9]+)?$` .Values.api.authOrigin) -}}
 {{- fail "api.authOrigin must be an exact HTTPS origin (HTTP localhost is allowed for development)" -}}
 {{- end -}}
-{{- $_ := required "api.image.repository is required" .Values.api.image.repository -}}
-{{- $_ := required "api.image.tag is required" .Values.api.image.tag -}}
-{{- $_ := required "web.image.repository is required" .Values.web.image.repository -}}
-{{- $_ := required "web.image.tag is required" .Values.web.image.tag -}}
+{{- $_ := include "logice.image" (dict "name" "api" "image" .Values.api.image) -}}
+{{- $_ := include "logice.image" (dict "name" "web" "image" .Values.web.image) -}}

@@ -1,0 +1,422 @@
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["PyYAML==6.0.3"]
+# ///
+"""Deployment guards with local files and a fake GitHub API. No remote writes."""
+
+import copy
+import importlib.util
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import tempfile
+import unittest
+from unittest.mock import patch
+
+import yaml
+
+sys.dont_write_bytecode = True
+ROOT = Path(__file__).resolve().parents[2]
+spec = importlib.util.spec_from_file_location("deployment", ROOT / "scripts/deployment.py")
+deploy = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(deploy)
+
+
+def fixture():
+    return {"schema": 1, "revision": "a" * 40, "version": "1.2.3",
+            "images": {name: f"ghcr.io/narumiruna/logice-{name}@sha256:" + char * 64
+                       for name, char in (("api", "b"), ("web", "c"))},
+            "run": {"id": 123, "attempt": 1}}
+
+
+class GitHubFixture:
+    def __init__(self):
+        self.value = fixture()
+        self.run = {"id": 123, "workflow_id": 7, "path": ".github/workflows/release.yml",
+                    "head_repository": {"full_name": deploy.REPOSITORY}, "head_branch": "main",
+                    "event": "push", "status": "completed", "conclusion": "success", "run_attempt": 1}
+        self.artifacts = [{"id": 5, "name": "logice-deployment-1", "expired": False}]
+        self.refs = []
+        self.pulls = []
+        self.writes = []
+        self.dispatches = []
+        self.base = "d" * 40
+        self.head = "e" * 40
+        self.files = {}
+        self.downloads = 0
+        self.dispatch_failure = False
+        self.unrelated = False
+
+    def api(self, path, data=None):
+        if data is not None:
+            self.writes.append((path, data))
+            if path == "git/trees":
+                self.files = {item["path"]: json.loads(item["content"]) for item in data["tree"]}
+                return {"sha": "f" * 40}
+            if path == "git/commits":
+                return {"sha": self.head}
+            if path == "git/refs":
+                self.refs.append({"ref": data["ref"], "object": {"sha": data["sha"]}})
+                return {}
+            if path == "pulls":
+                self.pulls.append({"state": "open", "html_url": "https://example.invalid/pull/1"})
+                return self.pulls[0]
+            raise AssertionError(path)
+        if path == "actions/runs/123":
+            return self.run
+        if path == "actions/workflows/release.yml":
+            return {"id": 7}
+        if path.startswith("git/matching-refs/heads/"):
+            return self.refs
+        if path == "git/ref/heads/main":
+            return {"object": {"sha": self.base}}
+        if path.startswith("git/ref/heads/narumi/chore/"):
+            return {"object": {"sha": self.head}}
+        if path.startswith("compare/"):
+            files = list(self.files) + (["unrelated.go"] if self.unrelated else [])
+            return {"total_commits": 1, "files": [{"filename": path} for path in files]}
+        if path == f"git/commits/{self.base}":
+            return {"tree": {"sha": "0" * 40}}
+        raise AssertionError(path)
+
+    def pages(self, path):
+        if path.startswith("actions/runs/"):
+            return self.artifacts
+        if path.startswith("pulls?"):
+            return self.pulls
+        raise AssertionError(path)
+
+    def download(self, run_id, name, directory):
+        self.downloads += 1
+        Path(directory, "candidate.json").write_text(json.dumps(self.value))
+
+    def file(self, ref, path):
+        return self.files[path]
+
+    def dispatch(self, branch, commit):
+        self.dispatches.append((branch, commit))
+        if self.dispatch_failure:
+            raise RuntimeError("fixture dispatch denied")
+
+
+class CandidateTests(unittest.TestCase):
+    def test_digest_pair_and_all_consumers(self):
+        value = deploy.candidate(fixture())
+        app = deploy.application(value)
+        source = app["spec"]["source"]
+        self.assertEqual(source["targetRevision"], value["revision"])
+        self.assertEqual(source["path"], "charts/logice")
+        for component, ref in value["images"].items():
+            image = source["helm"]["valuesObject"][component]["image"]
+            self.assertEqual(image["repository"] + "@" + image["digest"], ref)
+            self.assertEqual(image["tag"], "")
+
+    def test_partial_mismatched_and_extra_image_records_fail(self):
+        with tempfile.TemporaryDirectory() as directory:
+            for component in ("api", "web"):
+                Path(directory, f"{component}.json").write_text(json.dumps({
+                    "component": component, "revision": fixture()["revision"], "image": fixture()["images"][component]}))
+            self.assertEqual(deploy.pair(directory, fixture()["revision"]), fixture()["images"])
+            Path(directory, "extra.json").write_text("{}")
+            with self.assertRaises(ValueError):
+                deploy.pair(directory, fixture()["revision"])
+            Path(directory, "extra.json").unlink()
+            record = json.loads(Path(directory, "web.json").read_text())
+            record["revision"] = "f" * 40
+            Path(directory, "web.json").write_text(json.dumps(record))
+            with self.assertRaises(ValueError):
+                deploy.pair(directory, fixture()["revision"])
+            Path(directory, "web.json").unlink()
+            with self.assertRaises(ValueError):
+                deploy.pair(directory, fixture()["revision"])
+
+    def test_invalid_identity_and_bounded_json(self):
+        for field, values in {
+            "revision": ["main", "a" * 40 + "\n"],
+            "version": ["latest", "01.2.3", "1.2.3-beta", "1.2.3\n", "9" * 128 + ".0.0"],
+            "schema": [True, 2], "run": [{"id": True, "attempt": 1}, {"id": 123, "attempt": 0}],
+        }.items():
+            for invalid in values:
+                value = fixture()
+                value[field] = invalid
+                with self.assertRaises(ValueError):
+                    deploy.candidate(value)
+        for ref in ("ghcr.io/narumiruna/logice-api:latest", fixture()["images"]["web"],
+                    fixture()["images"]["api"] + "\nother", fixture()["images"]["api"].replace("b" * 64, "B" * 64)):
+            value = fixture()
+            value["images"]["api"] = ref
+            with self.assertRaises(ValueError):
+                deploy.candidate(value)
+        for data in ('{"revision":1,"revision":2}', " " * 65537):
+            with self.assertRaises(ValueError):
+                deploy.decode(data)
+
+    def test_same_pair_is_noop_but_rebuilt_or_older_release_is_rejected(self):
+        current = fixture()
+        repeated = copy.deepcopy(current)
+        repeated["run"]["attempt"] = 2
+        self.assertFalse(deploy.forward_only(current, repeated))
+        for version in ("1.2.2", "1.2.3", "0.9.0"):
+            repeated["version"] = version
+            repeated["images"]["api"] = repeated["images"]["api"].replace("b" * 64, "d" * 64)
+            with self.assertRaises(ValueError):
+                deploy.forward_only(current, repeated)
+        repeated["version"] = "1.2.4"
+        self.assertTrue(deploy.forward_only(current, repeated))
+
+
+class SourceTests(unittest.TestCase):
+    def test_exact_source_version_and_ancestry_use_real_git(self):
+        previous = Path.cwd()
+        with tempfile.TemporaryDirectory() as directory:
+            env = dict(os.environ, GIT_AUTHOR_NAME="Deployment fixture", GIT_AUTHOR_EMAIL="fixture@example.invalid",
+                       GIT_COMMITTER_NAME="Deployment fixture", GIT_COMMITTER_EMAIL="fixture@example.invalid",
+                       GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull)
+            def git(*args):
+                return subprocess.check_output(["git", *args], cwd=directory, env=env, stderr=subprocess.PIPE, text=True).strip()
+            git("init", "--initial-branch=main")
+            Path(directory, "VERSION").write_text("1.2.3\n")
+            git("add", "VERSION")
+            git("-c", "commit.gpgsign=false", "commit", "-m", "test: release source")
+            value = fixture()
+            value["revision"] = git("rev-parse", "HEAD")
+            os.chdir(directory)
+            try:
+                deploy.verify_source(value, "main")
+                value["version"] = "1.2.4"
+                with self.assertRaises(ValueError):
+                    deploy.verify_source(value, "main")
+                value["version"] = "1.2.3"
+                git("checkout", "--orphan", "other")
+                git("-c", "commit.gpgsign=false", "commit", "-m", "test: unrelated history")
+                with self.assertRaises(subprocess.CalledProcessError):
+                    deploy.verify_source(value, "other")
+            finally:
+                os.chdir(previous)
+
+
+class EvidenceTests(unittest.TestCase):
+    def test_successful_exact_run_and_missing_artifact(self):
+        github = GitHubFixture()
+        self.assertEqual(deploy.release_evidence(github, 123, 1), fixture())
+        github.artifacts = []
+        self.assertIsNone(deploy.release_evidence(github, 123, 1, allow_missing=True))
+        with self.assertRaises(ValueError):
+            deploy.release_evidence(github, 123, 1)
+
+    def test_wrong_failed_cancelled_or_untrusted_runs_cannot_promote(self):
+        changes = [("workflow_id", 99), ("path", ".github/workflows/docker.yml"),
+                   ("head_repository", {"full_name": "untrusted/logice"}), ("head_branch", "topic"),
+                   ("event", "pull_request"), ("status", "in_progress"), ("conclusion", "failure"),
+                   ("conclusion", "cancelled"), ("run_attempt", 2)]
+        for key, value in changes:
+            github = GitHubFixture()
+            github.run[key] = value
+            with self.assertRaises(ValueError):
+                deploy.release_evidence(github, 123, 1)
+            self.assertEqual(github.downloads, 0)
+            self.assertEqual(github.writes, [])
+
+    def test_expired_duplicate_and_replayed_artifacts_fail(self):
+        for kind in ("expired", "duplicate", "wrong_attempt", "wrong_run"):
+            github = GitHubFixture()
+            if kind == "expired":
+                github.artifacts[0]["expired"] = True
+            elif kind == "duplicate":
+                github.artifacts *= 2
+            elif kind == "wrong_attempt":
+                github.value["run"]["attempt"] = 2
+            else:
+                github.value["run"]["id"] = 456
+            with self.assertRaises(ValueError):
+                deploy.release_evidence(github, 123, 1)
+            self.assertEqual(github.writes, [])
+            if kind == "expired":
+                with self.assertRaises(ValueError):
+                    deploy.release_evidence(github, 123, 1, allow_missing=True)
+
+
+class PromotionTests(unittest.TestCase):
+    def test_atomic_two_file_draft_pr_and_explicit_ci(self):
+        github = GitHubFixture()
+        url = deploy.propose(github, fixture(), github.base, None)
+        self.assertEqual(url, "https://example.invalid/pull/1")
+        tree = next(data for path, data in github.writes if path == "git/trees")
+        self.assertEqual({item["path"] for item in tree["tree"]}, {deploy.RELEASE_PATH, deploy.APPLICATION_PATH})
+        pull = next(data for path, data in github.writes if path == "pulls")
+        self.assertTrue(pull["draft"])
+        self.assertEqual(pull["base"], "main")
+        self.assertEqual(github.dispatches, [("narumi/chore/deploy-v1-2-3", github.head)])
+        before = copy.deepcopy(github.writes)
+        self.assertEqual(deploy.propose(github, fixture(), github.base, None), url)
+        self.assertEqual(github.writes, before)
+
+    def test_stale_retry_and_changed_base_make_no_remote_writes(self):
+        github = GitHubFixture()
+        newer = fixture()
+        newer["version"] = "1.3.0"
+        with self.assertRaises(ValueError):
+            deploy.propose(github, fixture(), github.base, newer)
+        with self.assertRaises(ValueError):
+            deploy.propose(github, fixture(), "1" * 40, None)
+        self.assertEqual(github.writes, [])
+        self.assertEqual(github.dispatches, [])
+        self.assertIsNone(deploy.propose(github, fixture(), github.base, fixture()))
+
+    def test_changed_or_closed_branch_is_not_overwritten(self):
+        github = GitHubFixture()
+        deploy.propose(github, fixture(), github.base, None)
+        before = copy.deepcopy(github.writes)
+        github.unrelated = True
+        with self.assertRaises(ValueError):
+            deploy.propose(github, fixture(), github.base, None)
+        github.unrelated = False
+        github.files[deploy.RELEASE_PATH]["revision"] = "f" * 40
+        with self.assertRaises(ValueError):
+            deploy.propose(github, fixture(), github.base, None)
+        github.pulls[0]["state"] = "closed"
+        with self.assertRaises(ValueError):
+            deploy.propose(github, fixture(), github.base, None)
+        self.assertEqual(github.writes, before)
+
+    def test_dispatch_failure_is_reported_and_retry_reuses_the_pr(self):
+        github = GitHubFixture()
+        github.dispatch_failure = True
+        with self.assertRaisesRegex(RuntimeError, "dispatch denied"):
+            deploy.propose(github, fixture(), github.base, None)
+        self.assertEqual(len(github.pulls), 1)
+        before = copy.deepcopy(github.writes)
+        github.dispatch_failure = False
+        deploy.propose(github, fixture(), github.base, None)
+        self.assertEqual(github.writes, before)
+
+    def test_ci_dispatch_reuses_current_checks_and_retries_failed_checks(self):
+        for status, conclusion, sha, expected_calls in (
+            ("completed", "success", "e" * 40, 1),
+            ("in_progress", None, "e" * 40, 1),
+            ("completed", "failure", "e" * 40, 2),
+            ("completed", "success", "f" * 40, 2),
+        ):
+            runs = [{"workflow_runs": [{"head_sha": sha, "status": status, "conclusion": conclusion}]}]
+            with patch.object(deploy, "command", side_effect=[json.dumps(runs), ""]) as run:
+                deploy.GitHub().dispatch("narumi/chore/deploy-v1-2-3", "e" * 40)
+                self.assertEqual(run.call_count, expected_calls)
+                if expected_calls == 2:
+                    self.assertEqual(run.call_args.args[:4], ("gh", "workflow", "run", "ci.yml"))
+
+    def test_gitops_record_guard_checks_proof_and_rejects_deletion_or_edits(self):
+        old_cwd = Path.cwd()
+        with tempfile.TemporaryDirectory() as directory:
+            os.chdir(directory)
+            try:
+                Path(deploy.RELEASE_PATH).parent.mkdir(parents=True)
+                value = fixture()
+                Path(deploy.RELEASE_PATH).write_text(deploy.encoded(value))
+                Path(deploy.APPLICATION_PATH).write_text(deploy.encoded(deploy.application(value)))
+                with patch.object(deploy, "git_file", return_value=None), patch.object(deploy, "verify_source") as source:
+                    deploy.check("origin/main", GitHubFixture())
+                    source.assert_called_once()
+                    app = deploy.application(value)
+                    app["spec"]["source"]["targetRevision"] = "main"
+                    Path(deploy.APPLICATION_PATH).write_text(deploy.encoded(app))
+                    with self.assertRaises(ValueError):
+                        deploy.check("origin/main", GitHubFixture())
+                Path(deploy.RELEASE_PATH).unlink()
+                Path(deploy.APPLICATION_PATH).unlink()
+                with patch.object(deploy, "git_file", return_value=deploy.encoded(value)):
+                    with self.assertRaises(ValueError):
+                        deploy.check("origin/main", GitHubFixture())
+            finally:
+                os.chdir(old_cwd)
+
+
+class WorkflowTests(unittest.TestCase):
+    def workflow(self, name):
+        return yaml.load((ROOT / f".github/workflows/{name}.yml").read_text(), Loader=yaml.BaseLoader)
+
+    def test_candidate_waits_for_pair_and_full_ci(self):
+        jobs = self.workflow("docker")["jobs"]
+        self.assertEqual(jobs["pair"]["needs"], "publish")
+        self.assertEqual(jobs["validate-images"]["needs"], "pair")
+        self.assertEqual(jobs["validate-images"]["uses"], "./.github/workflows/ci.yml")
+        self.assertEqual(jobs["candidate"]["needs"], ["pair", "validate-images"])
+        self.assertNotIn("if", jobs["candidate"])
+        build = next(s for s in jobs["publish"]["steps"] if s.get("id") == "build")
+        record = next(s for s in jobs["publish"]["steps"] if s.get("name") == "Record the published index digest")
+        self.assertEqual(build["uses"], "docker/build-push-action@v7")
+        self.assertIn("steps.build.outputs.digest", record["env"]["IMAGE"])
+        self.assertNotIn(":latest", record["env"]["IMAGE"])
+        for component in ("api", "web"):
+            self.assertEqual(jobs["validate-images"]["with"][f"{component}-image"], '${{ needs.pair.outputs.' + component + ' }}')
+
+    def test_ci_uses_exact_source_and_published_images(self):
+        ci = self.workflow("ci")
+        for job in ci["jobs"].values():
+            checkout = job["steps"][0]
+            self.assertEqual(checkout["with"]["ref"], "${{ inputs.revision || github.sha }}")
+            self.assertEqual(checkout["with"]["persist-credentials"], "false")
+        steps = ci["jobs"]["compose-web-validation"]["steps"]
+        self.assertIn('scripts/validate-compose-web.sh "$API_IMAGE" "$WEB_IMAGE"', steps[-1]["run"])
+        self.assertIn("deployment-checks", ci["jobs"])
+        self.assertEqual(ci["on"]["merge_group"]["types"], ["checks_requested"])
+        self.assertEqual(ci["jobs"]["compose-web-validation"]["permissions"]["packages"], "read")
+
+    def test_promotion_has_no_cluster_access_and_uses_trusted_main(self):
+        workflow = self.workflow("promote")
+        self.assertEqual(workflow["on"]["workflow_run"]["workflows"], ["Release"])
+        self.assertEqual(workflow["concurrency"]["cancel-in-progress"], "false")
+        job = workflow["jobs"]["propose"]
+        self.assertIn("github.event.workflow_run.conclusion == 'success'", job["if"])
+        self.assertEqual(job["steps"][0]["with"]["ref"], "main")
+        self.assertEqual(job["permissions"], {"contents": "write", "pull-requests": "write", "actions": "write"})
+        text = (ROOT / ".github/workflows/promote.yml").read_text()
+        for forbidden in ("kubectl", "argocd app", "KUBECONFIG", "pull_request_target"):
+            self.assertNotIn(forbidden, text)
+        parent = yaml.safe_load((ROOT / "charts/argocd-gitops-parent.example.yaml").read_text())
+        self.assertEqual(parent["spec"]["source"]["directory"]["include"], "logice.json")
+
+    def test_pinned_container_failures_never_build_or_continue(self):
+        for failure in ("build", "pull", "up"):
+            with tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                binary = root / "docker"
+                binary.write_text('''#!/bin/sh
+printf '%s\\n' "$*" >> "$FIXTURE_CALLS"
+case "$*" in
+  *" config --quiet") exec "$FIXTURE_DOCKER" "$@" ;;
+  *" build "*) if [ "$FIXTURE_FAILURE" = build ]; then exit 41; fi ;;
+  *" pull "*) if [ "$FIXTURE_FAILURE" = pull ]; then exit 42; fi ;;
+  *" up "*) if [ "$FIXTURE_FAILURE" = up ]; then exit 43; fi ;;
+  "image inspect "*) printf '%s\\n' "$FIXTURE_REVISION" ;;
+esac
+exit 0
+''')
+                binary.chmod(0o755)
+                env = dict(os.environ, PATH=str(root) + os.pathsep + os.environ["PATH"],
+                           FIXTURE_CALLS=str(root / "calls"), FIXTURE_FAILURE=failure,
+                           FIXTURE_DOCKER=shutil.which("docker"),
+                           FIXTURE_REVISION=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip())
+                images = [] if failure == "build" else list(fixture()["images"].values())
+                result = subprocess.run(["sh", "scripts/validate-compose-web.sh", *images],
+                                        cwd=ROOT, env=env, text=True, capture_output=True, timeout=30)
+                self.assertEqual(result.returncode, {"build": 41, "pull": 42, "up": 43}[failure], result.stdout + result.stderr)
+                calls = (root / "calls").read_text()
+                self.assertIn(f" {failure} ", calls)
+                if failure == "build":
+                    self.assertIn(" build api web migrate", calls)
+                else:
+                    self.assertNotIn(" build ", calls)
+                self.assertIn(" down ", calls)
+                self.assertNotIn(" bootstrap ", calls)
+                if failure in ("build", "pull"):
+                    self.assertNotIn(" up ", calls)
+        for invalid in ([fixture()["images"]["api"]], [fixture()["images"]["api"] + "\nother", fixture()["images"]["web"]]):
+            result = subprocess.run(["sh", "scripts/validate-compose-web.sh", *invalid], cwd=ROOT, capture_output=True, timeout=10)
+            self.assertNotEqual(result.returncode, 0)
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

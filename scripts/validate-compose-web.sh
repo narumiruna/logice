@@ -2,6 +2,16 @@
 # Disposable container and browser checks. Requires Compose 2.24.4+ and web-local Playwright.
 set -eu
 root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
+# Optional positional arguments select the exact published pair. No tag or
+# partial override is accepted, and this mode never builds an image.
+api_image=${1:-}
+web_image=${2:-}
+if [ "$#" -ne 0 ]; then
+  test "$#" -eq 2
+  case "$api_image$web_image" in *[!a-z0-9./@:-]*) exit 64 ;; esac
+  printf '%s\n' "$api_image" | grep -Eq '^ghcr\.io/narumiruna/logice-api@sha256:[0-9a-f]{64}$'
+  printf '%s\n' "$web_image" | grep -Eq '^ghcr\.io/narumiruna/logice-web@sha256:[0-9a-f]{64}$'
+fi
 work=$(mktemp -d)
 project="logice-web-check-$(openssl rand -hex 8)"
 replacement="$project-api-replacement"
@@ -43,10 +53,28 @@ trap 'exit 143' TERM
 # known. Docker must still bind it; a concurrent claimant makes startup fail.
 port=$(uv run python -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1]); s.close()')
 export AUTH_ORIGIN="http://localhost:$port"
-printf 'services:\n  web:\n    ports: !override\n      - "127.0.0.1:%s:8080"\n' "$port" > "$work/ports.yaml"
+printf 'services:\n' > "$work/ports.yaml"
+if [ -n "$api_image" ]; then
+  # All API-image consumers, including migration, use the same digest.
+  for component in api migrate alerts-worker; do
+    printf '  %s:\n    build: !reset null\n    image: "%s"\n' "$component" "$api_image" >> "$work/ports.yaml"
+  done
+fi
+printf '  web:\n    ports: !override\n      - "127.0.0.1:%s:8080"\n' "$port" >> "$work/ports.yaml"
+if [ -n "$web_image" ]; then
+  printf '    build: !reset null\n    image: "%s"\n' "$web_image" >> "$work/ports.yaml"
+fi
 compose config --quiet
-compose build api web
-compose up --detach --wait --wait-timeout 90 api web clickhouse collector
+if [ -n "$api_image" ]; then
+  compose pull api web migrate
+  revision=$(git -C "$root" rev-parse HEAD)
+  for image in "$api_image" "$web_image"; do
+    test "$(timeout --kill-after=5s 20 docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$image")" = "$revision"
+  done
+else
+  compose build api web migrate
+fi
+compose up --no-build --detach --wait --wait-timeout 90 api web clickhouse collector
 address=$(compose port web 8080)
 case "$address" in
   127.0.0.1:*) ;;
@@ -66,6 +94,8 @@ curl --fail --silent --show-error --max-time 10 "$base$asset" > "$work/app.js"
 grep -q 'Logice' "$work/app.js"
 curl --fail --silent --show-error --max-time 10 "$base/api/healthz" > "$work/health.json"
 grep -qx '{"status":"ok"}' "$work/health.json"
+curl --fail --silent --show-error --max-time 5 "$base/api/readyz" > "$work/ready.json"
+grep -qx '{"status":"ready"}' "$work/ready.json"
 for path in /api /api/not-found; do
   code=$(curl --silent --show-error --max-time 10 -D "$work/headers" -o "$work/error.json" -w '%{http_code}' "$base$path")
   test "$code" = 401
@@ -91,6 +121,13 @@ export LOGICE_E2E_INVITATION
 export LOGICE_E2E_AUTH_FILE="$work/browser-auth.json"
 export LOGICE_E2E_OUTPUT_DIR="$work/browser-results"
 timeout --kill-after=5s 180 npm --prefix "$root/web" run test:e2e -- --max-failures=1
+# Storage loss removes readiness, not process liveness. This is a disposable DB.
+compose stop postgres
+code=$(curl --silent --show-error --max-time 5 -o /dev/null -w '%{http_code}' "$base/api/readyz")
+test "$code" = 503
+curl --fail --silent --show-error --max-time 5 "$base/api/healthz" > /dev/null
+compose up --no-build --detach --wait --wait-timeout 60 postgres
+curl --fail --silent --show-error --max-time 5 --retry 10 --retry-all-errors "$base/api/readyz" > /dev/null
 # Allocate the replacement while the old API still owns its address. This
 # guarantees a different dynamic IP without a fixed subnet or a static --ip.
 image=$(timeout --kill-after=5s 20 docker inspect --format '{{.Config.Image}}' "$api")

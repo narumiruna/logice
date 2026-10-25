@@ -16,6 +16,8 @@ The Git tag and source archive contain Go and React from the same validated rele
 
 Helm chart versions remain separate. Both API and web images are published to `ghcr.io/narumiruna/logice-api` and `ghcr.io/narumiruna/logice-web`.
 
+Release image builds now capture both index digests, run all CI on the selected commit and exact image pair, and produce a deployment candidate only after success. The separate Promote deployment workflow opens a draft GitOps PR and explicitly starts its CI. Source publication alone does not authorize deployment. See [deployment operations](deployment.md) for the actual watched path, one-time Argo CD adoption, branch rules, operator gates, and recovery.
+
 ### Docker image triggers
 
 - A push to `main` publishes the checked-out commit SHA and `latest` for both images.
@@ -65,7 +67,7 @@ Manual runs have two modes:
 1. `manage-pr` is the default. It checks the source and manages the release PR without publication.
 2. `retry-publication` checks the source and retries the latest validated batch without updating the release PR.
 
-The Release PR job needs `contents: write` and `pull-requests: write`. Tag/Release publication needs only `contents: write`. The separate Docker job needs `contents: read` and `packages: write`. Validation and CI use read permissions. Checkout credentials are not persisted. The Actions use their `github-token` input, which defaults to the workflow token; no npm or production credential is needed.
+The Release PR job needs `contents: write` and `pull-requests: write`. Tag/Release publication needs only `contents: write`. The separate Docker workflow needs `contents: read`, `packages: write`, and `actions: read` for its nested validation. Promotion needs repository and PR writes plus Actions dispatch permission; it has no cluster credentials. Validation and CI use read permissions. Checkout credentials are not persisted. The Actions use their `github-token` input, which defaults to the workflow token; no npm or production credential is needed.
 
 Enable **Actions → General → Allow GitHub Actions to create and approve pull requests** in repository settings. A PR created with `GITHUB_TOKEN` does not start another workflow automatically. Start CI on its exact branch before merge:
 

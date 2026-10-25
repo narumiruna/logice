@@ -21,11 +21,11 @@ spec:
         api:
           image:
             repository: registry.example.com/private/logice-api
-            tag: REPLACE_WITH_IMAGE_TAG
+            digest: sha256:REPLACE_WITH_TESTED_API_INDEX_DIGEST
         web:
           image:
             repository: registry.example.com/private/logice-web
-            tag: REPLACE_WITH_IMAGE_TAG
+            digest: sha256:REPLACE_WITH_TESTED_WEB_INDEX_DIGEST
         # Ingress is off. Add private routing only after access controls exist.
   destination:
     server: https://kubernetes.default.svc

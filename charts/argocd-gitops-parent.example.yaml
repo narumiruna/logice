@@ -1,0 +1,25 @@
+# One-time operator adoption only. Do not apply during source validation.
+# Require the private AppProject to allow this repo, destination, and child
+# Application management. Keep that permission limited to trusted operators.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: logice-deployments
+  namespace: argocd
+spec:
+  project: private
+  source:
+    repoURL: https://github.com/narumiruna/logice
+    targetRevision: main
+    path: deploy/gitops
+    directory:
+      include: logice.json
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    # Adopt the existing logice Application only after operator acceptance.
+    # No prune: deleting the parent must not cascade into the application.
+    automated:
+      prune: false
+      selfHeal: true
