@@ -2,6 +2,12 @@
 
 Release notes for the Go application and private React frontend. No application release has been published by this setup.
 
+## 0.2.0
+
+### Minor Changes
+
+- Add reviewed GitOps promotion for tested API/web image digests, ordered Helm rollout, and bounded API readiness. Keep production adoption, physical Passkey validation, and schema-safe recovery under operator approval.
+
 ## 0.1.1
 
 ### Patch Changes
