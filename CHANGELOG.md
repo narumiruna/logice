@@ -2,6 +2,12 @@
 
 Release notes for the Go application and private React frontend. No application release has been published by this setup.
 
+## 0.2.1
+
+### Patch Changes
+
+- Keep Live follow state synchronized before restoring keyboard focus. This keeps keyboard navigation in the rendered window after a large snapshot.
+
 ## 0.2.0
 
 ### Minor Changes
