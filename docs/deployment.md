@@ -28,6 +28,17 @@ Docker no longer updates `latest`. Existing installations that track `latest` do
 
 The workflow has repository permissions but no cluster credentials. It never syncs Argo CD or merges a PR. It explicitly dispatches `ci.yml` on the generated branch because `GITHUB_TOKEN` PR creation does not trigger PR CI.
 
+## Recover a mixed-version installation
+
+A successful login does not prove that the API supports projects. If the web image supports projects but the API image predates them, the project list fails and the creation form is hidden. Argo CD can still report Healthy because the older API passes its liveness probe.
+
+1. Compare the running API and web image digests and their `org.opencontainers.image.revision` labels. Both must come from the same tested release commit; matching `latest` tags are not evidence of matching source.
+2. Use read-only schema checks to confirm the required project tables. A successful migration initContainer only proves that its own image applied its embedded schema. Do not add tables manually or rerun the old migration image as a repair.
+3. If the fix is already on `main` but not in a release, add a change note and review the generated release PR. Require a successful Release run with a deployment candidate. A successful no-op run without that artifact does not qualify, and retrying an older saved batch does not include later fixes.
+4. Review the generated draft deployment PR, then complete the adoption and operator gates below. The API, migration container, and web must use the approved image pair. Merging a release PR alone does not update an existing `latest` installation.
+
+Keep the current deployment unchanged until those gates pass. Do not use a future tag, a failed image pair, or a restart of `latest` as a substitute for promotion.
+
 ## One-time adoption: operator gate
 
 **This source change does not modify the existing live Application.** An Application that still reads `charts/logice` at `HEAD` with `latest` will keep the old deployment behavior. Adoption is a separate, approved cluster change.
