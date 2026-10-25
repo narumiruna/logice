@@ -125,6 +125,11 @@ export const LiveTree = forwardRef<
     pendingFocus.current = id
     programmatic.current = true
     virtual.scrollToIndex(index, { align: "auto" })
+    // Commit the navigation anchor and follow state before resize/poll effects
+    // can restore the previous position. A frame is only needed to mount rows.
+    remember()
+    const pane = scroll.current
+    if (pane) onFollow(pane.scrollHeight - pane.scrollTop - pane.clientHeight < 28)
     elements.current.get(id)?.focus({ preventScroll: true })
     cancelAnimationFrame(focusFrame.current)
     focusFrame.current = requestAnimationFrame(() => {
@@ -132,8 +137,6 @@ export const LiveTree = forwardRef<
       if (element) restoreMountedFocus(id, element)
       programmatic.current = false
       remember()
-      const pane = scroll.current
-      if (pane) onFollow(pane.scrollHeight - pane.scrollTop - pane.clientHeight < 28)
     })
   }
   useImperativeHandle(ref, () => ({ focusRecord }))

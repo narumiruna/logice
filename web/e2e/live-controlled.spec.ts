@@ -258,6 +258,9 @@ test("Live renders only bounded virtual rows at the maximum valid snapshot and k
     expect(await mounted.count()).toBeLessThanOrEqual(120)
     await tree.focus()
     await page.keyboard.press("Home")
+    // Navigation must stop following before a resize or poll can move us back.
+    // Keep animation frames frozen until this state change is committed.
+    await expect(page.getByLabel("Follow latest", { exact: true })).not.toBeChecked()
     await page.clock.runFor(50)
     await expectClockFocus(page, tree.locator('[data-event-id][aria-rowindex="2"]'))
     await expect(tree.locator('[data-event-id][aria-rowindex="2"]')).toBeFocused()
