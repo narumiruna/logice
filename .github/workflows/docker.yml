@@ -1,12 +1,6 @@
 name: Docker
 
 on:
-  push:
-    branches:
-      - main
-    tags:
-      - 'v*'
-  workflow_dispatch:
   workflow_call:
     inputs:
       revision:
@@ -36,31 +30,28 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.revision || github.sha }}
+          ref: ${{ inputs.revision }}
           persist-credentials: false
       - name: Set image tags
         id: image
         env:
           REPOSITORY: ${{ github.repository }}
           COMPONENT: ${{ matrix.component }}
-          REF: ${{ github.ref }}
-          # Reusable workflows keep the caller event name. Inspect the call input instead.
-          CALLED: ${{ contains(toJSON(inputs), '"revision"') }}
           EXPECTED_REVISION: ${{ inputs.revision }}
-          VERSION_TAG: ${{ inputs.version-tag || (github.ref_type == 'tag' && github.ref_name) || '' }}
+          VERSION_TAG: ${{ inputs.version-tag }}
         run: |
           set -euo pipefail
           revision=$(git rev-parse HEAD)
-          if [[ "$CALLED" == true ]]; then
-            [[ "$EXPECTED_REVISION" =~ ^[0-9a-f]{40}$ && "$revision" == "$EXPECTED_REVISION" && -n "$VERSION_TAG" ]] || {
-              echo 'A reusable build requires an exact commit and a version tag.' >&2
-              exit 1
-            }
-          fi
-          if [[ -n "$VERSION_TAG" && ( ${#VERSION_TAG} -gt 128 || ! "$VERSION_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ) ]]; then
+          [[ "$EXPECTED_REVISION" =~ ^[0-9a-f]{40}$ && "$revision" == "$EXPECTED_REVISION" ]] || {
+            echo 'A release build requires the exact validated commit.' >&2
+            exit 1
+          }
+          if [[ ${#VERSION_TAG} -gt 128 || ! "$VERSION_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
             echo 'Use a stable v<major>.<minor>.<patch> tag of at most 128 characters.' >&2
             exit 1
           fi
+          IFS= read -r version < VERSION
+          test "$VERSION_TAG" = "v$version"
           repository=$(printf '%s' "$REPOSITORY" | tr '[:upper:]' '[:lower:]')
           name="ghcr.io/${repository}-${COMPONENT}"
           {
@@ -68,8 +59,7 @@ jobs:
             echo "revision=$revision"
             echo 'tags<<IMAGE_TAGS'
             echo "$name:$revision"
-            if [[ -n "$VERSION_TAG" ]]; then echo "$name:$VERSION_TAG"; fi
-            if [[ "$CALLED" != true && "$REF" == refs/heads/main ]]; then echo "$name:latest"; fi
+            echo "$name:$VERSION_TAG"
             echo 'IMAGE_TAGS'
           } >> "$GITHUB_OUTPUT"
       - uses: docker/setup-qemu-action@v4
@@ -95,72 +85,64 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.component }}
           cache-to: type=gha,mode=max,scope=${{ matrix.component }}
       - name: Record the published index digest
-        if: inputs.revision != ''
         env:
           COMPONENT: ${{ matrix.component }}
           REVISION: ${{ steps.image.outputs.revision }}
           IMAGE: ${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}
         run: jq -n --arg component "$COMPONENT" --arg revision "$REVISION" --arg image "$IMAGE" '{component:$component,revision:$revision,image:$image}' > "$COMPONENT.json"
       - uses: actions/upload-artifact@v7
-        if: inputs.revision != ''
         with:
           name: logice-image-${{ github.run_attempt }}-${{ matrix.component }}
           path: ${{ matrix.component }}.json
           if-no-files-found: error
           retention-days: 30
 
-  pair:
-    if: inputs.revision != ''
+  validate-images:
     needs: publish
     runs-on: ubuntu-latest
-    timeout-minutes: 5
-    outputs:
-      api: ${{ steps.pair.outputs.api }}
-      web: ${{ steps.pair.outputs.web }}
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: read
     steps:
       - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.revision }}
           persist-credentials: false
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26.11.1
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: HUSKY=0 npm --prefix web ci
+      - run: npm --prefix web exec -- playwright install --with-deps chromium
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/download-artifact@v8
         with:
           pattern: logice-image-${{ github.run_attempt }}-*
           path: image-records
           merge-multiple: true
-      - id: pair
+      - name: Read the complete image pair
+        id: pair
         env:
           REVISION: ${{ inputs.revision }}
         run: uv run scripts/deployment.py pair image-records "$REVISION"
-
-  validate-images:
-    needs: pair
-    permissions:
-      contents: read
-      actions: read
-      packages: read
-    uses: ./.github/workflows/ci.yml
-    with:
-      revision: ${{ inputs.revision }}
-      api-image: ${{ needs.pair.outputs.api }}
-      web-image: ${{ needs.pair.outputs.web }}
-
-  candidate:
-    needs: [pair, validate-images]
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: ${{ inputs.revision }}
-          persist-credentials: false
-      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
-      - name: Record the fully validated deployment candidate
+      - name: Validate the published image pair
+        env:
+          API_IMAGE: ${{ steps.pair.outputs.api }}
+          WEB_IMAGE: ${{ steps.pair.outputs.web }}
+        run: timeout --kill-after=60s 600 sh scripts/validate-compose-web.sh "$API_IMAGE" "$WEB_IMAGE"
+      - name: Record the tested deployment candidate
         env:
           REVISION: ${{ inputs.revision }}
           VERSION: ${{ inputs.version-tag }}
-          API_IMAGE: ${{ needs.pair.outputs.api }}
-          WEB_IMAGE: ${{ needs.pair.outputs.web }}
+          API_IMAGE: ${{ steps.pair.outputs.api }}
+          WEB_IMAGE: ${{ steps.pair.outputs.web }}
         run: uv run scripts/deployment.py candidate --revision "$REVISION" --version "$VERSION" --api-image "$API_IMAGE" --web-image "$WEB_IMAGE" --output candidate.json
       - uses: actions/upload-artifact@v7
         with:

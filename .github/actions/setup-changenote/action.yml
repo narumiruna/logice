@@ -7,9 +7,6 @@ outputs:
 runs:
   using: composite
   steps:
-    - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable action
-      with:
-        toolchain: 1.92.0
     - name: Fetch pinned source
       id: source
       shell: bash
@@ -22,11 +19,23 @@ runs:
         test "$(git -C "$source_dir" rev-parse HEAD)" = 66afe581b2f7b19f96188a1f217518c41aaaf77d
         echo "path=$source_dir" >> "$GITHUB_OUTPUT"
         echo "CHANGENOTE_ACTION_PATH=$source_dir" >> "$GITHUB_ENV"
+    - uses: actions/cache@v5
+      id: cli-cache
+      with:
+        path: ${{ runner.temp }}/changenote/bin
+        key: changenote-${{ runner.os }}-${{ runner.arch }}-rust-1.92.0-66afe581b2f7b19f96188a1f217518c41aaaf77d
+    - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable action
+      if: steps.cli-cache.outputs.cache-hit != 'true'
+      with:
+        toolchain: 1.92.0
     - name: Install pinned CLI
+      if: steps.cli-cache.outputs.cache-hit != 'true'
       shell: bash
       env:
         CHANGENOTE_SOURCE: ${{ steps.source.outputs.path }}
+      run: cargo install --path "$CHANGENOTE_SOURCE" --locked --root "$RUNNER_TEMP/changenote"
+    - name: Verify pinned CLI
+      shell: bash
       run: |
-        cargo install --path "$CHANGENOTE_SOURCE" --locked --root "$RUNNER_TEMP/changenote"
         test "$("$RUNNER_TEMP/changenote/bin/changenote" --version)" = 'changenote 0.7.0'
         echo "$RUNNER_TEMP/changenote/bin" >> "$GITHUB_PATH"

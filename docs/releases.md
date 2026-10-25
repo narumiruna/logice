@@ -1,6 +1,6 @@
 # Releases
 
-Logice uses [narumiruna/changenote](https://github.com/narumiruna/changenote) for language-independent versioning, change notes, and GitHub source releases. The CLI and Actions use the same reviewed revision: `66afe581b2f7b19f96188a1f217518c41aaaf77d` (`v0.7.0`). CI builds that CLI with Rust 1.92.0. No Changesets npm dependency or root npm package is required.
+Logice uses [narumiruna/changenote](https://github.com/narumiruna/changenote) for language-independent versioning, change notes, and GitHub source releases. The CLI and Actions use the same reviewed revision: `66afe581b2f7b19f96188a1f217518c41aaaf77d` (`v0.7.0`). CI caches that CLI by source revision, Rust 1.92.0, runner OS, and architecture. A cache miss builds it; every use checks the CLI version. No Changesets npm dependency or root npm package is required.
 
 ## One application version
 
@@ -16,18 +16,15 @@ The Git tag and source archive contain Go and React from the same validated rele
 
 Helm chart versions remain separate. Both API and web images are published to `ghcr.io/narumiruna/logice-api` and `ghcr.io/narumiruna/logice-web`.
 
-Release image builds now capture both index digests, run all CI on the selected commit and exact image pair, and produce a deployment candidate only after success. The separate Promote deployment workflow opens a draft GitOps PR and explicitly starts its CI. Source publication alone does not authorize deployment. See [deployment operations](deployment.md) for the actual watched path, one-time Argo CD adoption, branch rules, operator gates, and recovery.
+Release validates the selected source commit, builds both images, tests their recorded index digests, and produces a deployment candidate only after success. The separate Promote deployment workflow opens a draft GitOps PR and explicitly starts its CI. Source publication alone does not authorize deployment. See [deployment operations](deployment.md) for the actual watched path, one-time Argo CD adoption, branch rules, operator gates, and recovery.
 
-### Docker image triggers
+### One Docker publication path
 
-- A push to `main` publishes the checked-out commit SHA and `latest` for both images.
-- A pushed stable Git tag, such as `v1.2.3`, publishes that exact version tag and its target commit SHA. Annotated tags use the commit, not the tag object ID. Tag builds do not change `latest`.
-- Manual Docker runs retain the same behavior for the selected branch or tag. Non-main branch runs publish only the commit SHA.
-- The reusable Docker workflow requires an exact 40-character commit SHA and a stable version tag. It checks out that SHA and never updates `latest`, even when the caller runs on `main`.
+Only Release calls `docker.yml`. Docker has no main-push, tag-push, or manual trigger. It requires an exact validated 40-character commit SHA and a stable `v<major>.<minor>.<patch>` tag that matches that source's `VERSION`. Invalid inputs fail before registry login or a build.
 
-Only stable `v<major>.<minor>.<patch>` release tags are supported. Invalid version tags and mismatched reusable-call revisions fail before registry login or a build. Both images retain `linux/amd64` and `linux/arm64` builds. Pin deployments to the tested release version, commit SHA, or image digest; use a digest when exact image content must remain fixed across rebuilds.
+Both images retain `linux/amd64` and `linux/arm64` builds and receive only commit-SHA and version tags. `latest` is no longer updated. Existing deployments that track `latest` must adopt a reviewed pinned release separately. Deployments use the tested digest pair because tags can point to rebuilt content.
 
-Git tags pushed with `GITHUB_TOKEN` do not start another push workflow. The Release workflow therefore calls the same Docker workflow after a successful new tag or GitHub Release publication. It passes the validated publisher commit, not the triggering branch tip. A no-op publication does not rebuild old version images on every `main` push. Explicit `retry-publication` runs also retry Docker images when the Git tag and GitHub Release already exist.
+Release passes the validated publisher commit, not the triggering branch tip. An already published batch skips release-source validation and image builds on ordinary `main` pushes. A partial publication is selected for recovery. Explicit `retry-publication` runs validate the selected source and retry images even when the Git tag and GitHub Release already exist.
 
 To recover a failed image build or backfill the latest saved release, an authorized operator can run:
 
@@ -35,7 +32,7 @@ To recover a failed image build or backfill the latest saved release, an authori
 gh workflow run release.yml --ref main -f operation=retry-publication
 ```
 
-This selects and validates the latest saved release batch before rebuilding its images. It is not permission to move a Git tag or select an arbitrary source revision. Existing releases need this retry path if their tag predates the Docker tag trigger.
+This selects and validates the latest saved release batch before rebuilding its images. It is not permission to move a Git tag or select an arbitrary source revision. Use this same entry point for image recovery; do not dispatch Docker or push a tag to start an alternate build.
 
 ## Add a note
 
@@ -52,22 +49,23 @@ Use `--minor logice` for a feature or `--major logice` for a breaking change. Co
 
 ## Release workflow
 
-`.github/workflows/release.yml` runs only on `main`. One concurrency group serializes release work and does not cancel an active run. Validation and publication jobs have a 15-minute deadline; Docker image jobs have a 30-minute deadline.
+`.github/workflows/release.yml` runs only on `main`. One concurrency group serializes release work and does not cancel an active run. Source-check jobs retain their CI deadlines. Selection, source publication, and image validation have a 15-minute deadline; Docker build jobs have a 30-minute deadline.
 
-1. A read-only job checks the triggering commit. The pinned preview Action then selects the latest verifiable release batch without remote writes. If a batch exists, the job checks out that exact commit and runs Go, frontend, and release checks on it. Only a successful job passes that immutable commit to publication.
-2. On a `main` push, the Release PR job uses tooling from the checked triggering commit. The pinned Action refreshes pending notes from `main` and opens or updates `narumi/chore/changenote-release-main`. Reserve that branch for automation. PR generation is not publication approval. Removing all pending notes closes its managed PR.
-3. Review the generated version files, lockfile, changelog, consumed notes, and saved batch. Complete CI on the exact PR head and all applicable operator release gates before merge.
-4. Publication checks out only the selected, checked release commit. It invokes the pinned upstream `publish.sh` with that expected commit because the composite publication Action has no expected-commit input. The script fetches `main`, reconstructs the latest batch, and compares its commit with the expected value before any tag or Release write. A new batch stops publication and requires a new validation run. Unrelated commits or pending notes do not change the selected target. No batch means no publication job.
-5. Existing matching tags and Releases remain unchanged. A partial failure can be retried without moving a tag or replacing release notes.
+1. A read-only job uses the pinned preview Action to inspect the latest verifiable release batch without remote writes. It selects the exact release commit only when publication is needed or `retry-publication` was requested. A no-op batch needs no additional source checks or image builds.
+2. The selected commit runs reusable source CI once within Release: Go, frontend, vulnerability, native integration, Helm, deployment, and release checks. The local-image browser job is skipped here because Docker later tests the published digest pair. Independent PR/main CI still runs its full application checks, including local-image browser tests. No cross-run check-result cache is used.
+3. On a `main` push, the Release PR job uses tooling from the triggering commit. The pinned Action refreshes pending notes from `main` and opens or updates `narumi/chore/changenote-release-main`. Reserve that branch for automation. PR generation is not publication approval. Removing all pending notes closes its managed PR.
+4. Review the generated version files, lockfile, changelog, consumed notes, and saved batch. Complete CI on the exact PR head and all applicable operator release gates before merge.
+5. Publication requires successful source CI and checks out only the selected, checked release commit. It invokes the pinned upstream `publish.sh` with that expected commit because the composite publication Action has no expected-commit input. The script fetches `main`, reconstructs the latest batch, and compares its commit with the expected value before any tag or Release write. A new batch stops publication and requires a new validation run. Unrelated commits or pending notes do not change the selected target. No batch means no publication job.
+6. Existing matching tags and Releases remain unchanged. A partial failure can be retried without moving a tag or replacing release notes. Docker builds both images, reads both digest records, runs the container/browser checks against that pair, and only then records the candidate. It does not call source CI again.
 
-Publication also runs on ordinary `main` pushes to recover the latest validated batch. It can recover an earlier batch if Release PR management fails, but it cannot run after validation fails or the workflow is cancelled. It does not publish an unmerged release PR. Full-tree validation rejects manually edited release batches or release commits with unrelated source changes.
+Publication also runs on ordinary `main` pushes when the preview finds incomplete publication work for the latest batch. It can recover an earlier batch if Release PR management fails, but it cannot run after validation fails or the workflow is cancelled. It does not publish an unmerged release PR. Full-tree validation rejects manually edited release batches or release commits with unrelated source changes.
 
 Manual runs have two modes:
 
-1. `manage-pr` is the default. It checks the source and manages the release PR without publication.
-2. `retry-publication` checks the source and retries the latest validated batch without updating the release PR.
+1. `manage-pr` is the default. It checks release metadata and manages the release PR without publication. Application checks remain in CI.
+2. `retry-publication` validates the exact selected source and retries the latest batch without updating the release PR.
 
-The Release PR job needs `contents: write` and `pull-requests: write`. Tag/Release publication needs only `contents: write`. The separate Docker workflow needs `contents: read`, `packages: write`, and `actions: read` for its nested validation. Promotion needs repository and PR writes plus Actions dispatch permission; it has no cluster credentials. Validation and CI use read permissions. Checkout credentials are not persisted. The Actions use their `github-token` input, which defaults to the workflow token; no npm or production credential is needed.
+The Release PR job needs `contents: write` and `pull-requests: write`. Tag/Release publication needs only `contents: write`. Reusable source CI needs `contents: read` and `actions: read` for deployment evidence checks. Docker build jobs need `contents: read` and `packages: write`; image validation needs only repository and package read permissions. Promotion needs repository and PR writes plus Actions dispatch permission; it has no cluster credentials. Validation and CI use read permissions. Checkout credentials are not persisted. The Actions use their `github-token` input, which defaults to the workflow token; no npm or production credential is needed.
 
 Enable **Actions → General → Allow GitHub Actions to create and approve pull requests** in repository settings. A PR created with `GITHUB_TOKEN` does not start another workflow automatically. Start CI on its exact branch before merge:
 
@@ -76,6 +74,10 @@ gh workflow run ci.yml --ref narumi/chore/changenote-release-main
 ```
 
 Check the resulting run against the version PR head. Do not bypass required checks or assume version generation grants release approval. Physical-authenticator validation, database/key backups, and production deployment checks remain operator tasks.
+
+## Tooling checks
+
+`ci.yml` retains Go/frontend, vulnerability, native integration, browser, Helm, deployment, and release checks. `tooling.yml` runs hook-failure and frontend-layout fixture checks only for PRs that change workflow, hook, dependency, or related tool configuration paths. It also supports manual runs. Do not make a path-filtered workflow a required main check: an unrelated PR does not create that check. Keep required application checks and code-owner approval configured as described in [deployment operations](deployment.md).
 
 ## Validation
 
