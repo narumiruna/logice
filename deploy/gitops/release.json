@@ -1,0 +1,13 @@
+{
+  "images": {
+    "api": "ghcr.io/narumiruna/logice-api@sha256:e8c93fd75f5b105623f25c1128d32d2e0926777388a105089adaeb155b8c2001",
+    "web": "ghcr.io/narumiruna/logice-web@sha256:29928b37c6a154a50e289fc085199270c3d2a8ce620b82ea732d585484540c1d"
+  },
+  "revision": "e022ad6b2a5fdaf3e03c913b18b5e33af6b5439c",
+  "run": {
+    "attempt": 1,
+    "id": 40200759390
+  },
+  "schema": 1,
+  "version": "0.2.1"
+}
