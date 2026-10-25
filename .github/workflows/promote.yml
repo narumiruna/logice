@@ -1,0 +1,55 @@
+name: Promote deployment
+
+on:
+  workflow_run:
+    workflows: [Release]
+    branches: [main]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      release-run:
+        description: Successful Release run with an unexpired deployment candidate
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: logice-deployment-promotion
+  cancel-in-progress: false
+
+jobs:
+  propose:
+    if: >-
+      github.repository == 'narumiruna/logice' &&
+      ((github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
+       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    steps:
+      # Use trusted current main tooling, never scripts from an artifact or PR.
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      - name: Propose only a complete, current release candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_RUN: ${{ inputs.release-run || github.event.workflow_run.id }}
+          RELEASE_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          git -c credential.helper= -c 'credential.helper=!gh auth git-credential' fetch origin main
+          test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
+          if [ "$EVENT" = workflow_run ]; then
+            uv run scripts/deployment.py promote "$RELEASE_RUN" --attempt "$RELEASE_ATTEMPT" --allow-missing
+          else
+            uv run scripts/deployment.py promote "$RELEASE_RUN"
+          fi

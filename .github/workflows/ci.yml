@@ -2,6 +2,22 @@ name: CI
 
 on:
   workflow_dispatch:
+  merge_group:
+    types: [checks_requested]
+  workflow_call:
+    inputs:
+      revision:
+        description: Exact release commit to validate
+        type: string
+        required: true
+      api-image:
+        description: API image reference pinned by digest
+        type: string
+        required: true
+      web-image:
+        description: Web image reference pinned by digest
+        type: string
+        required: true
   push:
     branches:
       - main
@@ -18,6 +34,9 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.revision || github.sha }}
+          persist-credentials: false
       - uses: actions/setup-go@v7
         with:
           go-version: 1.26.10
@@ -32,6 +51,9 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.revision || github.sha }}
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: 26.11.1
@@ -47,6 +69,9 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.revision || github.sha }}
+          persist-credentials: false
       - uses: actions/setup-go@v7
         with:
           go-version: 1.26.10
@@ -63,6 +88,9 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.revision || github.sha }}
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: 26.11.1
@@ -73,9 +101,15 @@ jobs:
 
   compose-web-validation:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: read
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.revision || github.sha }}
+          persist-credentials: false
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
       - uses: actions/setup-node@v7
         with:
@@ -84,14 +118,31 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - run: HUSKY=0 npm --prefix web ci
       - run: npm --prefix web exec -- playwright install --with-deps chromium
+      - uses: docker/login-action@v4
+        if: inputs.api-image != ''
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Validate containerized telemetry workflow
-        run: timeout --kill-after=60s 420 sh scripts/validate-compose-web.sh
+        env:
+          API_IMAGE: ${{ inputs.api-image }}
+          WEB_IMAGE: ${{ inputs.web-image }}
+        run: |
+          if [ -n "$API_IMAGE$WEB_IMAGE" ]; then
+            timeout --kill-after=60s 600 sh scripts/validate-compose-web.sh "$API_IMAGE" "$WEB_IMAGE"
+          else
+            timeout --kill-after=60s 600 sh scripts/validate-compose-web.sh
+          fi
 
   helm-checks:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.revision || github.sha }}
+          persist-credentials: false
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
       - run: uv run charts/logice/tests/check.py
@@ -101,6 +152,9 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.revision || github.sha }}
+          persist-credentials: false
       - uses: actions/setup-go@v7
         with:
           go-version: 1.26.10
@@ -108,12 +162,34 @@ jobs:
       - name: Validate ingestion and database migrations
         run: go test -race -tags=integration -count=1 -timeout=8m -v ./tests/integration/... ./internal/auth/...
 
+  deployment-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.revision || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      - run: uv run tests/deployment/check.py
+      - name: Validate changed GitOps records against release evidence and current main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git -c credential.helper= -c 'credential.helper=!gh auth git-credential' fetch origin main
+          uv run scripts/deployment.py check --base origin/main
+
   release-checks:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ inputs.revision || github.sha }}
           fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@v7

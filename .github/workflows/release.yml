@@ -161,6 +161,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      actions: read
     uses: ./.github/workflows/docker.yml
     with:
       revision: ${{ needs.publish.outputs.release-commit }}

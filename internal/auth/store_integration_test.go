@@ -158,6 +158,24 @@ func TestStoreIntegration(t *testing.T) {
 			t.Fatal("missing browser binding after retry", err)
 		}
 	})
+	t.Run("future schema rejects rollback without modifying data", func(t *testing.T) {
+		for _, table := range []string{"auth_schema_versions", "workspace_schema_versions"} {
+			execSQL("INSERT INTO " + table + "(version) VALUES(99)")
+			if Ready(ctx, pool) == nil {
+				t.Fatal("future schema accepted")
+			}
+			if err := Migrate(ctx, pool); err != nil {
+				t.Fatal(err)
+			}
+			if Ready(ctx, pool) == nil {
+				t.Fatal("migration retry erased the rollback guard")
+			}
+			execSQL("DELETE FROM " + table + " WHERE version=99")
+			if err := Ready(ctx, pool); err != nil {
+				t.Fatal(err)
+			}
+		}
+	})
 	t.Run("concurrent bootstrap", func(t *testing.T) {
 		reset()
 		var successes atomic.Int32

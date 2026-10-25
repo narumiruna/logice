@@ -21,13 +21,14 @@ See [authentication](../../docs/authentication.md) and the [Passkey operator run
 
 The [Docker workflow](../../.github/workflows/docker.yml) publishes `linux/amd64` and `linux/arm64` API/web images on pushes to `main` and manual runs. It uses `GITHUB_TOKEN` and tags images with the full commit SHA; runs on `main` also publish `latest`.
 
-Wait for both authentication image publish jobs to succeed. For repeatable rollout and rollback, set both image tags to that same full SHA:
+Wait for both image builds and full validation to succeed. For fixed image content, promote the tested digests from one release commit. A commit or version tag can change on rebuild. See [deployment operations](../../docs/deployment.md).
 
 | Value | Default | Requirement |
 | --- | --- | --- |
 | `api.image.repository` | `ghcr.io/narumiruna/logice-api` | Cluster must have pull access |
 | `web.image.repository` | `ghcr.io/narumiruna/logice-web` | Cluster must have pull access |
-| `api.image.tag`, `web.image.tag` | `latest` | Override with the same tested authentication commit SHA |
+| `api.image.tag`, `web.image.tag` | `latest` | Legacy tag-only rendering; not an immutable deployment record |
+| `api.image.digest`, `web.image.digest` | Empty | Set both tested `sha256:<64 hex>` digests; each overrides its tag |
 | `existingSecret` | `logice-secrets` | All four keys above must already exist |
 | `api.authOrigin` | `https://logice.narumi.dev` | Exact external HTTPS origin; no trailing slash or path |
 
@@ -70,9 +71,11 @@ Each API Pod runs `logice migrate` before starting the server. A failed migratio
 
 ## Argo CD
 
-Copy [the Application example](../argocd-application.example.yaml) into a private GitOps repository and select a restricted AppProject. Repository and registry credentials are separate. The example uses manual sync and a pinned Git commit. Create the namespace and Secret before an approved sync; `CreateNamespace=true` does not create credentials.
+Use [reviewed release promotion](../../docs/deployment.md) for a pinned chart and tested image pair. It requires one-time operator adoption of [the GitOps parent](../argocd-gitops-parent.example.yaml). The parent reads only `deploy/gitops/logice.json`; changing the example alone does not change the live Application.
 
-Rendering without overrides works, but is not a deployment readiness check. The `latest` API/web tags publish separately and can temporarily refer to different revisions. `pullPolicy: Always` checks the registry only at container startup. Argo CD does not detect changes behind the same tag. Prefer immutable matching tags; restart only after operator approval and confirmed compatible images/Secrets.
+For an independently managed manual installation, copy [the Application example](../argocd-application.example.yaml) into a private GitOps repository and select a restricted AppProject. Repository and registry credentials are separate. The example uses manual sync and a pinned Git commit. Create the namespace and Secret before an approved sync; `CreateNamespace=true` does not create credentials.
+
+Rendering without overrides works, but is not a deployment readiness check. The `latest` API/web tags publish separately and can temporarily refer to different revisions. `pullPolicy: Always` checks the registry only at container startup. Argo CD does not detect changes behind the same tag. Use digests from one tested release; restart only after operator approval and confirmed compatible images/Secrets. Digest-based API deployments use `/api/readyz`; tag-only legacy deployments keep their previous liveness-only readiness probe to avoid probing an endpoint absent in old images. Only digest mode satisfies promotion acceptance.
 
 ## Access and ingestion
 
@@ -82,7 +85,9 @@ The web Service is `logice-tunnel`, with NodePort `30173` by default. This name 
 
 API, PostgreSQL, ClickHouse, and Collector Services are ClusterIP. No public database, LoadBalancer, or Collector Ingress is created. The Collector NetworkPolicy permits HTTP ingestion only from this release\'s API pods. It requires a CNI that enforces NetworkPolicy; verify enforcement before release. Other service access requires separate network controls. In-cluster database traffic is plaintext; use trusted cluster networking or separately managed TLS where required.
 
-Nginx forwards `/api` and `/v1/` to the API Service; the Go API must enforce sessions on real query routes. Static assets and process health probes need not require a session. Configuration changes trigger web rollouts. Health probes do not prove authenticated queries or credential validity.
+Nginx forwards `/api` and `/v1/` to the API Service; the Go API must enforce sessions on real query routes. Static assets and generic status probes need not require a session. Configuration changes trigger web rollouts. `/api/healthz` remains liveness. `/api/readyz` checks PostgreSQL/schema and configured ClickHouse access with a two-second deadline and one active request. Neither proves authenticated queries or credential validity.
+
+Argo CD applies infrastructure in wave 0, API in wave 1, and web/optional worker in wave 2. API migration and readiness must complete before wave 2. Recreate causes an API outage; this is not an atomic rollout. Keep old-browser/new-API compatibility. See the deployment runbook for failure handling and schema-safe recovery.
 
 Create a project token in **Project settings**. Send OTLP HTTP protobuf to the application origin at `/v1/traces` or `/v1/logs` with `Authorization: Bearer <PROJECT_TOKEN>`. In-cluster applications use the web or API Service HTTP endpoint, not Collector. The infrastructure `OTLP_TOKEN` is internal-only. No public project-token gRPC endpoint is provided. Browser sessions and ingestion tokens are independent.
 

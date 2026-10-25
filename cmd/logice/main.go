@@ -90,6 +90,7 @@ func run(address string) error {
 	defer func() { cleanupCancel(); <-cleanupDone }()
 
 	var reader telemetry.Reader
+	var storageReady func(context.Context) error
 	if storageAddress := os.Getenv("CLICKHOUSE_ADDR"); storageAddress != "" {
 		store, err := telemetry.Open(storageAddress, os.Getenv("CLICKHOUSE_PASSWORD"))
 		if err != nil {
@@ -97,6 +98,7 @@ func run(address string) error {
 		}
 		defer store.Close()
 		reader = store
+		storageReady = store.Ready
 	}
 
 	listener, err := net.Listen("tcp", address)
@@ -104,6 +106,14 @@ func run(address string) error {
 		return err
 	}
 	server := httpapi.NewServer(reader)
-	server.Handler = accounts.Wrap(server.Handler)
+	server.Handler = httpapi.WithReadiness(accounts.Wrap(server.Handler), func(ctx context.Context) error {
+		if err := auth.Ready(ctx, pool); err != nil {
+			return err
+		}
+		if storageReady != nil {
+			return storageReady(ctx)
+		}
+		return nil
+	})
 	return httpapi.Run(ctx, server, listener)
 }

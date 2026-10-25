@@ -48,6 +48,12 @@ func NewStore(db *sql.DB) *Store { return &Store{db: db} }
 
 func (s *Store) Close() error { return s.db.Close() }
 
+// Ready checks access without reading tenant data. The caller owns the deadline.
+func (s *Store) Ready(ctx context.Context) error {
+	var one uint8
+	return s.db.QueryRowContext(ctx, "SELECT 1").Scan(&one)
+}
+
 // queryContext also applies settings to databases supplied through NewStore.
 func queryContext(ctx context.Context) (context.Context, context.CancelFunc) {
 	ctx, cancel := context.WithTimeout(ctx, queryTimeout)

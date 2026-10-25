@@ -2,6 +2,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "logice.name" . }}-api
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
   labels:
     {{- include "logice.labels" . | nindent 4 }}
     app.kubernetes.io/component: api
@@ -28,7 +30,7 @@ spec:
       {{- end }}
       initContainers:
         - name: migrate
-          image: {{ printf "%s:%s" .Values.api.image.repository .Values.api.image.tag | quote }}
+          image: {{ include "logice.image" (dict "name" "api" "image" .Values.api.image) | quote }}
           imagePullPolicy: {{ .Values.api.image.pullPolicy }}
           args: ["migrate"]
           securityContext:
@@ -45,7 +47,7 @@ spec:
             {{- toYaml .Values.api.resources | nindent 12 }}
       containers:
         - name: api
-          image: {{ printf "%s:%s" .Values.api.image.repository .Values.api.image.tag | quote }}
+          image: {{ include "logice.image" (dict "name" "api" "image" .Values.api.image) | quote }}
           imagePullPolicy: {{ .Values.api.image.pullPolicy }}
           args: ["-listen", "0.0.0.0:8080"]
           securityContext:
@@ -69,9 +71,13 @@ spec:
             failureThreshold: 60
           readinessProbe:
             httpGet:
-              path: /api/healthz
+              # Keep tag-only legacy installs compatible until digest promotion.
+              path: {{ ternary "/api/readyz" "/api/healthz" (not (empty .Values.api.image.digest)) }}
               port: http
             periodSeconds: 5
+            {{- if .Values.api.image.digest }}
+            timeoutSeconds: 3
+            {{- end }}
           livenessProbe:
             httpGet:
               path: /api/healthz

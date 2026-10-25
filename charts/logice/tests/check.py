@@ -92,6 +92,14 @@ def check_resources(documents, prefix, secret="test-secret", origin="https://log
     api_pod = deployments["api"]["spec"]["template"]["spec"]
     api = api_pod["containers"][0]
     migration = api_pod["initContainers"][0]
+    assert deployments["api"]["metadata"]["annotations"]["argocd.argoproj.io/sync-wave"] == "1"
+    assert deployments["web"]["metadata"]["annotations"]["argocd.argoproj.io/sync-wave"] == "2"
+    for name in ("postgres", "clickhouse", "collector"):
+        assert deployments[name]["metadata"].get("annotations", {}).get("argocd.argoproj.io/sync-wave", "0") == "0"
+    assert api["readinessProbe"]["httpGet"]["path"] == "/api/healthz"
+    assert "timeoutSeconds" not in api["readinessProbe"]
+    for probe in ("startupProbe", "livenessProbe"):
+        assert api[probe]["httpGet"]["path"] == "/api/healthz"
     assert migration["name"] == "migrate"
     assert migration["args"] == ["migrate"]
     assert migration["image"] == api["image"]
@@ -242,8 +250,27 @@ def main():
     web_service = next(item for item in documents if item["kind"] == "Service" and item["metadata"]["name"] == "logice-tunnel")
     assert web_service["spec"]["type"] == "ClusterIP"
     assert "nodePort" not in web_service["spec"]["ports"][0]
+    digests = {name: "sha256:" + char * 64 for name, char in (("api", "a"), ("web", "b"))}
+    pins = {**VALUES, **{f"{name}.image.digest": digest for name, digest in digests.items()}}
+    _, pinned = render({**pins, "api.image.tag": "", "web.image.tag": "", "alertsWorker.enabled": "true"})
+    for item in pinned:
+        if item["kind"] == "Deployment":
+            component = item["metadata"]["labels"]["app.kubernetes.io/component"]
+            if component in ("api", "web", "alerts-worker"):
+                image_component = "web" if component == "web" else "api"
+                pod = item["spec"]["template"]["spec"]
+                if component == "api":
+                    assert pod["containers"][0]["readinessProbe"]["httpGet"]["path"] == "/api/readyz"
+                    assert pod["containers"][0]["readinessProbe"]["timeoutSeconds"] == 3
+                for container in [*pod["containers"], *pod.get("initContainers", [])]:
+                    assert container["image"] == f"registry.example.com/{image_component}@{digests[image_component]}"
+    for invalid in ("latest", "sha256:short", "sha256:" + "A" * 64, "sha256:" + "a" * 64 + "\\nother"):
+        for component in ("api", "web"):
+            failure = helm("template", "test", str(CHART), values={**VALUES, f"{component}.image.digest": invalid}, succeeds=False)
+            assert f"{component}.image.digest" in failure
     _, enabled = render({**VALUES, "alertsWorker.enabled": "true"})
     worker = next(item for item in enabled if item["kind"] == "Deployment" and item["metadata"]["name"] == "test-logice-alerts-worker")
+    assert worker["metadata"]["annotations"]["argocd.argoproj.io/sync-wave"] == "2"
     pod = worker["spec"]["template"]["spec"]
     assert pod["automountServiceAccountToken"] is False
     container = pod["containers"][0]
