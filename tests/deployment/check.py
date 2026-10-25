@@ -5,6 +5,7 @@
 """Deployment guards with local files and a fake GitHub API. No remote writes."""
 
 import copy
+from fnmatch import fnmatchcase
 import importlib.util
 import json
 import os
@@ -337,32 +338,78 @@ class WorkflowTests(unittest.TestCase):
     def workflow(self, name):
         return yaml.load((ROOT / f".github/workflows/{name}.yml").read_text(), Loader=yaml.BaseLoader)
 
-    def test_candidate_waits_for_pair_and_full_ci(self):
+    def test_candidate_is_recorded_only_after_both_builds_and_image_validation(self):
         jobs = self.workflow("docker")["jobs"]
-        self.assertEqual(jobs["pair"]["needs"], "publish")
-        self.assertEqual(jobs["validate-images"]["needs"], "pair")
-        self.assertEqual(jobs["validate-images"]["uses"], "./.github/workflows/ci.yml")
-        self.assertEqual(jobs["candidate"]["needs"], ["pair", "validate-images"])
-        self.assertNotIn("if", jobs["candidate"])
-        build = next(s for s in jobs["publish"]["steps"] if s.get("id") == "build")
-        record = next(s for s in jobs["publish"]["steps"] if s.get("name") == "Record the published index digest")
+        build_job = next(job for job in jobs.values() if "strategy" in job)
+        image_job = next(job for job in jobs.values()
+                         if any("scripts/deployment.py candidate" in step.get("run", "") for step in job.get("steps", [])))
+        self.assertEqual(image_job["needs"], "publish")
+        self.assertNotIn("if", image_job)
+        self.assertEqual(image_job["permissions"], {"contents": "read", "packages": "read"})
+        build = next(step for step in build_job["steps"] if step.get("id") == "build")
+        record = next(step for step in build_job["steps"] if "steps.build.outputs.digest" in step.get("env", {}).get("IMAGE", ""))
         self.assertEqual(build["uses"], "docker/build-push-action@v7")
-        self.assertIn("steps.build.outputs.digest", record["env"]["IMAGE"])
+        self.assertNotIn("if", record)
         self.assertNotIn(":latest", record["env"]["IMAGE"])
-        for component in ("api", "web"):
-            self.assertEqual(jobs["validate-images"]["with"][f"{component}-image"], '${{ needs.pair.outputs.' + component + ' }}')
+        steps = image_job["steps"]
+        pair = next(index for index, step in enumerate(steps) if step.get("id") == "pair")
+        validate = next(index for index, step in enumerate(steps) if "scripts/validate-compose-web.sh" in step.get("run", ""))
+        candidate = next(index for index, step in enumerate(steps) if "scripts/deployment.py candidate" in step.get("run", ""))
+        upload = next(index for index, step in enumerate(steps)
+                      if step.get("with", {}).get("path") == "candidate.json")
+        self.assertLess(pair, validate)
+        self.assertLess(validate, candidate)
+        self.assertLess(candidate, upload)
+        for step in steps:
+            self.assertNotIn("continue-on-error", step)
+            self.assertNotIn("if", step)
+        for index in (validate, candidate):
+            for component in ("api", "web"):
+                self.assertEqual(steps[index]["env"][f"{component.upper()}_IMAGE"],
+                                 "${{ steps.pair.outputs." + component + " }}")
+        self.assertIn('scripts/validate-compose-web.sh "$API_IMAGE" "$WEB_IMAGE"', steps[validate]["run"])
 
-    def test_ci_uses_exact_source_and_published_images(self):
+    def test_source_ci_and_published_image_checks_have_separate_responsibilities(self):
         ci = self.workflow("ci")
+        self.assertEqual(set(ci["on"]["workflow_call"]["inputs"]), {"revision"})
         for job in ci["jobs"].values():
             checkout = job["steps"][0]
             self.assertEqual(checkout["with"]["ref"], "${{ inputs.revision || github.sha }}")
             self.assertEqual(checkout["with"]["persist-credentials"], "false")
-        steps = ci["jobs"]["compose-web-validation"]["steps"]
-        self.assertIn('scripts/validate-compose-web.sh "$API_IMAGE" "$WEB_IMAGE"', steps[-1]["run"])
-        self.assertIn("deployment-checks", ci["jobs"])
+        browser = ci["jobs"]["compose-web-validation"]
+        self.assertEqual(browser["if"], "inputs.revision == ''")
+        self.assertIn("sh scripts/validate-compose-web.sh", browser["steps"][-1]["run"])
+        for name in ("go-checks", "web-checks", "stack-validation", "helm-checks", "deployment-checks", "release-checks"):
+            self.assertIn(name, ci["jobs"])
+            self.assertNotIn("if", ci["jobs"][name])
         self.assertEqual(ci["on"]["merge_group"]["types"], ["checks_requested"])
-        self.assertEqual(ci["jobs"]["compose-web-validation"]["permissions"]["packages"], "read")
+        self.assertEqual(ci["on"]["push"]["branches"], ["main"])
+        self.assertEqual(ci["on"]["pull_request"]["branches"], ["main"])
+        image_job = self.workflow("docker")["jobs"]["validate-images"]
+        self.assertEqual(image_job["steps"][0]["with"]["ref"], "${{ inputs.revision }}")
+        self.assertEqual(image_job["steps"][0]["with"]["persist-credentials"], "false")
+
+    def test_tooling_fixtures_are_path_scoped_and_manually_available(self):
+        ci = self.workflow("ci")
+        tooling = self.workflow("tooling")
+        self.assertIn("workflow_dispatch", tooling["on"])
+        self.assertEqual(tooling["on"]["pull_request"]["branches"], ["main"])
+        paths = tooling["on"]["pull_request"]["paths"]
+        for path in (".github/workflows/ci.yml", ".github/actions/setup-changenote/action.yml",
+                     ".husky/pre-commit", "scripts/check-go.sh", "scripts/pre-commit.sh",
+                     "scripts/validate-checks.sh", "scripts/validate-web-layout.sh",
+                     "tests/fixtures/web-layout/web/package.json", "web/package.json",
+                     "web/biome.json", "web/tsconfig.json", "web/vite.config.ts", "go.mod", "go.sum",
+                     ".changenote/config.json"):
+            self.assertTrue(any(fnmatchcase(path, pattern) for pattern in paths), path)
+        for path in ("web/src/live/tree.tsx", "internal/httpapi/live.go", "README.md"):
+            self.assertFalse(any(fnmatchcase(path, pattern) for pattern in paths), path)
+        for name in ("check-failure-validation", "web-layout-validation"):
+            self.assertNotIn(name, ci["jobs"])
+            self.assertIn(name, tooling["jobs"])
+        commands = "\n".join(step.get("run", "") for job in tooling["jobs"].values() for step in job["steps"])
+        for command in ("sh scripts/validate-checks.sh", "sh scripts/validate-web-layout.sh"):
+            self.assertIn(command, commands)
 
     def test_promotion_has_no_cluster_access_and_uses_trusted_main(self):
         workflow = self.workflow("promote")

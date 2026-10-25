@@ -281,10 +281,10 @@ class DockerWorkflowTests(unittest.TestCase):
     def git(self, *args):
         return subprocess.check_output(["git", *args], cwd=self.root, env=self.env, text=True, stderr=subprocess.PIPE, timeout=15)
 
-    def metadata(self, ref, tag="", called=False, expected="", component="api", succeeds=True):
+    def metadata(self, tag="v1.2.3", expected=None, component="api", succeeds=True):
         with tempfile.NamedTemporaryFile(dir=self.directory.name) as output:
-            env = dict(self.env, REPOSITORY="NarumiRuna/Logice", COMPONENT=component, REF=ref,
-                       VERSION_TAG=tag, CALLED=str(called).lower(), EXPECTED_REVISION=expected,
+            env = dict(self.env, REPOSITORY="NarumiRuna/Logice", COMPONENT=component,
+                       VERSION_TAG=tag, EXPECTED_REVISION=self.revision if expected is None else expected,
                        GITHUB_OUTPUT=output.name, GITHUB_SHA="not-the-checked-out-commit")
             result = subprocess.run(["bash", "-c", self.image["run"]], cwd=self.root, env=env,
                                     capture_output=True, text=True, timeout=15)
@@ -297,34 +297,27 @@ class DockerWorkflowTests(unittest.TestCase):
         self.assertIn(f"revision={self.revision}\n", text)
         return text.split("tags<<IMAGE_TAGS\n", 1)[1].split("\nIMAGE_TAGS", 1)[0].splitlines()
 
-    def test_main_latest_and_manual_branch_behavior(self):
+    def test_release_images_have_only_commit_and_version_tags(self):
         for component in ("api", "web"):
             name = f"ghcr.io/narumiruna/logice-{component}"
-            self.assertEqual(self.metadata("refs/heads/main", component=component),
-                             [f"{name}:{self.revision}", f"{name}:latest"])
-            self.assertEqual(self.metadata("refs/heads/topic", component=component), [f"{name}:{self.revision}"])
-
-    def test_annotated_release_tag_uses_commit_not_tag_object(self):
+            self.assertEqual(self.metadata(component=component),
+                             [f"{name}:{self.revision}", f"{name}:v1.2.3"])
         self.git("-c", "tag.gpgSign=false", "tag", "-a", "v1.2.3", "-m", "Fixture tag")
         self.assertNotEqual(self.git("rev-parse", "v1.2.3").strip(), self.revision)
         self.git("checkout", "--detach", "v1.2.3")
-        self.assertEqual(self.metadata("refs/tags/v1.2.3", "v1.2.3"),
-                         [f"ghcr.io/narumiruna/logice-api:{self.revision}", "ghcr.io/narumiruna/logice-api:v1.2.3"])
+        self.assertEqual(self.metadata(), [
+            f"ghcr.io/narumiruna/logice-api:{self.revision}", "ghcr.io/narumiruna/logice-api:v1.2.3",
+        ])
 
-    def test_reusable_release_never_updates_latest(self):
-        self.assertEqual(self.metadata("refs/heads/main", "v1.2.3", called=True, expected=self.revision),
-                         [f"ghcr.io/narumiruna/logice-api:{self.revision}", "ghcr.io/narumiruna/logice-api:v1.2.3"])
+    def test_invalid_tags_unpinned_commits_and_wrong_source_versions_fail_before_outputs(self):
+        for tag in ("", "latest", "v01.2.3", "v1.2", "v1.2.3-beta.1", "v1.2.3/other", "v1.2.3\nlatest", "v1.2.3; echo unsafe", "v" + "9" * 130 + ".0.0", "v2.0.0"):
+            self.metadata(tag=tag, succeeds=False)
+        for expected in ("", "main", "v1.2.3", "f" * 40):
+            self.metadata(expected=expected, succeeds=False)
 
-    def test_invalid_tags_and_unpinned_calls_fail_before_outputs(self):
-        for tag in ("latest", "v01.2.3", "v1.2", "v1.2.3-beta.1", "v1.2.3/other", "v1.2.3\nlatest", "v1.2.3; echo unsafe", "v" + "9" * 130 + ".0.0"):
-            self.metadata("refs/tags/invalid", tag, succeeds=False)
-        for expected, tag in (("", "v1.2.3"), ("main", "v1.2.3"), ("f" * 40, "v1.2.3"), (self.revision, "")):
-            self.metadata("refs/heads/main", tag, called=True, expected=expected, succeeds=False)
-
-    def test_docker_triggers_inputs_permissions_and_build_metadata(self):
+    def test_docker_has_one_publication_entry_and_preserves_build_identity(self):
         events = self.workflow["on"]
-        self.assertEqual(events["push"], {"branches": ["main"], "tags": ["v*"]})
-        self.assertIn("workflow_dispatch", events)
+        self.assertEqual(set(events), {"workflow_call"})
         self.assertEqual(set(events["workflow_call"]["inputs"]), {"revision", "version-tag"})
         for spec in events["workflow_call"]["inputs"].values():
             self.assertEqual(spec["type"], "string")
@@ -332,13 +325,33 @@ class DockerWorkflowTests(unittest.TestCase):
         job = self.workflow["jobs"]["publish"]
         self.assertEqual(job["permissions"], {"contents": "read", "packages": "write"})
         self.assertEqual(job["strategy"]["matrix"]["component"], ["api", "web"])
-        self.assertEqual(job["steps"][0]["with"]["ref"], "${{ inputs.revision || github.sha }}")
-        self.assertEqual(self.image["env"]["CALLED"], '${{ contains(toJSON(inputs), \'"revision"\') }}')
-        self.assertIn("inputs.version-tag", self.image["env"]["VERSION_TAG"])
+        self.assertEqual(job["steps"][0]["with"]["ref"], "${{ inputs.revision }}")
         build = next(step for step in job["steps"] if step.get("id") == "build")["with"]
         self.assertEqual(build["tags"], "${{ steps.image.outputs.tags }}")
         self.assertIn("steps.image.outputs.revision", build["labels"])
         self.assertEqual(build["platforms"], "linux/amd64,linux/arm64")
+
+    def test_noop_publication_is_skipped_but_partial_work_and_retries_are_selected(self):
+        workflow = yaml.load((ROOT / ".github/workflows/release.yml").read_text(), Loader=yaml.BaseLoader)
+        selection = next(step for step in workflow["jobs"]["select"]["steps"] if step.get("id") == "selection")
+        for operation, actions, ready, selected in (
+            ("", ["none"], "true", False),
+            ("", ["create-tag-and-release"], "true", True),
+            ("", ["create-release"], "true", True),
+            ("", ["none", "create-release"], "true", True),
+            ("retry-publication", ["none"], "true", True),
+            ("retry-publication", ["create-release"], "false", False),
+        ):
+            with self.subTest(operation=operation, actions=actions, ready=ready):
+                with tempfile.NamedTemporaryFile(dir=self.directory.name) as output:
+                    env = dict(self.env, RELEASE_COMMIT=self.revision, PREVIEW_READY=ready,
+                               PUBLICATION_PLAN=json.dumps([{"action": action} for action in actions]),
+                               OPERATION=operation, GITHUB_OUTPUT=output.name)
+                    result = subprocess.run(["bash", "-e", "-c", selection["run"]], cwd=self.root, env=env,
+                                            capture_output=True, text=True, timeout=15)
+                    self.assertEqual(result.returncode == 0, ready == "true", result.stderr)
+                    self.assertEqual(Path(output.name).read_text(),
+                                     f"release-commit={self.revision}\n" if selected else "")
 
     def test_release_tag_metadata_is_bound_to_the_published_commit(self):
         workflow = yaml.load((ROOT / ".github/workflows/release.yml").read_text(), Loader=yaml.BaseLoader)
@@ -374,63 +387,106 @@ class RepositoryContractTests(unittest.TestCase):
         for path in ("package.json", "package-lock.json", "web/.changeset", "web/scripts/release.mjs"):
             self.assertFalse((ROOT / path).exists(), path)
 
-    def test_workflow_pins_permissions_modes_and_cache_preparation(self):
+    def test_exact_source_checks_gate_publication_without_a_docker_ci_cycle(self):
         workflow = yaml.load((ROOT / ".github/workflows/release.yml").read_text(), Loader=yaml.BaseLoader)
+        jobs = workflow["jobs"]
         self.assertEqual(workflow["permissions"], {"contents": "read"})
         self.assertEqual(workflow["on"]["push"]["branches"], ["main"])
         self.assertEqual(workflow["on"]["workflow_dispatch"]["inputs"]["operation"]["default"], "manage-pr")
         self.assertEqual(workflow["concurrency"]["cancel-in-progress"], "false")
-        jobs = workflow["jobs"]
+        selected = "${{ needs.select.outputs.release-commit }}"
+        self.assertEqual(jobs["validate"]["uses"], "./.github/workflows/ci.yml")
+        self.assertEqual(jobs["validate"]["needs"], "select")
+        self.assertEqual(jobs["validate"]["with"], {"revision": selected})
+        self.assertEqual(jobs["validate"]["permissions"], {"contents": "read", "actions": "read"})
         self.assertEqual(jobs["publish"]["permissions"], {"contents": "write"})
-        self.assertEqual(jobs["release"]["permissions"], {"contents": "write", "pull-requests": "write"})
-        self.assertIn("retry-publication", jobs["publish"]["if"])
+        self.assertIn("validate", jobs["publish"]["needs"])
         self.assertIn("needs.validate.result == 'success'", jobs["publish"]["if"])
+        self.assertIn("needs.select.outputs.release-commit != ''", jobs["publish"]["if"])
         self.assertIn("!cancelled()", jobs["publish"]["if"])
-        self.assertEqual(jobs["validate"]["steps"][0]["with"]["ref"], "${{ github.sha }}")
-        self.assertEqual(jobs["release"]["steps"][0]["with"]["ref"], "${{ github.sha }}")
-        selected = "${{ needs.validate.outputs.publication-commit }}"
         self.assertEqual(jobs["publish"]["steps"][0]["with"]["ref"], selected)
-        self.assertIn("needs.validate.outputs.publication-commit != ''", jobs["publish"]["if"])
-        preview = next(step for step in jobs["validate"]["steps"] if step.get("id") == "preview")
-        self.assertEqual(preview["uses"], f"narumiruna/changenote/preview@{PIN}")
-        self.assertEqual(jobs["validate"]["outputs"]["publication-commit"], "${{ steps.preview.outputs.release-commit }}")
-        validate_source = next(step for step in jobs["validate"]["steps"] if step.get("working-directory") == "publication-source")
-        self.assertEqual(validate_source["env"]["EXPECTED_RELEASE_COMMIT"], "${{ steps.preview.outputs.release-commit }}")
-        for command in ('git rev-parse HEAD', 'sh scripts/check-go.sh', 'npm --prefix web run ci', 'uv run tests/release/check.py'):
-            self.assertIn(command, validate_source["run"])
         publish = next(step for step in jobs["publish"]["steps"] if step.get("id") == "publish")
         self.assertEqual(publish["env"]["EXPECTED_RELEASE_COMMIT"], selected)
         self.assertEqual(publish["run"], 'bash "$CHANGENOTE_SOURCE/scripts/action/publish.sh" "$EXPECTED_RELEASE_COMMIT"')
+        self.assertEqual(jobs["release"]["permissions"], {"contents": "write", "pull-requests": "write"})
         self.assertEqual(jobs["release"]["steps"][-1]["uses"], f"narumiruna/changenote@{PIN}")
+        preview = next(step for step in jobs["select"]["steps"] if step.get("id") == "preview")
+        self.assertEqual(preview["uses"], f"narumiruna/changenote/preview@{PIN}")
         for name, job in jobs.items():
             self.assertIn("github.ref == 'refs/heads/main'", job["if"])
-            if name == "docker":
-                self.assertEqual(job["uses"], "./.github/workflows/docker.yml")
-                self.assertEqual(job["permissions"], {"contents": "read", "packages": "write", "actions": "read"})
-                self.assertEqual(job["with"], {
-                    "revision": "${{ needs.publish.outputs.release-commit }}",
-                    "version-tag": "${{ needs.publish.outputs.image-tag }}",
-                })
-                self.assertIn("needs.publish.result == 'success'", job["if"])
-                self.assertIn("needs.publish.outputs.published == 'true'", job["if"])
-                self.assertIn("inputs.operation == 'retry-publication'", job["if"])
-                self.assertIn("needs.publish.outputs.release-commit != ''", job["if"])
+            if "uses" in job:
                 continue
             self.assertLessEqual(int(job["timeout-minutes"]), 15)
-            checkout = job["steps"][0]
-            self.assertEqual(checkout["with"]["persist-credentials"], "false")
-            if name in ("release", "publish"):
-                self.assertTrue(any("npm --prefix web ci --ignore-scripts" in step.get("run", "") for step in job["steps"]))
-        setup = (ROOT / ".github/actions/setup-changenote/action.yml").read_text()
-        self.assertIn('git -C "$source_dir" checkout --detach FETCH_HEAD', setup)
-        self.assertIn(f'test "$(git -C "$source_dir" rev-parse HEAD)" = {PIN}', setup)
-        self.assertIn('cargo install --path "$CHANGENOTE_SOURCE" --locked', setup)
-        self.assertIn("changenote 0.7.0", setup)
+            self.assertEqual(job["steps"][0]["with"]["persist-credentials"], "false")
+            self.assertTrue(any("npm --prefix web ci --ignore-scripts" in step.get("run", "") for step in job["steps"]))
+        docker = jobs["docker"]
+        self.assertEqual(docker["needs"], "publish")
+        self.assertEqual(docker["uses"], "./.github/workflows/docker.yml")
+        self.assertEqual(docker["permissions"], {"contents": "read", "packages": "write"})
+        self.assertEqual(docker["with"], {
+            "revision": "${{ needs.publish.outputs.release-commit }}",
+            "version-tag": "${{ needs.publish.outputs.image-tag }}",
+        })
+        for condition in ("needs.publish.result == 'success'", "needs.publish.outputs.published == 'true'",
+                          "inputs.operation == 'retry-publication'", "needs.publish.outputs.release-commit != ''"):
+            self.assertIn(condition, docker["if"])
+        # Main/PR CI stays independent. Only the selected release runs reusable
+        # source CI; Docker must not call it again.
+        docker_workflow = yaml.load((ROOT / ".github/workflows/docker.yml").read_text(), Loader=yaml.BaseLoader)
+        self.assertFalse(any(job.get("uses") == "./.github/workflows/ci.yml"
+                             for job in docker_workflow["jobs"].values()))
+        for job in (jobs["select"], jobs["release"], jobs["publish"]):
+            commands = "\n".join(step.get("run", "") for step in job["steps"])
+            self.assertNotIn("scripts/check-go.sh", commands)
+            self.assertNotIn("npm --prefix web run ci", commands)
         config = json.loads((ROOT / ".changenote/config.json").read_text())
         self.assertIn(PIN, config["$schema"])
         self.assertEqual(config["packages"]["logice"], {
             "path": ".", "version_file": "VERSION", "version_outputs": ["web/package.json"], "tag_prefix": "v",
         })
+
+    def test_pinned_cli_cache_skips_compilation_but_never_skips_verification(self):
+        action = yaml.load((ROOT / ".github/actions/setup-changenote/action.yml").read_text(), Loader=yaml.BaseLoader)
+        steps = action["runs"]["steps"]
+        cache = next(step for step in steps if step.get("id") == "cli-cache")
+        self.assertIn(PIN, cache["with"]["key"])
+        for key in ("${{ runner.os }}", "${{ runner.arch }}", "rust-1.92.0"):
+            self.assertIn(key, cache["with"]["key"])
+        self.assertNotIn("restore-keys", cache["with"])
+        install = next(step for step in steps if "cargo install" in step.get("run", ""))
+        compiler = next(step for step in steps if step.get("uses", "").startswith("dtolnay/rust-toolchain@"))
+        self.assertEqual(compiler["with"]["toolchain"], "1.92.0")
+        for step in (install, compiler):
+            self.assertEqual(step["if"], "steps.cli-cache.outputs.cache-hit != 'true'")
+        verify = next(step for step in steps if "--version" in step.get("run", ""))
+        self.assertNotIn("if", verify)
+        source = next(step for step in steps if step.get("id") == "source")
+        self.assertIn(f'test "$(git -C "$source_dir" rev-parse HEAD)" = {PIN}', source["run"])
+        with tempfile.TemporaryDirectory(prefix="logice-cli-cache-test-") as directory:
+            root = Path(directory)
+            binary = root / "changenote/bin/changenote"
+            binary.parent.mkdir(parents=True)
+            mock = root / "mock"
+            mock.mkdir()
+            cargo = mock / "cargo"
+            cargo.write_text('#!/bin/sh\nprintf "%s\\n" "$*" >> "$RUNNER_TEMP/cargo-calls"\n'
+                             'printf \'#!/bin/sh\\nprintf "changenote 0.7.0\\\\n"\\n\' > "$RUNNER_TEMP/changenote/bin/changenote"\n'
+                             'chmod +x "$RUNNER_TEMP/changenote/bin/changenote"\n')
+            cargo.chmod(0o755)
+            env = dict(os.environ, RUNNER_TEMP=directory, CHANGENOTE_SOURCE="/pinned/source",
+                       PATH=str(mock) + os.pathsep + os.environ["PATH"], GITHUB_PATH=str(root / "path"))
+            subprocess.run(["bash", "-e", "-c", install["run"]], env=env, check=True, timeout=15)
+            # A cache miss installs once; a later hit only verifies the binary.
+            for _ in range(2):
+                subprocess.run(["bash", "-e", "-c", verify["run"]], env=env, check=True, timeout=15)
+            self.assertEqual((root / "cargo-calls").read_text().splitlines(),
+                             [f"install --path /pinned/source --locked --root {directory}/changenote"])
+            self.assertEqual((root / "path").read_text().splitlines(), [str(binary.parent)] * 2)
+            binary.write_text('#!/bin/sh\nprintf "changenote 0.0.0\\n"\n')
+            self.assertNotEqual(subprocess.run(["bash", "-e", "-c", verify["run"]], env=env, timeout=15).returncode, 0)
+            binary.unlink()
+            self.assertNotEqual(subprocess.run(["bash", "-e", "-c", verify["run"]], env=env,
+                                               capture_output=True, timeout=15).returncode, 0)
 
 
 if __name__ == "__main__":

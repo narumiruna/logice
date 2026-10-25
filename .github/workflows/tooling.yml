@@ -1,0 +1,58 @@
+name: Tooling
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/**'
+      - '.husky/**'
+      - 'scripts/check-go.sh'
+      - 'scripts/pre-commit.sh'
+      - 'scripts/validate-checks.sh'
+      - 'scripts/validate-web-layout.sh'
+      - 'tests/fixtures/web-layout/**'
+      - 'go.mod'
+      - 'go.sum'
+      - 'web/package.json'
+      - 'web/package-lock.json'
+      - 'web/biome.json'
+      - 'web/tsconfig.json'
+      - 'web/vite.config.ts'
+      - '.changenote/config.json'
+
+permissions:
+  contents: read
+
+jobs:
+  check-failure-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version: 1.26.10
+          cache: true
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26.11.1
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: sh scripts/validate-checks.sh
+
+  web-layout-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26.11.1
+          cache: npm
+          cache-dependency-path: tests/fixtures/web-layout/web/package-lock.json
+      - run: sh scripts/validate-web-layout.sh

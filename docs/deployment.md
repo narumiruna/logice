@@ -8,8 +8,8 @@ The deployment candidate contains one source commit, one stable version, and two
 
 ```mermaid
 flowchart TD
-    A[Exact release commit] --> B[Build both images and capture index digests]
-    B --> C[Full CI on the commit and exact image pair]
+    A[Exact release source checks] --> B[Build both images and capture index digests]
+    B --> C[Container and browser checks on the exact image pair]
     C --> D[Successful Release candidate artifact]
     D --> E[Draft deployment PR and explicit PR CI]
     E --> F[Operator approval and merge]
@@ -17,7 +17,9 @@ flowchart TD
     G --> H[Record deployed images and authenticated smoke checks]
 ```
 
-Main, tag, and manual Docker publication still work. Only the reusable build called by Release produces a deployment candidate. It runs the complete CI workflow on the selected commit. Container/browser checks pull the recorded digests and never rebuild that pair. Failed checks, a partial pair, or a cancelled Release cannot produce an approved candidate.
+Release is the only Docker publication entry point. It validates the selected commit through source CI once before source/image publication. Docker then builds both images and runs container/browser checks against the recorded digests; it does not call source CI again or rebuild the tested pair. Failed checks, a partial pair, or a cancelled Release cannot produce an approved candidate. Independent PR/main CI remains in place. Recover images with `release.yml` and `operation=retry-publication`, not a direct Docker run or a tag push.
+
+Docker no longer updates `latest`. Existing installations that track `latest` do not receive new images until an operator adopts an approved pinned release. This change does not modify an existing Application.
 
 `.github/workflows/promote.yml` reads only a successful main-branch Release run from this repository. It uses current main tooling, not artifact scripts. It checks the run, attempt, source ancestry, version, and both digests. It opens a draft PR with exactly these files:
 
@@ -30,7 +32,7 @@ The workflow has repository permissions but no cluster credentials. It never syn
 
 **This source change does not modify the existing live Application.** An Application that still reads `charts/logice` at `HEAD` with `latest` will keep the old deployment behavior. Adoption is a separate, approved cluster change.
 
-1. Configure required checks and code-owner approval for `main`. Require an up-to-date branch or a merge queue. Require the deployment check as well as the existing CI checks.
+1. Configure required checks and code-owner approval for `main`. Require an up-to-date branch or a merge queue. Require the deployment check as well as the application CI checks. The path-filtered Tooling workflow is optional for unrelated PRs and must not be a required check.
    - Protect `deploy/gitops/`, deployment tooling, and workflows through the existing code owner.
    - Do not permit an old green check to authorize a stale deployment PR.
    - Do not enable auto-merge for deployment PRs.
