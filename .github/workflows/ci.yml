@@ -21,9 +21,76 @@ permissions:
   contents: read
 
 jobs:
-  go-checks:
+  checks:
+    name: Checks
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      docs-only: ${{ steps.changes.outputs.docs-only }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.revision || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      - name: Identify documentation-only PRs
+        id: changes
+        # Older release checkouts need not contain this PR-only helper.
+        if: github.event_name == 'pull_request' && inputs.revision == ''
+        env:
+          REVISION: ${{ inputs.revision }}
+        run: uv run scripts/ci-docs-only.py
+      - uses: actions/setup-go@v7
+        with:
+          go-version: 1.26.10
+          cache: true
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26.11.1
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Verify npm version
+        run: test "$(npm --version)" = 11.20.0
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+      - uses: ./.github/actions/setup-changenote
+      - name: Verify Go modules
+        run: go mod verify
+      - name: Check Go source
+        run: sh scripts/check-go.sh
+      - name: Check Go vulnerabilities
+        run: timeout --kill-after=5s 240 go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 -test -tags=integration ./...
+      - name: Install frontend dependencies
+        run: HUSKY=0 npm --prefix web ci
+      - name: Check frontend source
+        run: npm --prefix web run ci
+      - name: Check frontend vulnerabilities
+        run: npm --prefix web audit --audit-level=low
+      - name: Check Helm chart
+        run: uv run charts/logice/tests/check.py
+      - name: Check deployment and CI guards
+        run: uv run tests/deployment/check.py
+      - name: Validate changed GitOps records against release evidence and current main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git -c credential.helper= -c 'credential.helper=!gh auth git-credential' fetch origin main
+          uv run scripts/deployment.py check --base origin/main
+      - name: Check release tooling
+        run: uv run tests/release/check.py
+      - name: Check pending releases
+        run: changenote status
+
+  integration:
+    name: Integration
+    needs: checks
+    # An absent selector result keeps full validation for non-PR events.
+    if: needs.checks.outputs.docs-only != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
         with:
@@ -33,32 +100,14 @@ jobs:
         with:
           go-version: 1.26.10
           cache: true
-      - run: go mod verify
-      - run: sh scripts/check-go.sh
-      - name: Check Go vulnerabilities
-        run: timeout --kill-after=5s 240 go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 -test -tags=integration ./...
+      - name: Validate ingestion and database migrations
+        run: go test -race -tags=integration -count=1 -timeout=8m -v ./tests/integration/... ./internal/auth/...
 
-  web-checks:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: ${{ inputs.revision || github.sha }}
-          persist-credentials: false
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 26.11.1
-          cache: npm
-          cache-dependency-path: web/package-lock.json
-      - run: test "$(npm --version)" = 11.20.0
-      - run: HUSKY=0 npm --prefix web ci
-      - run: npm --prefix web run ci
-      - run: npm --prefix web audit --audit-level=low
-
-  compose-web-validation:
+  e2e:
+    name: E2E
+    needs: checks
     # Release checks the published digest pair instead of rebuilding it here.
-    if: inputs.revision == ''
+    if: inputs.revision == '' && needs.checks.outputs.docs-only != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -76,72 +125,3 @@ jobs:
       - run: npm --prefix web exec -- playwright install --with-deps chromium
       - name: Validate containerized telemetry workflow
         run: timeout --kill-after=60s 600 sh scripts/validate-compose-web.sh
-
-  helm-checks:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: ${{ inputs.revision || github.sha }}
-          persist-credentials: false
-      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
-      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
-      - run: uv run charts/logice/tests/check.py
-
-  stack-validation:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: ${{ inputs.revision || github.sha }}
-          persist-credentials: false
-      - uses: actions/setup-go@v7
-        with:
-          go-version: 1.26.10
-          cache: true
-      - name: Validate ingestion and database migrations
-        run: go test -race -tags=integration -count=1 -timeout=8m -v ./tests/integration/... ./internal/auth/...
-
-  deployment-checks:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-      actions: read
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: ${{ inputs.revision || github.sha }}
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
-      - run: uv run tests/deployment/check.py
-      - name: Validate changed GitOps records against release evidence and current main
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          git -c credential.helper= -c 'credential.helper=!gh auth git-credential' fetch origin main
-          uv run scripts/deployment.py check --base origin/main
-
-  release-checks:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: ${{ inputs.revision || github.sha }}
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 26.11.1
-          cache: npm
-          cache-dependency-path: web/package-lock.json
-      - run: test "$(npm --version)" = 11.20.0
-      - run: HUSKY=0 npm --prefix web ci --ignore-scripts
-      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
-      - uses: ./.github/actions/setup-changenote
-      - run: uv run tests/release/check.py
-      - run: changenote status

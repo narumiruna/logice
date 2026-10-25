@@ -52,7 +52,7 @@ Use `--minor logice` for a feature or `--major logice` for a breaking change. Co
 `.github/workflows/release.yml` runs only on `main`. One concurrency group serializes release work and does not cancel an active run. Source-check jobs retain their CI deadlines. Selection, source publication, and image validation have a 15-minute deadline; Docker build jobs have a 30-minute deadline.
 
 1. A read-only job uses the pinned preview Action to inspect the latest verifiable release batch without remote writes. It selects the exact release commit only when publication is needed or `retry-publication` was requested. A no-op batch needs no additional source checks or image builds.
-2. The selected commit runs reusable source CI once within Release: Go, frontend, vulnerability, native integration, Helm, deployment, and release checks. The local-image browser job is skipped here because Docker later tests the published digest pair. Independent PR/main CI still runs its full application checks, including local-image browser tests. No cross-run check-result cache is used.
+2. The selected commit runs reusable source CI once within Release: Go, frontend, vulnerability, native integration, Helm, deployment, and release checks. The local-image browser job is skipped here because Docker later tests the published digest pair. Application and release PRs, main pushes, manual runs, and merge queues retain full application checks. Only verified documentation-only PRs skip native integration and local-image browser checks. No cross-run check-result cache is used.
 3. On a `main` push, the Release PR job uses tooling from the triggering commit. The pinned Action refreshes pending notes from `main` and opens or updates `narumi/chore/changenote-release-main`. Reserve that branch for automation. PR generation is not publication approval. Removing all pending notes closes its managed PR.
 4. Review the generated version files, lockfile, changelog, consumed notes, and saved batch. Complete CI on the exact PR head and all applicable operator release gates before merge.
 5. Publication requires successful source CI and checks out only the selected, checked release commit. It invokes the pinned upstream `publish.sh` with that expected commit because the composite publication Action has no expected-commit input. The script fetches `main`, reconstructs the latest batch, and compares its commit with the expected value before any tag or Release write. A new batch stops publication and requires a new validation run. Unrelated commits or pending notes do not change the selected target. No batch means no publication job.
@@ -75,9 +75,23 @@ gh workflow run ci.yml --ref narumi/chore/changenote-release-main
 
 Check the resulting run against the version PR head. Do not bypass required checks or assume version generation grants release approval. Physical-authenticator validation, database/key backups, and production deployment checks remain operator tasks.
 
+## CI checks
+
+`ci.yml` exposes three checks:
+
+1. **Checks** runs Go/frontend formatting, typechecks, unit tests, builds, vulnerability checks, Helm validation, deployment guards, and release tooling tests. It has a 20-minute deadline and installs shared tools and frontend dependencies once.
+2. **Integration** runs race-enabled ingestion, database, migration, and authentication tests. It has a 15-minute deadline.
+3. **E2E** runs the container/browser workflow. It has a 15-minute deadline. Release source CI skips this local-image build because Docker validates the published image pair separately.
+
+Checks always runs. Integration and E2E start in parallel after Checks succeeds. Only ordinary PRs with a non-empty diff limited to `README.md`, `CHANGELOG.md`, `.changenote/README.md`, and Markdown files under `docs/` can skip those two expensive jobs. Pending change notes and release metadata are not on this allowlist. Renames include both old and new paths. Missing metadata or an unavailable diff keeps full validation.
+
+The managed release branch never uses the documentation-only exception. Main pushes, manual runs, merge queues, and exact-commit reusable release CI also keep full source validation. The selector runs only for ordinary PR checkouts, so older release commits do not need the new helper. The workflow itself has no path filter; skipped jobs still report a result.
+
+Require `Checks`, `Integration`, and `E2E` when configuring main branch rules. These names replace the former seven CI job names; remove obsolete required contexts when adopting this workflow. Do not change branch rules merely to bypass a failing check.
+
 ## Tooling checks
 
-`ci.yml` retains Go/frontend, vulnerability, native integration, browser, Helm, deployment, and release checks. `tooling.yml` runs hook-failure and frontend-layout fixture checks only for PRs that change workflow, hook, dependency, or related tool configuration paths. It also supports manual runs. Do not make a path-filtered workflow a required main check: an unrelated PR does not create that check. Keep required application checks and code-owner approval configured as described in [deployment operations](deployment.md).
+`tooling.yml` runs hook-failure and frontend-layout fixture checks only for PRs that change workflow, hook, dependency, or related tool configuration paths. It also supports manual runs. Do not make a path-filtered workflow a required main check: an unrelated PR does not create that check. Keep required application checks and code-owner approval configured as described in [deployment operations](deployment.md).
 
 ## Validation
 
@@ -93,6 +107,7 @@ export CHANGENOTE_ACTION_PATH="$tools/source"
 npm --prefix web ci
 changenote status
 uv run tests/release/check.py
+uv run tests/deployment/check.py
 npm --prefix web run ci
 actionlint .github/workflows/*.yml
 sh scripts/validate-checks.sh

@@ -2,7 +2,7 @@
 # requires-python = ">=3.11"
 # dependencies = ["PyYAML==6.0.3"]
 # ///
-"""Deployment guards with local files and a fake GitHub API. No remote writes."""
+"""Deployment and CI guards with disposable fixtures. No remote writes."""
 
 import copy
 from fnmatch import fnmatchcase
@@ -24,6 +24,9 @@ ROOT = Path(__file__).resolve().parents[2]
 spec = importlib.util.spec_from_file_location("deployment", ROOT / "scripts/deployment.py")
 deploy = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(deploy)
+ci_spec = importlib.util.spec_from_file_location("ci_docs_only", ROOT / "scripts/ci-docs-only.py")
+ci_docs_only = importlib.util.module_from_spec(ci_spec)
+ci_spec.loader.exec_module(ci_docs_only)
 
 
 def fixture():
@@ -334,6 +337,117 @@ class PromotionTests(unittest.TestCase):
                 os.chdir(old_cwd)
 
 
+class CIDocumentationTests(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory(prefix="logice-ci-docs-")
+        self.addCleanup(self.directory.cleanup)
+        self.root = Path(self.directory.name)
+        self.addCleanup(os.chdir, Path.cwd())
+        os.chdir(self.root)
+        self.env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+        self.env.update({
+            "GIT_AUTHOR_NAME": "CI fixture", "GIT_AUTHOR_EMAIL": "fixture@example.invalid",
+            "GIT_COMMITTER_NAME": "CI fixture", "GIT_COMMITTER_EMAIL": "fixture@example.invalid",
+            "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull, "GIT_TERMINAL_PROMPT": "0",
+        })
+        self.git("init", "--initial-branch=main")
+        for path in ("README.md", "docs/guide.md", "internal/app.go"):
+            self.write(path, "Initial fixture.\n")
+        self.base = self.commit("README.md", "docs/guide.md", "internal/app.go")
+        self.head = self.base
+
+    def git(self, *args):
+        return subprocess.check_output(["git", *args], env=self.env, text=True,
+                                       stderr=subprocess.PIPE, timeout=15).strip()
+
+    def write(self, path, content):
+        target = self.root / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content)
+
+    def commit(self, *paths):
+        if paths:
+            self.git("add", "--", *paths)
+        self.git("-c", "commit.gpgsign=false", "commit", "-m", "test: CI diff fixture")
+        return self.git("rev-parse", "HEAD")
+
+    def event(self, branch="narumi/docs/guide"):
+        return {"pull_request": {"base": {"sha": self.base}, "head": {"sha": self.head, "ref": branch}}}
+
+    def selected(self, event=None, event_name="pull_request", revision=""):
+        return ci_docs_only.documentation_only(event_name, revision, self.event() if event is None else event)
+
+    def test_only_known_markdown_documentation_can_skip_expensive_jobs(self):
+        for path in ("README.md", "CHANGELOG.md", ".changenote/README.md", "docs/guide.md", "docs/deep/guide.md"):
+            self.write(path, "Updated documentation.\n")
+            self.head = self.commit(path)
+            self.assertTrue(self.selected(), path)
+
+    def test_code_release_metadata_and_unlisted_paths_keep_full_tests(self):
+        for path in ("internal/app.go", "web/src/app.tsx", ".github/workflows/ci.yml", "scripts/check-go.sh",
+                     "docs/fixture.sql", "docs.md", "VERSION", "web/package-lock.json",
+                     ".changenote/fix.md", ".changenote/releases.json", "deploy/gitops/logice.json"):
+            with self.subTest(path=path), patch.object(ci_docs_only.subprocess, "check_output",
+                                                      return_value=f"docs/guide.md\0{path}\0".encode()):
+                self.assertFalse(self.selected())
+
+    def test_renaming_code_into_documentation_does_not_hide_its_removal(self):
+        self.git("mv", "internal/app.go", "docs/app.md")
+        self.head = self.commit()
+        self.assertFalse(self.selected())
+
+    def test_deleting_code_keeps_full_tests(self):
+        self.git("rm", "--", "internal/app.go")
+        self.head = self.commit()
+        self.assertFalse(self.selected())
+
+    def test_documentation_renames_and_deletions_stay_documentation_only(self):
+        self.git("mv", "docs/guide.md", "docs/renamed.md")
+        self.head = self.commit()
+        self.assertTrue(self.selected())
+        self.git("rm", "--", "docs/renamed.md")
+        self.head = self.commit()
+        self.assertTrue(self.selected())
+
+    def test_empty_diffs_keep_full_tests(self):
+        self.assertFalse(self.selected())
+
+    def test_release_prs_reusable_ci_and_non_pr_events_never_skip(self):
+        with patch.object(ci_docs_only.subprocess, "check_output") as diff:
+            self.assertFalse(self.selected(event=self.event("narumi/chore/changenote-release-main")))
+            self.assertFalse(self.selected(revision="a" * 40))
+            for event in ("push", "workflow_dispatch", "merge_group", "workflow_call", ""):
+                self.assertFalse(self.selected(event_name=event), event)
+            diff.assert_not_called()
+
+    def test_invalid_metadata_and_unavailable_diffs_keep_full_tests(self):
+        for event in ({}, {"pull_request": []}, {"pull_request": {"head": {}}},
+                      {"pull_request": {"base": {"sha": "main"}, "head": {"sha": self.head, "ref": "docs"}}}):
+            self.assertFalse(self.selected(event=event), event)
+        for error in (OSError("fixture"), subprocess.CalledProcessError(1, "git"),
+                      subprocess.TimeoutExpired("git", 30)):
+            with patch.object(ci_docs_only.subprocess, "check_output", side_effect=error):
+                self.assertFalse(self.selected())
+
+    def test_null_delimited_paths_do_not_split_newline_filenames(self):
+        self.write("docs/multiple\nlines.md", "Documentation.\n")
+        self.head = self.commit("docs/multiple\nlines.md")
+        self.assertTrue(self.selected())
+
+    def test_cli_outputs_a_decision_and_invalid_json_keeps_full_tests(self):
+        self.write("docs/guide.md", "Updated documentation.\n")
+        self.head = self.commit("docs/guide.md")
+        event = self.root / "event.json"
+        output = self.root / "output"
+        for content, expected in ((json.dumps(self.event()), "true"), ("invalid-json", "false")):
+            event.write_text(content)
+            output.write_text("")
+            with patch.dict(os.environ, {"GITHUB_EVENT_NAME": "pull_request", "REVISION": "",
+                                         "GITHUB_EVENT_PATH": str(event), "GITHUB_OUTPUT": str(output)}):
+                ci_docs_only.main()
+            self.assertEqual(output.read_text(), f"docs-only={expected}\n")
+
+
 class WorkflowTests(unittest.TestCase):
     def workflow(self, name):
         return yaml.load((ROOT / f".github/workflows/{name}.yml").read_text(), Loader=yaml.BaseLoader)
@@ -376,12 +490,40 @@ class WorkflowTests(unittest.TestCase):
             checkout = job["steps"][0]
             self.assertEqual(checkout["with"]["ref"], "${{ inputs.revision || github.sha }}")
             self.assertEqual(checkout["with"]["persist-credentials"], "false")
-        browser = ci["jobs"]["compose-web-validation"]
-        self.assertEqual(browser["if"], "inputs.revision == ''")
+        jobs = ci["jobs"]
+        self.assertEqual({key: job["name"] for key, job in jobs.items()},
+                         {"checks": "Checks", "integration": "Integration", "e2e": "E2E"})
+        checks = jobs["checks"]
+        self.assertNotIn("if", checks)
+        self.assertEqual(checks["permissions"], {"contents": "read", "actions": "read"})
+        self.assertEqual(checks["steps"][0]["with"]["fetch-depth"], "0")
+        self.assertEqual(checks["outputs"], {"docs-only": "${{ steps.changes.outputs.docs-only }}"})
+        selector = next(step for step in checks["steps"] if step.get("id") == "changes")
+        self.assertEqual(selector["if"], "github.event_name == 'pull_request' && inputs.revision == ''")
+        self.assertEqual(selector["run"], "uv run scripts/ci-docs-only.py")
+        self.assertEqual(selector["env"], {"REVISION": "${{ inputs.revision }}"})
+        commands = "\n".join(step.get("run", "") for step in checks["steps"])
+        for command in ("go mod verify", "sh scripts/check-go.sh", "govulncheck@v1.9.0",
+                        "npm --prefix web ci", "npm --prefix web run ci", "npm --prefix web audit --audit-level=low",
+                        "uv run charts/logice/tests/check.py", "uv run tests/deployment/check.py",
+                        "uv run scripts/deployment.py check --base origin/main",
+                        "uv run tests/release/check.py", "changenote status"):
+            self.assertIn(command, commands)
+        for step in checks["steps"]:
+            self.assertNotIn("continue-on-error", step)
+            if step is not selector:
+                self.assertNotIn("if", step)
+        for name, minutes in (("checks", "20"), ("integration", "15"), ("e2e", "15")):
+            self.assertEqual(jobs[name]["timeout-minutes"], minutes)
+        integration = jobs["integration"]
+        self.assertEqual(integration["needs"], "checks")
+        self.assertEqual(integration["if"], "needs.checks.outputs.docs-only != 'true'")
+        self.assertEqual(integration["steps"][-1]["run"],
+                         "go test -race -tags=integration -count=1 -timeout=8m -v ./tests/integration/... ./internal/auth/...")
+        browser = jobs["e2e"]
+        self.assertEqual(browser["needs"], "checks")
+        self.assertEqual(browser["if"], "inputs.revision == '' && needs.checks.outputs.docs-only != 'true'")
         self.assertIn("sh scripts/validate-compose-web.sh", browser["steps"][-1]["run"])
-        for name in ("go-checks", "web-checks", "stack-validation", "helm-checks", "deployment-checks", "release-checks"):
-            self.assertIn(name, ci["jobs"])
-            self.assertNotIn("if", ci["jobs"][name])
         self.assertEqual(ci["on"]["merge_group"]["types"], ["checks_requested"])
         self.assertEqual(ci["on"]["push"]["branches"], ["main"])
         self.assertEqual(ci["on"]["pull_request"]["branches"], ["main"])

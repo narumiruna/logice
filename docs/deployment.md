@@ -43,7 +43,7 @@ Keep the current deployment unchanged until those gates pass. Do not use a futur
 
 **This source change does not modify the existing live Application.** An Application that still reads `charts/logice` at `HEAD` with `latest` will keep the old deployment behavior. Adoption is a separate, approved cluster change.
 
-1. Configure required checks and code-owner approval for `main`. Require an up-to-date branch or a merge queue. Require the deployment check as well as the application CI checks. The path-filtered Tooling workflow is optional for unrelated PRs and must not be a required check.
+1. Configure required checks and code-owner approval for `main`. Require an up-to-date branch or a merge queue. Require CI's `Checks`, `Integration`, and `E2E`; deployment evidence validation is included in Checks. Replace obsolete job names when adopting the three-check workflow. Verified documentation-only PRs report explicit skips for the two expensive jobs. The path-filtered Tooling workflow is optional for unrelated PRs and must not be a required check.
    - Protect `deploy/gitops/`, deployment tooling, and workflows through the existing code owner.
    - Do not permit an old green check to authorize a stale deployment PR.
    - Do not enable auto-merge for deployment PRs.
