@@ -113,7 +113,9 @@ export function AccountSettings() {
               <div className="settings-card-heading">
                 <h2>{t("Appearance")}</h2>
                 <p>
-                  {t("Your theme is stored in this browser. Telemetry filters stay unchanged.")}
+                  {t(
+                    "Your theme and language are stored in this browser. Telemetry filters stay unchanged.",
+                  )}
                 </p>
               </div>
               <div className="appearance-options">
@@ -127,7 +129,7 @@ export function AccountSettings() {
             <section className="settings-card" id="security">
               <div className="settings-card-heading">
                 <h2>{t("Security and access")}</h2>
-                <p>{t("Sign in with a user-verified Passkey. No password is stored.")}</p>
+                <p>{t("Sign in with a passkey. No password is required.")}</p>
               </div>
               <dl className="settings-facts">
                 <div>
@@ -145,7 +147,7 @@ export function AccountSettings() {
               </dl>
               <p className="settings-hint">
                 {t(
-                  "For a lost Passkey, ask your operator to recover this account UUID. Recovery replaces your sign-in credentials; it does not revoke project ingestion tokens.",
+                  "For a lost passkey, ask your operator to recover this account UUID. Recovery replaces your sign-in credentials; it does not revoke project ingestion tokens.",
                 )}
               </p>
               <button

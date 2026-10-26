@@ -4,6 +4,20 @@
 
 Validate the local trace/log workflow, Go API, frontend tooling, selected storage, Collector, native Go drivers, and migration behavior with disposable data. This is not a production deployment. Authentication, multi-project authorization, load targets, and public Cloudflare routing remain separate acceptance gates. Historical foundation evidence below applies to its recorded revision.
 
+## UI wording and terminology: 2026-10-27
+
+The six wording findings are resolved across the UI and all nine catalogs. [UI wording rules](design/ui-copy.md) define the terms. Alert conditions, delivery failures, and audit actions now use readable display labels while retaining their original API values. Root-span metrics and thresholds name duration, not request latency; sample-count labels distinguish traces from root spans. The header toggle is **Column headers**. Saved-view actions are **Open view** and **Copy link**. Setup and settings use ingestion-token terminology, and empty/network-error states no longer assume a local validation deployment.
+
+| Check | Actual result |
+| --- | --- |
+| `npm --prefix web run ci` | Biome, TypeScript, all 356 unit tests, and the production build passed. The existing local catalog bundle-size warning remains visible. |
+| Catalog and display-label checks | All nine catalogs contain the same 847 keys and matching interpolation variables. Tests cover every known audit action, alert condition, and delivery-failure label while retaining the original API values and unknown-value fallback. |
+| `sh scripts/validate-compose-web.sh` | All 133 Chromium tests passed, followed by static/API checks, readiness recovery, API-IP replacement recovery, and disposable cleanup. |
+| New browser coverage | Metric-specific form labels and unchanged ratio/nanosecond/sample-count payloads; readable rule and nonempty delivery history in English and Italian; readable audit labels with original filter values; saved-view navigation and copied links; project-scoped setup links; and network-error retry guidance. Existing role, passkey, Live lifecycle, and narrow-layout checks remain enabled. |
+| Strict E2E TypeScript and whitespace checks | Passed. |
+
+Review found four remaining raw delivery-failure codes. These now have display labels, with all four cases checked in nonempty history before and after a language change. Follow-up review found no further concrete defect. Translations were spot-checked, not approved by native speakers. No backend, API, schema, permission, polling, or operator-data changes were made.
+
 ## Web UI languages: 2026-10-27
 
 The web UI now supports English (`en`), Traditional Chinese (`zh-TW`), Japanese (`ja`), Korean (`ko`), Spanish (`es`), French (`fr`), German (`de`), Portuguese (`pt`), and Italian (`it`). English remains the default and fallback. Simplified Chinese, Arabic, and the separate Brazilian Portuguese locale are not offered.

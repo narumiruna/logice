@@ -219,7 +219,7 @@ export function ProjectDashboard({ project }: { project: Project }) {
             <h2>{t("Send telemetry to this project")}</h2>
             <p>
               {t(
-                "Use OTLP HTTP protobuf at the application origin. Project tokens allow writes only; browser sessions do not authorize ingestion.",
+                "Use OTLP HTTP protobuf at the application origin. Ingestion tokens allow writes only; browser sessions do not authorize ingestion.",
               )}
             </p>
             <code>

@@ -1,6 +1,7 @@
 import { Fragment, type ReactNode } from "react"
 import type { TimeWindow } from "./api"
 import { useI18n } from "./i18n"
+import { projectPath } from "./project-path"
 
 export function Notice({
   title,
@@ -132,11 +133,8 @@ export function EmptyState({
           {t("Reset filters")}
         </a>
       )}
-      <p>
-        {t(
-          "To add local telemetry, send OTLP traces and logs from your application to the Collector configured for this validation project.",
-        )}
-      </p>
+      <p>{t("Connect your application to send OTLP traces and logs to this project.")}</p>
+      <a href={projectPath("/setup")}>{t("Connect application")}</a>
       {kind === "correlated logs" && <p>{t("Logs must include this trace ID to appear here.")}</p>}
     </div>
   )

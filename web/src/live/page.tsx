@@ -522,7 +522,7 @@ function LiveWorkspace({
                 checked={headers}
                 onChange={(event) => setHeaders(event.target.checked)}
               />
-              {t("Columns")}
+              {t("Column headers")}
             </label>
             <button
               type="button"

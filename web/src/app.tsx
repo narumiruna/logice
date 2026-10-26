@@ -168,7 +168,7 @@ export function App() {
                       ? t("Request failed ({status}).", { status: state.error.status })
                       : t(state.error.message)
                     : t(
-                        "Cannot reach the API. Check the local API and Collector services, then try again.",
+                        "Check your connection and try again. If the problem continues, contact your Logice operator.",
                       )}
                 </p>
                 {state.error instanceof ApiError && state.error.status === 404 && (

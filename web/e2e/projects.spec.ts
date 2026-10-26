@@ -19,7 +19,7 @@ test("project roles, one-time tokens, membership removal, ownership and project 
   const base = `/api/projects/${project}`
   await page.getByRole("link", { name: "Project settings" }).click()
   await page.getByLabel("Token name", { exact: true }).fill("Owner application")
-  await page.getByRole("button", { name: "Create token", exact: true }).click()
+  await page.getByRole("button", { name: "Create ingestion token", exact: true }).click()
   await expect(page.getByRole("note", { name: "New ingestion token" })).toBeVisible()
   const token = await page.getByRole("note", { name: "New ingestion token" }).textContent()
   if (!token) throw new Error("Token creation returned no credential")
@@ -54,7 +54,7 @@ test("project roles, one-time tokens, membership removal, ownership and project 
       await expect(member.getByRole("button", { name: "Add member", exact: true })).toHaveCount(0)
       if (role === "Developer") {
         await member.getByLabel("Token name", { exact: true }).fill("Developer application")
-        await member.getByRole("button", { name: "Create token", exact: true }).click()
+        await member.getByRole("button", { name: "Create ingestion token", exact: true }).click()
         await expect(member.getByRole("note", { name: "New ingestion token" })).toBeVisible()
         await member.evaluate(() => window.dispatchEvent(new PageTransitionEvent("pagehide")))
         await expect(member.getByRole("note", { name: "New ingestion token" })).toHaveCount(0)
@@ -73,9 +73,9 @@ test("project roles, one-time tokens, membership removal, ownership and project 
           "active",
         )
       } else {
-        await expect(member.getByRole("button", { name: "Create token", exact: true })).toHaveCount(
-          0,
-        )
+        await expect(
+          member.getByRole("button", { name: "Create ingestion token", exact: true }),
+        ).toHaveCount(0)
         const csrf = (await (await context.request.get("/api/auth/csrf")).json()).csrfToken
         const denied = await context.request.post(`${base}/tokens`, {
           headers: { Origin: process.env.LOGICE_E2E_URL ?? "", "X-CSRF-Token": csrf },

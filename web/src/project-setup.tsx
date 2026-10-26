@@ -98,7 +98,7 @@ export function ProjectSetup({ project }: { project: Project }) {
             <h1>{t("Connect your application")}</h1>
             <p>
               {t(
-                "Create an application credential, configure an exporter, and check for stored telemetry.",
+                "Create an ingestion token, configure an exporter, and check for stored telemetry.",
               )}
             </p>
           </div>
@@ -108,7 +108,7 @@ export function ProjectSetup({ project }: { project: Project }) {
           <h2>{t("1. Create an ingestion token")}</h2>
           <p>
             {t(
-              "Project tokens allow writes only. Registration invitations and browser sessions cannot send telemetry.",
+              "Ingestion tokens allow writes only. Registration invitations and browser sessions cannot send telemetry.",
             )}
           </p>
           {canManageTokens(project.role) ? (
@@ -121,7 +121,7 @@ export function ProjectSetup({ project }: { project: Project }) {
                 }}
               >
                 <label>
-                  {t("Setup token name")}
+                  {t("Token name")}
                   <input
                     value={name}
                     onChange={(e) => setName(e.target.value)}
@@ -135,7 +135,7 @@ export function ProjectSetup({ project }: { project: Project }) {
                   type="submit"
                   disabled={busy || !name.trim()}
                 >
-                  {t("Create setup token")}
+                  {t("Create ingestion token")}
                 </button>
               </form>
               <p>{t("You can also use an existing token from your application's secret store.")}</p>
@@ -161,7 +161,7 @@ export function ProjectSetup({ project }: { project: Project }) {
                   "Copy this token now. Leaving this page clears it; the token stays valid until revoked.",
                 )}
               </p>
-              <pre role="note" aria-label={t("Setup ingestion token")}>
+              <pre role="note" aria-label={t("New ingestion token")}>
                 {secret}
               </pre>
               <button
@@ -169,7 +169,7 @@ export function ProjectSetup({ project }: { project: Project }) {
                 className="button button-secondary"
                 onClick={() => void copyText(secret)}
               >
-                {t("Copy setup token")}
+                {t("Copy ingestion token")}
               </button>
               <button
                 type="button"
@@ -179,7 +179,7 @@ export function ProjectSetup({ project }: { project: Project }) {
                   setCopy("")
                 }}
               >
-                {t("Dismiss setup token")}
+                {t("Dismiss token")}
               </button>
             </div>
           )}

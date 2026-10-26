@@ -135,7 +135,7 @@ export function ProjectOverview({ window, service }: { window: TimeWindow; servi
               </small>
             </article>
             <article>
-              <span>{t("Root-span p50")}</span>
+              <span>{t("Root span duration (p50)")}</span>
               <strong>{data.p50Ns === null ? "—" : formatDuration(data.p50Ns)}</strong>
               <small>
                 {t("{count} unambiguous exported root spans", {
@@ -144,14 +144,18 @@ export function ProjectOverview({ window, service }: { window: TimeWindow; servi
               </small>
             </article>
             <article>
-              <span>{t("Root-span p95")}</span>
+              <span>{t("Root span duration (p95)")}</span>
               <strong>{data.p95Ns === null ? "—" : formatDuration(data.p95Ns)}</strong>
               <small>{t("Exact stored-duration percentile, not request latency")}</small>
             </article>
             <article>
               <span>{t("Conflicting span identities")}</span>
               <strong>{number(BigInt(data.conflicts), { useGrouping: false })}</strong>
-              <small>{t("Excluded from root latency; counts use canonical representatives")}</small>
+              <small>
+                {t(
+                  "Excluded from root span duration statistics; counts use canonical representatives",
+                )}
+              </small>
             </article>
           </div>
           <details className="settings-card">
@@ -169,7 +173,7 @@ export function ProjectOverview({ window, service }: { window: TimeWindow; servi
                     <th>{t("Traces")}</th>
                     <th>{t("Logs")}</th>
                     <th>{t("Error traces")}</th>
-                    <th>{t("Root p95")}</th>
+                    <th>{t("Root span duration (p95)")}</th>
                   </tr>
                 </thead>
                 <tbody>

@@ -178,7 +178,7 @@ function ProjectList({
       <section className="settings-card project-create">
         <div>
           <h2>{t("Create a project")}</h2>
-          <p>{t("You become its Owner. Project data and tokens stay separate.")}</p>
+          <p>{t("You become its Owner. Project data and ingestion tokens stay separate.")}</p>
         </div>
         <form className="project-create-form" onSubmit={(event) => void create(event)}>
           <label>

@@ -100,7 +100,7 @@ test("Live columns toggle preserves selection and Reset view restores controls w
   await page.goto(projectHref("/live"))
   await page.getByRole("button", { name: "Inspect reserve_inventory", exact: true }).click()
   const selected = page.locator(`[data-event-id="${rows[1].id}"]`)
-  await page.getByLabel("Columns", { exact: true }).uncheck()
+  await page.getByLabel("Column headers", { exact: true }).uncheck()
   await expect(page.getByRole("columnheader")).toHaveCount(0)
   await expect(page.getByRole("treegrid")).toHaveAttribute("aria-rowcount", "4")
   await expect(selected).toHaveAttribute("aria-selected", "true")
@@ -114,7 +114,7 @@ test("Live columns toggle preserves selection and Reset view restores controls w
   await expect(page.getByRole("button", { name: "Pause live updates" })).toBeVisible()
   await expect(page.getByLabel("Auto-expand", { exact: true })).toBeChecked()
   await expect(page.getByLabel("Follow latest", { exact: true })).toBeChecked()
-  await expect(page.getByLabel("Columns", { exact: true })).toBeChecked()
+  await expect(page.getByLabel("Column headers", { exact: true })).toBeChecked()
   await expect(page.getByRole("columnheader")).toHaveCount(5)
   await expect(page.locator(".lv-event-row")).toHaveCount(4)
   expect(state.data.spans).toHaveLength(2)
@@ -202,9 +202,9 @@ test("Live follows the bottom through column, inspector and viewport size change
     await expect(page.getByLabel("Follow latest", { exact: true })).toBeChecked()
   }
   await atBottom()
-  await page.getByLabel("Columns", { exact: true }).uncheck()
+  await page.getByLabel("Column headers", { exact: true }).uncheck()
   await atBottom()
-  await page.getByLabel("Columns", { exact: true }).check()
+  await page.getByLabel("Column headers", { exact: true }).check()
   await atBottom()
   await page.getByRole("button", { name: "Inspect Exported span 99", exact: true }).click()
   await atBottom()
@@ -224,7 +224,7 @@ for (const theme of ["classic", "studio"]) {
     await page.goto(projectHref("/live"))
     await page.getByRole("combobox", { name: "Theme", exact: true }).selectOption(theme)
     await expect(page.locator(".lv-event-row")).toHaveCount(4)
-    await expect(page.getByLabel("Columns", { exact: true })).toBeVisible()
+    await expect(page.getByLabel("Column headers", { exact: true })).toBeVisible()
     await expect(page.locator(".lv-time").first()).toHaveText("00:00:00")
     expect(
       await page
