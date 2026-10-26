@@ -26,8 +26,9 @@ export interface LiveTree {
 export function isSpanId(id: string): boolean {
   return /^[a-f\d]{16}$/i.test(id) && !/^0{16}$/.test(id)
 }
+// Logs can open their trace without a recorded span identity.
 export function isLinkable(record: LiveRecord): boolean {
-  return isTraceId(record.traceId) && isSpanId(record.spanId)
+  return isTraceId(record.traceId) && (record.kind === "log" || isSpanId(record.spanId))
 }
 export function groupId(record: LiveRecord): string {
   return isTraceId(record.traceId) ? record.traceId.toLowerCase() : record.id
@@ -105,12 +106,12 @@ export function buildTree(
     let parent: string | null = null
     let issue: string | null = null
     if (item.parentConflict) issue = "Ambiguous parent"
-    else if (!isLinkable(item))
+    else if (!isLinkable(item) || (item.spanId !== "" && !isSpanId(item.spanId)))
       issue =
         item.kind === "log" && !item.traceId && !item.spanId
           ? "Uncorrelated log"
           : "Invalid identifiers"
-    else if (item.kind === "log" || item.parentSpanId) {
+    else if (item.kind === "log" ? item.spanId : item.parentSpanId) {
       const spanId = item.kind === "log" ? item.spanId : item.parentSpanId
       if (!isSpanId(spanId)) issue = "Invalid parent"
       else {
