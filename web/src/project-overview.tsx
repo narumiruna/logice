@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import { requestJSON, type TimeWindow } from "./api"
+import { useI18n } from "./i18n"
 import { projectApi } from "./project-path"
 import { formatDuration, listHref, timestampNs } from "./telemetry"
 
@@ -62,6 +63,7 @@ export function validateOverview(v: Overview, window: TimeWindow): Overview {
   return v
 }
 export function ProjectOverview({ window, service }: { window: TimeWindow; service: string }) {
+  const { t, number } = useI18n()
   const [data, setData] = useState<Overview | null>(null)
   const [error, setError] = useState("")
   const [retry, setRetry] = useState(0)
@@ -87,72 +89,87 @@ export function ProjectOverview({ window, service }: { window: TimeWindow; servi
   const link = (w: TimeWindow) =>
     `${listHref("traces", w)}${service ? `&service=${encodeURIComponent(service)}` : ""}`
   return (
-    <section aria-label="Full-window telemetry statistics">
+    <section aria-label={t("Full-window telemetry statistics")}>
       {error && (
         <div className="workspace-error" role="alert">
-          <p>{error}</p>
+          <p>{t(error)}</p>
           <button
             className="button button-secondary"
             type="button"
             onClick={() => setRetry((n) => n + 1)}
           >
-            Retry statistics
+            {t("Retry statistics")}
           </button>
         </div>
       )}
-      {!data && !error && <p role="status">Loading full-window statistics…</p>}
+      {!data && !error && <p role="status">{t("Loading full-window statistics…")}</p>}
       {data && (
         <>
           <div className="dashboard-stats">
             <article>
-              <span>Stored traces</span>
-              <strong>{data.traces}</strong>
-              <small>Distinct eligible trace IDs in this window</small>
+              <span>{t("Stored traces")}</span>
+              <strong>{number(BigInt(data.traces), { useGrouping: false })}</strong>
+              <small>{t("Distinct eligible trace IDs in this window")}</small>
             </article>
             <article>
-              <span>Stored logs (deduplicated)</span>
-              <strong>{data.logs}</strong>
-              <small>Identical stored log content counts once</small>
+              <span>{t("Stored logs (deduplicated)")}</span>
+              <strong>{number(BigInt(data.logs), { useGrouping: false })}</strong>
+              <small>{t("Identical stored log content counts once")}</small>
             </article>
             <article>
-              <span>Error trace proportion</span>
+              <span>{t("Error trace proportion")}</span>
               <strong>
                 {data.errorProportion === null
                   ? "—"
-                  : `${(data.errorProportion * 100).toFixed(2)}%`}
+                  : number(Number((data.errorProportion * 100).toFixed(2)) / 100, {
+                      style: "percent",
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                      useGrouping: false,
+                    })}
               </strong>
-              <small>{data.errorTraces} traces with a canonical Error span</small>
+              <small>
+                {t("{count} traces with a canonical Error span", {
+                  count: number(BigInt(data.errorTraces), { useGrouping: false }),
+                })}
+              </small>
             </article>
             <article>
-              <span>Root-span p50</span>
+              <span>{t("Root-span p50")}</span>
               <strong>{data.p50Ns === null ? "—" : formatDuration(data.p50Ns)}</strong>
-              <small>{data.rootSpans} unambiguous exported root spans</small>
+              <small>
+                {t("{count} unambiguous exported root spans", {
+                  count: number(BigInt(data.rootSpans), { useGrouping: false }),
+                })}
+              </small>
             </article>
             <article>
-              <span>Root-span p95</span>
+              <span>{t("Root-span p95")}</span>
               <strong>{data.p95Ns === null ? "—" : formatDuration(data.p95Ns)}</strong>
-              <small>Exact stored-duration percentile, not request latency</small>
+              <small>{t("Exact stored-duration percentile, not request latency")}</small>
             </article>
             <article>
-              <span>Conflicting span identities</span>
-              <strong>{data.conflicts}</strong>
-              <small>Excluded from root latency; counts use canonical representatives</small>
+              <span>{t("Conflicting span identities")}</span>
+              <strong>{number(BigInt(data.conflicts), { useGrouping: false })}</strong>
+              <small>{t("Excluded from root latency; counts use canonical representatives")}</small>
             </article>
           </div>
           <details className="settings-card">
-            <summary>Full-window trends (60 UTC buckets)</summary>
+            <summary>{t("Full-window trends (60 UTC buckets)")}</summary>
             <div className="table-scroll">
               <table className="data-table">
                 <caption>
-                  Trace counts per bucket are not additive across a trace spanning multiple buckets.
+                  {t(
+                    "Trace counts per bucket are not additive across a trace spanning multiple buckets.",
+                  )}
                 </caption>
                 <thead>
                   <tr>
-                    <th>From UTC</th>
-                    <th>Traces</th>
-                    <th>Logs</th>
-                    <th>Error traces</th>
-                    <th>Root p95</th>
+                    <th>{t("From UTC")}</th>
+                    <th>{t("Traces")}</th>
+                    <th>{t("Logs")}</th>
+                    <th>{t("Error traces")}</th>
+                    <th>{t("Root p95")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -161,9 +178,9 @@ export function ProjectOverview({ window, service }: { window: TimeWindow; servi
                       <td>
                         <a href={link(b)}>{b.from}</a>
                       </td>
-                      <td>{b.traces}</td>
-                      <td>{b.logs}</td>
-                      <td>{b.errorTraces}</td>
+                      <td>{number(BigInt(b.traces), { useGrouping: false })}</td>
+                      <td>{number(BigInt(b.logs), { useGrouping: false })}</td>
+                      <td>{number(BigInt(b.errorTraces), { useGrouping: false })}</td>
                       <td>{b.p95Ns === null ? "—" : formatDuration(b.p95Ns)}</td>
                     </tr>
                   ))}
@@ -172,11 +189,10 @@ export function ProjectOverview({ window, service }: { window: TimeWindow; servi
             </div>
           </details>
           <p className="settings-hint">
-            Counts cover stored matching data, not total application traffic or complete traces.
-            Canonical records are assigned to their representative timestamp. Service filters choose
-            matching representatives; conflict flags consider all stored variants of each retained
-            identity in the window. Late exports can change results; the span and log reads are not
-            a transactional snapshot. Queried {data.queriedAt}.
+            {t(
+              "Counts cover stored matching data, not total application traffic or complete traces. Canonical records are assigned to their representative timestamp. Service filters choose matching representatives; conflict flags consider all stored variants of each retained identity in the window. Late exports can change results; the span and log reads are not a transactional snapshot. Queried {date}.",
+              { date: data.queriedAt },
+            )}
           </p>
         </>
       )}

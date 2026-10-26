@@ -1,5 +1,6 @@
-import type { ReactNode } from "react"
+import { Fragment, type ReactNode } from "react"
 import type { TimeWindow } from "./api"
+import { useI18n } from "./i18n"
 
 export function Notice({
   title,
@@ -18,6 +19,24 @@ export function Notice({
   )
 }
 
+// Keep linked sentences together so translations can change link order.
+export function LinkedMessage({
+  message,
+  links,
+}: {
+  message: string
+  links: Record<string, ReactNode>
+}) {
+  const { t } = useI18n()
+  const placeholders = Object.fromEntries(Object.keys(links).map((key) => [key, `{${key}}`]))
+  return t(message, placeholders)
+    .split(/(\{\w+\})/)
+    .map((part, index) => (
+      // biome-ignore lint/suspicious/noArrayIndexKey: Message parts have no state and can repeat.
+      <Fragment key={index}>{index % 2 ? (links[part.slice(1, -1)] ?? part) : part}</Fragment>
+    ))
+}
+
 export function Badge({ label, tone }: { label: string; tone: string }) {
   return <span className={`badge badge-${tone}`}>{label}</span>
 }
@@ -31,12 +50,13 @@ export function Timestamp({ value }: { value: string }) {
 }
 
 export function WindowLabel({ window }: { window: TimeWindow }) {
+  const { t } = useI18n()
   return (
     <div className="window-label">
-      <span className="eyebrow">Query window</span>
+      <span className="eyebrow">{t("Query window")}</span>
       <div>
         <Timestamp value={window.from} />
-        <span className="sr-only"> to </span>
+        <span className="sr-only"> {t("to")} </span>
         <span className="window-arrow" aria-hidden="true">
           {" "}
           →{" "}
@@ -48,11 +68,12 @@ export function WindowLabel({ window }: { window: TimeWindow }) {
 }
 
 export function Attributes({ title, values }: { title: string; values: Record<string, string> }) {
+  const { t, number } = useI18n()
   const entries = Object.entries(values ?? {}).sort(([a], [b]) => a.localeCompare(b))
   return (
     <section className="attribute-section" aria-label={title}>
       <h4>
-        {title} <span className="count">{entries.length}</span>
+        {title} <span className="count">{number(entries.length, { useGrouping: false })}</span>
       </h4>
       {entries.length ? (
         <div className="table-scroll">
@@ -60,8 +81,8 @@ export function Attributes({ title, values }: { title: string; values: Record<st
             <caption className="sr-only">{title}</caption>
             <thead>
               <tr>
-                <th scope="col">Key</th>
-                <th scope="col">Value</th>
+                <th scope="col">{t("Key")}</th>
+                <th scope="col">{t("Value")}</th>
               </tr>
             </thead>
             <tbody>
@@ -79,7 +100,7 @@ export function Attributes({ title, values }: { title: string; values: Record<st
           </table>
         </div>
       ) : (
-        <p className="muted">No attributes recorded.</p>
+        <p className="muted">{t("No attributes recorded.")}</p>
       )}
     </section>
   )
@@ -92,30 +113,39 @@ export function EmptyState({
   kind: "traces" | "logs" | "correlated logs"
   resetHref?: string
 }) {
+  const { t } = useI18n()
   return (
     <div className="empty-state">
       <span className="empty-symbol" aria-hidden="true">
         ∅
       </span>
-      <h3>No {kind} in this window</h3>
-      <p>Try a wider time range or remove filters.</p>
+      <h3>
+        {kind === "traces"
+          ? t("No traces in this window")
+          : kind === "logs"
+            ? t("No logs in this window")
+            : t("No correlated logs in this window")}
+      </h3>
+      <p>{t("Try a wider time range or remove filters.")}</p>
       {resetHref && (
         <a className="button button-secondary empty-reset" href={resetHref}>
-          Reset filters
+          {t("Reset filters")}
         </a>
       )}
       <p>
-        To add local telemetry, send OTLP traces and logs from your application to the Collector
-        configured for this validation project.
+        {t(
+          "To add local telemetry, send OTLP traces and logs from your application to the Collector configured for this validation project.",
+        )}
       </p>
-      {kind === "correlated logs" && <p>Logs must include this trace ID to appear here.</p>}
+      {kind === "correlated logs" && <p>{t("Logs must include this trace ID to appear here.")}</p>}
     </div>
   )
 }
 
 export function Truncation({ children }: { children: ReactNode }) {
+  const { t } = useI18n()
   return (
-    <Notice title="More records are available" tone="warning">
+    <Notice title={t("More records are available")} tone="warning">
       {children}
     </Notice>
   )

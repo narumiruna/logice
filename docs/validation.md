@@ -4,6 +4,24 @@
 
 Validate the local trace/log workflow, Go API, frontend tooling, selected storage, Collector, native Go drivers, and migration behavior with disposable data. This is not a production deployment. Authentication, multi-project authorization, load targets, and public Cloudflare routing remain separate acceptance gates. Historical foundation evidence below applies to its recorded revision.
 
+## Web UI languages: 2026-10-27
+
+The web UI now supports English (`en`), Traditional Chinese (`zh-TW`), Japanese (`ja`), Korean (`ko`), Spanish (`es`), French (`fr`), German (`de`), Portuguese (`pt`), and Italian (`it`). English remains the default and fallback. Simplified Chinese, Arabic, and the separate Brazilian Portuguese locale are not offered.
+
+Use **Language** before sign-in, in the application header, or under **Account settings → Appearance**. The preference is stored as `logice.locale`. Changing it updates the document language without navigation. User content, protocol values, code samples, and exact UTC timestamps remain unchanged. No backend, dependency, schema, ingestion, or polling changes are required.
+
+| Check | Actual result |
+| --- | --- |
+| `npm --prefix web run ci` | Biome, TypeScript, all 332 unit tests, and the production build passed. |
+| Catalog checks | All nine catalogs contain the same 850 English message keys, with nonempty translations and matching interpolation variables. Tests also check literal source keys, English fallback, browser storage failures, server rendering, safe interpolation, exact timestamps, and unchanged telemetry text. |
+| `sh scripts/validate-compose-web.sh` | All 129 Chromium tests passed. Static/API checks, storage readiness recovery, API-IP replacement recovery, and disposable-resource cleanup also passed. |
+| Language browser checks | All eight added languages preserve form drafts, filters, loaded results, URL state, and theme. Checks cover keyboard selection, reload/navigation persistence, synchronized account controls, translated role search, query/API errors, paused Live selection and inspector tabs, both shell themes at 390px and 1440px, and sign-in at 320px, 390px, and 1440px. |
+| E2E TypeScript and whitespace checks | Strict E2E TypeScript checks and `git diff --check` passed. |
+
+Review corrected project role search to match both the localized label and original API value. The existing appearance test now selects its theme control by accessible name because that section also contains the language control. The keyboard test waits for the authenticated explorer before checking focus; it does not test a control that is about to unmount during session loading.
+
+The build reports a chunk-size warning: translation catalogs are bundled locally with the application. There is no runtime translation service. Unknown server or browser error text uses the English fallback. Automated checks do not establish native-speaker translation approval, physical-device behavior, or full accessibility conformance. Validation used disposable resources and did not deploy or alter operator data.
+
 ## Workspace settings and Dashboard: 2026-10-24
 
 Implementation: `d4d8d41` on `narumi/feat/workspace-settings-dashboard`; [PR #18](https://github.com/narumiruna/logice/pull/18). Account Settings, project cards, Dashboard, and section-linked Project Settings now share the application shell. Usage and profile API rules are in [project access](project-access.md). Dashboard counts explicitly describe bounded samples, not project totals.

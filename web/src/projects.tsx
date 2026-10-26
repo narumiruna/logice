@@ -1,4 +1,5 @@
 import { type FormEvent, type ReactNode, useEffect, useState } from "react"
+import { useI18n } from "./i18n"
 import { ProjectAlerts } from "./project-alerts"
 import { type Page, type Project, projectRequest } from "./project-api"
 import { ProjectContext } from "./project-context"
@@ -13,6 +14,7 @@ import "./projects.css"
 export { canManageTokens, type Project, projectRequest } from "./project-api"
 
 export function ProjectGate({ children }: { children: ReactNode }) {
+  const { t } = useI18n()
   const id = projectId()
   const path = typeof window === "undefined" ? "/projects" : window.location.pathname
   const local = localProjectPath(path).replace(/\/$/, "") || "/"
@@ -49,9 +51,7 @@ export function ProjectGate({ children }: { children: ReactNode }) {
       })
       .catch((error) => {
         if (!controller.signal.aborted)
-          setError(
-            `Projects could not be loaded. ${error instanceof Error ? error.message : "Try again."}`,
-          )
+          setError(error instanceof Error ? error.message : "Try again.")
       })
     return () => controller.abort()
   }, [id, offset, revision])
@@ -81,37 +81,45 @@ export function ProjectGate({ children }: { children: ReactNode }) {
         <main id="main" tabIndex={-1} className="workspace-page">
           {!id && !projectIndex ? (
             <>
-              <h1>This page does not exist</h1>
-              <a href="/projects">Choose a project</a>
+              <h1>{t("This page does not exist")}</h1>
+              <a href="/projects">{t("Choose a project")}</a>
             </>
           ) : (
             <>
               <div className="page-heading">
                 <div>
-                  <span className="eyebrow">Workspace</span>
-                  <h1>Projects</h1>
-                  <p>Organize your applications. Share access without sharing credentials.</p>
+                  <span className="eyebrow">{t("Workspace")}</span>
+                  <h1>{t("Projects")}</h1>
+                  <p>
+                    {t("Organize your applications. Share access without sharing credentials.")}
+                  </p>
                 </div>
                 <a className="button button-secondary" href="/account">
-                  Manage your account
+                  {t("Manage your account")}
                 </a>
               </div>
               {error ? (
                 <div className="workspace-error" role="alert">
-                  <h2>Project list unavailable</h2>
-                  <p>{error}</p>
+                  <h2>{t("Project list unavailable")}</h2>
+                  <p>
+                    {t("Projects could not be loaded. {error}", {
+                      error: /^Project request failed \(\d+\)\.$/.test(error)
+                        ? t("Project request failed ({status}).", { status: error.slice(24, -2) })
+                        : t(error),
+                    })}
+                  </p>
                   <button
                     type="button"
                     className="button button-primary"
                     onClick={() => setRevision((v) => v + 1)}
                   >
-                    Retry projects
+                    {t("Retry projects")}
                   </button>
-                  <a href="/account">Open account settings</a>
+                  <a href="/account">{t("Open account settings")}</a>
                 </div>
               ) : !projects ? (
                 <p className="workspace-loading" role="status">
-                  Loading projects…
+                  {t("Loading projects…")}
                 </p>
               ) : (
                 <ProjectList page={projects} offset={offset} onPage={setOffset} />
@@ -143,12 +151,13 @@ function ProjectList({
   offset: number
   onPage: (offset: number) => void
 }) {
+  const { t, number } = useI18n()
   const [name, setName] = useState("")
   const [search, setSearch] = useState("")
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState("")
   const visible = page.items.filter((p) =>
-    `${p.name} ${p.id} ${p.role}`.toLowerCase().includes(search.toLowerCase()),
+    `${p.name} ${p.id} ${p.role} ${t(p.role)}`.toLowerCase().includes(search.toLowerCase()),
   )
   async function create(event: FormEvent) {
     event.preventDefault()
@@ -168,53 +177,62 @@ function ProjectList({
     <>
       <section className="settings-card project-create">
         <div>
-          <h2>Create a project</h2>
-          <p>You become its Owner. Project data and tokens stay separate.</p>
+          <h2>{t("Create a project")}</h2>
+          <p>{t("You become its Owner. Project data and tokens stay separate.")}</p>
         </div>
         <form className="project-create-form" onSubmit={(event) => void create(event)}>
           <label>
-            Project name
+            {t("Project name")}
             <input
               value={name}
               maxLength={80}
               required
               disabled={busy}
-              placeholder="e.g. Production API"
+              placeholder={t("e.g. Production API")}
               onChange={(e) => setName(e.target.value)}
             />
           </label>
           <button className="button button-primary" type="submit" disabled={busy || !name.trim()}>
-            Create project
+            {t("Create project")}
           </button>
         </form>
-        {error && <p role="alert">{error}</p>}
+        {error && (
+          <p role="alert">
+            {/^Project request failed \(\d+\)\.$/.test(error)
+              ? t("Project request failed ({status}).", { status: error.slice(24, -2) })
+              : t(error)}
+          </p>
+        )}
       </section>
       <div className="project-list-toolbar">
         <label>
-          Search this page
+          {t("Search this page")}
           <input
-            aria-label="Search projects on this page"
+            aria-label={t("Search projects on this page")}
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Name, project ID, or role"
+            placeholder={t("Name, project ID, or role")}
           />
         </label>
         <span>
-          {visible.length} of {page.items.length} projects on this page
+          {t("{visible} of {total} projects on this page", {
+            visible: number(visible.length),
+            total: number(page.items.length),
+          })}
         </span>
       </div>
       {page.items.length === 0 ? (
         <section className="workspace-empty">
-          <h2>No projects yet</h2>
-          <p>Create your first project, or share your account UUID with a project Owner.</p>
-          <a href="/account">Find your account UUID</a>
+          <h2>{t("No projects yet")}</h2>
+          <p>{t("Create your first project, or share your account UUID with a project Owner.")}</p>
+          <a href="/account">{t("Find your account UUID")}</a>
         </section>
       ) : visible.length === 0 ? (
         <section className="workspace-empty">
-          <h2>No matching projects on this page</h2>
+          <h2>{t("No matching projects on this page")}</h2>
           <button className="button button-secondary" type="button" onClick={() => setSearch("")}>
-            Clear search
+            {t("Clear search")}
           </button>
         </section>
       ) : (
@@ -226,7 +244,7 @@ function ProjectList({
                   {project.name.slice(0, 1).toUpperCase()}
                 </span>
                 <span className={`project-role role-${project.role.toLowerCase()}`}>
-                  {project.role}
+                  {t(project.role)}
                 </span>
               </div>
               <h2>
@@ -235,14 +253,14 @@ function ProjectList({
               <code>{project.id}</code>
               <p>
                 {project.role === "Owner"
-                  ? "Manage members, tokens, and project settings."
+                  ? t("Manage members, tokens, and project settings.")
                   : project.role === "Developer"
-                    ? "Inspect telemetry and manage ingestion tokens."
-                    : "Inspect project telemetry with read-only access."}
+                    ? t("Inspect telemetry and manage ingestion tokens.")
+                    : t("Inspect project telemetry with read-only access.")}
               </p>
               <div className="project-card-actions">
-                <a href={`/projects/${project.id}/dashboard`}>Open dashboard →</a>
-                <a href={`/projects/${project.id}/settings`}>Settings</a>
+                <a href={`/projects/${project.id}/dashboard`}>{t("Open dashboard →")}</a>
+                <a href={`/projects/${project.id}/settings`}>{t("Settings")}</a>
               </div>
             </article>
           ))}
@@ -258,9 +276,9 @@ function ProjectList({
             onPage(offset - 100)
           }}
         >
-          Previous projects
+          {t("Previous projects")}
         </button>
-        <span>Page {offset / 100 + 1}</span>
+        <span>{t("Page {page}", { page: number(offset / 100 + 1, { useGrouping: false }) })}</span>
         <button
           className="button button-secondary"
           disabled={!page.hasMore}
@@ -270,7 +288,7 @@ function ProjectList({
             onPage(offset + 100)
           }}
         >
-          Next projects
+          {t("Next projects")}
         </button>
       </div>
     </>

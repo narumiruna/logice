@@ -12,6 +12,7 @@ import {
   useState,
 } from "react"
 import type { TimeWindow } from "../api"
+import { useI18n } from "../i18n"
 import { Glyph } from "../preview/icons"
 import { formatDuration, isTraceId, severity, spanStatus } from "../telemetry"
 import type { LiveRecord } from "./api"
@@ -64,6 +65,7 @@ export const LiveTree = forwardRef<
   },
   ref,
 ) {
+  const { t } = useI18n()
   const scroll = useRef<HTMLDivElement>(null)
   const grid = useRef<HTMLDivElement>(null)
   const elements = useRef(new Map<string, HTMLDivElement>())
@@ -236,20 +238,22 @@ export const LiveTree = forwardRef<
   }, [rows, forced])
   const effectiveActive = rows.some((row) => row.record.id === active) ? active : rows[0]?.record.id
   return (
-    <section className="lv-feed lp-feed" aria-label="Unified live event tree">
+    <section className="lv-feed lp-feed" aria-label={t("Unified live event tree")}>
       <div className="lp-day-divider">
-        <span>Recent events</span>
+        <span>{t("Recent events")}</span>
         <span>{window ? `${window.from.slice(0, 10)} UTC` : "UTC"}</span>
         <span className="lp-day-rule" />
         <span className="lp-retained-count">
-          {new Set(rows.map((row) => row.record.traceId).filter(isTraceId)).size} traces in window
+          {t("{count} traces in window", {
+            count: new Set(rows.map((row) => row.record.traceId).filter(isTraceId)).size,
+          })}
         </span>
       </div>
       {notice && (
         <p className="lv-anchor-notice" role="status">
-          {notice}{" "}
+          {t(notice)}{" "}
           <button type="button" onClick={() => setNotice("")}>
-            Dismiss
+            {t("Dismiss")}
           </button>
         </p>
       )}
@@ -257,7 +261,7 @@ export const LiveTree = forwardRef<
         ref={grid}
         className="lv-grid"
         role="treegrid"
-        aria-label="Live telemetry events"
+        aria-label={t("Live telemetry events")}
         aria-rowcount={rows.length + (headers ? 1 : 0)}
         aria-colcount={5}
         onFocusCapture={(event) => {
@@ -327,20 +331,20 @@ export const LiveTree = forwardRef<
         {headers && (
           <div role="row" tabIndex={-1} className="lv-row lv-grid-header">
             <span role="columnheader" tabIndex={-1}>
-              Time <span className="lv-heading-unit">UTC</span>
+              {t("Time")} <span className="lv-heading-unit">UTC</span>
             </span>
             <span role="columnheader" tabIndex={-1}>
-              Service
+              {t("Service")}
             </span>
             <span role="columnheader" tabIndex={-1}>
-              Message
+              {t("Message")}
             </span>
             <span role="columnheader" tabIndex={-1}>
-              Relative timing{" "}
+              {t("Relative timing")}{" "}
               <span className="lv-heading-unit">0 — {formatDuration(String(scaleNs))}</span>
             </span>
             <span role="columnheader" tabIndex={-1}>
-              Duration
+              {t("Duration")}
             </span>
           </div>
         )}
@@ -414,7 +418,7 @@ export const LiveTree = forwardRef<
                     <span className={`lp-service-chip ${serviceClass(record.serviceName)}`}>
                       <span aria-hidden="true" />
                       <span className="lv-service-name">
-                        {record.serviceName || "Unknown service"}
+                        {record.serviceName || t("Unknown service")}
                       </span>
                     </span>
                   </div>
@@ -438,11 +442,15 @@ export const LiveTree = forwardRef<
                         tabIndex={-1}
                         disabled={forcedOpen.has(record.id)}
                         aria-expanded={expanded.has(record.id) || forcedOpen.has(record.id)}
-                        aria-label={`${expanded.has(record.id) || forcedOpen.has(record.id) ? "Collapse" : "Expand"} ${record.name || record.body}`}
+                        aria-label={
+                          expanded.has(record.id) || forcedOpen.has(record.id)
+                            ? t("Collapse {message}", { message: record.name || record.body })
+                            : t("Expand {message}", { message: record.name || record.body })
+                        }
                         title={
                           forcedOpen.has(record.id)
-                            ? "Filters keep matching paths expanded"
-                            : `${row.childCount} direct children`
+                            ? t("Filters keep matching paths expanded")
+                            : t("{count} direct children", { count: row.childCount })
                         }
                         onClick={() => onToggle(record.id)}
                       >
@@ -460,28 +468,33 @@ export const LiveTree = forwardRef<
                       tabIndex={-1}
                       className={`lv-message-button lp-event-message ${record.kind} ${record.kind === "log" ? status.tone : ""}`}
                       aria-pressed={selected === record.id}
-                      title={record.name || record.body || "Empty record"}
-                      aria-label={`Inspect ${record.name || record.body || "empty record"}`}
+                      title={record.name || record.body || t("Empty record")}
+                      aria-label={t("Inspect {message}", {
+                        message: record.name || record.body || t("empty record"),
+                      })}
                       onClick={() => onSelect(record)}
                     >
                       {record.kind === "span"
-                        ? record.name || "Unnamed span"
-                        : record.body || "(Empty body)"}
+                        ? record.name || t("Unnamed span")
+                        : record.body || t("(Empty body)")}
                     </button>
-                    {status.tone === "error" && <span className="lp-row-error">error</span>}
+                    {status.tone === "error" && <span className="lp-row-error">{t("error")}</span>}
                     {record.kind === "log" && status.tone === "warning" && (
                       <span className="lv-tag lv-warning-tag">{status.label}</span>
                     )}
-                    {record.contextOnly && <span className="lv-tag">Context</span>}
-                    {record.conflict && <span className="lv-tag lv-error">Conflict</span>}
+                    {record.contextOnly && <span className="lv-tag">{t("Context")}</span>}
+                    {record.conflict && <span className="lv-tag lv-error">{t("Conflict")}</span>}
                     {BigInt(record.occurrences) > 1n && (
-                      <span className="lv-tag" title="Stored occurrences, not a proven retry count">
+                      <span
+                        className="lv-tag"
+                        title={t("Stored occurrences, not a proven retry count")}
+                      >
                         ×{record.occurrences}
                       </span>
                     )}
                     {row.issue && (
-                      <span className="lv-tag" title={row.issue}>
-                        {row.issue}
+                      <span className="lv-tag" title={t(row.issue)}>
+                        {t(row.issue)}
                       </span>
                     )}
                   </div>
@@ -490,7 +503,12 @@ export const LiveTree = forwardRef<
                       className="lv-track lp-bar-track"
                       title={
                         record.kind === "span"
-                          ? `${record.durationNs} ns · ${status.label}`
+                          ? t("{duration} ns · {status}", {
+                              duration: record.durationNs,
+                              status: ["Error", "OK", "Unset"].includes(status.label)
+                                ? t(status.label)
+                                : status.label,
+                            })
                           : `${record.startTime} · ${status.label}`
                       }
                     >
@@ -506,7 +524,16 @@ export const LiveTree = forwardRef<
                       />
                     </span>
                   </div>
-                  <div role="gridcell" tabIndex={-1} className="lv-duration" title={status.label}>
+                  <div
+                    role="gridcell"
+                    tabIndex={-1}
+                    className="lv-duration"
+                    title={
+                      record.kind === "span" && ["Error", "OK", "Unset"].includes(status.label)
+                        ? t(status.label)
+                        : status.label
+                    }
+                  >
                     {record.kind === "span" ? formatDuration(record.durationNs) : "—"}
                   </div>
                 </div>

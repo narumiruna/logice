@@ -17,7 +17,10 @@ test("account settings persist a display name and remain available without the p
     await expect(page.getByLabel("Account", { exact: true })).toContainText("Workspace operator")
     await page.reload()
     await expect(page.getByLabel("Display name", { exact: true })).toHaveValue("Workspace operator")
-    await page.locator("#appearance").getByRole("combobox").selectOption("studio")
+    await page
+      .locator("#appearance")
+      .getByRole("combobox", { name: "Appearance theme", exact: true })
+      .selectOption("studio")
     await expect(page.locator("html")).toHaveAttribute("data-theme", "studio")
     await expect(page.locator("#security")).toContainText("24 hours idle")
     await expect(page.locator("#invitations")).toContainText(

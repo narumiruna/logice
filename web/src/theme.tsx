@@ -1,4 +1,5 @@
 import { createContext, type ReactNode, useContext, useState } from "react"
+import { useI18n } from "./i18n"
 
 export type Theme = "classic" | "studio"
 export const themeStorageKey = "logice.theme"
@@ -47,20 +48,21 @@ export function ThemeProvider({
   return <ThemeContext value={{ theme, setTheme }}>{children}</ThemeContext>
 }
 
-export function ThemeSelect({ label = "Theme" }: { label?: string }) {
+export function ThemeSelect({ label }: { label?: string }) {
+  const { t } = useI18n()
   const context = useContext(ThemeContext)
   if (!context) throw new Error("ThemeSelect requires ThemeProvider")
   return (
     <label className="theme-select">
-      <span>{label}</span>
+      <span>{label ?? t("Theme")}</span>
       <select
         value={context.theme}
         onChange={(event) => {
           if (isTheme(event.target.value)) context.setTheme(event.target.value)
         }}
       >
-        <option value="classic">Classic</option>
-        <option value="studio">Studio</option>
+        <option value="classic">{t("Classic")}</option>
+        <option value="studio">{t("Studio")}</option>
       </select>
     </label>
   )

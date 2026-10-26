@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { useI18n } from "../i18n"
 import { AppShell } from "../shell"
 import { Glyph } from "./icons"
 import { formatDuration, PreviewInspector } from "./inspector"
@@ -32,6 +33,7 @@ function Overview({
   now: number
   windowMs: number
 }) {
+  const { t } = useI18n()
   const buckets = Array.from({ length: 60 }, (_, slot) => ({ slot, count: 0, errors: 0 }))
   for (const event of traces.flatMap((trace) => trace.events)) {
     const index = Math.floor(((event.startMs - (now - windowMs)) / windowMs) * buckets.length)
@@ -42,13 +44,13 @@ function Overview({
   }
   const max = Math.max(1, ...buckets.map((bucket) => bucket.count))
   return (
-    <section className="lp-overview" aria-label="Sample event volume over time">
+    <section className="lp-overview" aria-label={t("Sample event volume over time")}>
       <div className="lp-overview-caption">
         <span>
-          Event volume <span className="lp-muted">/ sample data</span>
+          {t("Event volume")} <span className="lp-muted">{t("/ sample data")}</span>
         </span>
         <span className="lp-overview-now">
-          <span /> Now
+          <span /> {t("Now")}
         </span>
       </div>
       <svg
@@ -56,9 +58,9 @@ function Overview({
         viewBox="0 0 960 43"
         preserveAspectRatio="none"
         role="img"
-        aria-label="Histogram of simulated events in the selected time window"
+        aria-label={t("Histogram of simulated events in the selected time window")}
       >
-        <title>Sample event volume</title>
+        <title>{t("Sample event volume")}</title>
         <rect x="880" y="0" width="80" height="43" fill="var(--chart-highlight)" />
         <line x1="0" x2="960" y1="42" y2="42" stroke="var(--color-border)" />
         {buckets.map((bucket) => (
@@ -93,6 +95,8 @@ function Overview({
 }
 
 export function LivePreview() {
+  const { t } = useI18n()
+  const [updatesBefore, updatesAfter] = t("{count} updates", { count: "\0" }).split("\0")
   const [session, setSession] = useState(() => createPreviewState(Date.now()))
   const [live, setLive] = useState(true)
   const [expanded, setExpanded] = useState(() => initialExpanded(session.traces))
@@ -235,14 +239,15 @@ export function LivePreview() {
             <div className="lp-page-title">
               <div>
                 <span className="lp-breadcrumb">
-                  Explore <span>/</span> Live
+                  {t("Explore")} <span>/</span> {t("Live")}
                 </span>
                 <h1>
-                  Live <span className="lp-heading-caption">Every event. In context.</span>
+                  {t("Live")}{" "}
+                  <span className="lp-heading-caption">{t("Every event. In context.")}</span>
                 </h1>
               </div>
               <span className="lp-live-meta">
-                {live ? "Updating every second" : "Updates paused"}
+                {live ? t("Updating every second") : t("Updates paused")}
                 <span className={live ? "lp-connection-dot" : "lp-connection-dot paused"} />
               </span>
             </div>
@@ -251,20 +256,20 @@ export function LivePreview() {
                 <Glyph name="search" />
                 <input
                   ref={searchInput}
-                  aria-label="Filter sample events"
-                  placeholder="Search messages, services, or trace IDs…"
+                  aria-label={t("Filter sample events")}
+                  placeholder={t("Search messages, services, or trace IDs…")}
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                 />
                 <kbd>/</kbd>
               </label>
               <select
-                aria-label="Service filter"
+                aria-label={t("Service filter")}
                 className="lp-select"
                 value={service}
                 onChange={(event) => setService(event.target.value)}
               >
-                <option value="all">All services</option>
+                <option value="all">{t("All services")}</option>
                 {services.map((item) => (
                   <option key={item} value={item}>
                     {item}
@@ -274,25 +279,25 @@ export function LivePreview() {
               <div className="lp-time-control">
                 <Glyph name="clock" size={14} />
                 <select
-                  aria-label="Time window"
+                  aria-label={t("Time window")}
                   value={windowMs}
                   onChange={(event) => setWindowMs(Number(event.target.value))}
                 >
-                  <option value="60000">Last 1 minute</option>
-                  <option value="300000">Last 5 minutes</option>
-                  <option value="900000">Last 15 minutes</option>
+                  <option value="60000">{t("Last 1 minute")}</option>
+                  <option value="300000">{t("Last 5 minutes")}</option>
+                  <option value="900000">{t("Last 15 minutes")}</option>
                 </select>
               </div>
               <button
                 className={live ? "lp-live-button active" : "lp-live-button"}
                 type="button"
-                aria-label={live ? "Pause live updates" : "Resume live updates"}
+                aria-label={live ? t("Pause live updates") : t("Resume live updates")}
                 aria-pressed={live}
                 onClick={() => setLive((value) => !value)}
               >
                 <Glyph name={live ? "pause" : "play"} size={13} />
                 <span className="lp-live-dot" />
-                {live ? "Live" : "Paused"}
+                {live ? t("Live") : t("Paused")}
               </button>
             </div>
             <Overview traces={traces} now={session.now} windowMs={windowMs} />
@@ -306,7 +311,7 @@ export function LivePreview() {
                   }}
                 >
                   <Glyph name="collapse" size={14} />
-                  Collapse all
+                  {t("Collapse all")}
                 </button>
                 <button
                   type="button"
@@ -319,7 +324,7 @@ export function LivePreview() {
                   }
                 >
                   <Glyph name="expand" size={14} />
-                  Expand all
+                  {t("Expand all")}
                 </button>
                 <span className="lp-toolbar-divider" />
                 <label>
@@ -329,7 +334,7 @@ export function LivePreview() {
                     onChange={(event) => setErrorsOnly(event.target.checked)}
                   />
                   <span className="lp-error-dot" />
-                  Errors only
+                  {t("Errors only")}
                 </label>
               </div>
               <div className="lp-feed-options">
@@ -339,7 +344,7 @@ export function LivePreview() {
                     checked={autoExpand}
                     onChange={(event) => setAutoExpand(event.target.checked)}
                   />
-                  Auto-expand
+                  {t("Auto-expand")}
                 </label>
                 <label>
                   <input
@@ -347,28 +352,30 @@ export function LivePreview() {
                     checked={headers}
                     onChange={(event) => setHeaders(event.target.checked)}
                   />
-                  Columns
+                  {t("Columns")}
                 </label>
                 <button
                   className="lp-icon-button"
                   type="button"
                   onClick={reset}
-                  aria-label="Reset demo"
-                  title="Reset simulated events"
+                  aria-label={t("Reset demo")}
+                  title={t("Reset simulated events")}
                 >
                   <Glyph name="reset" size={14} />
                 </button>
               </div>
             </div>
-            <section className="lp-feed" aria-label="Unified live event tree">
+            <section className="lp-feed" aria-label={t("Unified live event tree")}>
               <div className="lp-day-divider">
-                <span>Recent events</span>
+                <span>{t("Recent events")}</span>
                 <span>
                   {new Date(session.now).toISOString().slice(0, 10)}{" "}
                   <span className="lp-muted">UTC</span>
                 </span>
                 <span className="lp-day-rule" />
-                <span className="lp-retained-count">{traces.length} traces in window</span>
+                <span className="lp-retained-count">
+                  {t("{count} traces in window", { count: traces.length })}
+                </span>
               </div>
               <div
                 className="lp-feed-scroll"
@@ -379,20 +386,20 @@ export function LivePreview() {
                   rememberAnchor()
                 }}
               >
-                <table className="lp-event-table" aria-label="Live telemetry events">
+                <table className="lp-event-table" aria-label={t("Live telemetry events")}>
                   {headers && (
                     <thead>
                       <tr>
                         <th scope="col">
-                          Time <span>UTC</span>
+                          {t("Time")} <span>UTC</span>
                         </th>
-                        <th scope="col">Service</th>
-                        <th scope="col">Message</th>
+                        <th scope="col">{t("Service")}</th>
+                        <th scope="col">{t("Message")}</th>
                         <th scope="col" className="lp-timing-heading">
-                          Relative timing <span>0 — {formatDuration(scaleMs)}</span>
+                          {t("Relative timing")} <span>0 — {formatDuration(scaleMs)}</span>
                         </th>
                         <th scope="col" className="lp-duration-heading">
-                          Duration
+                          {t("Duration")}
                         </th>
                       </tr>
                     </thead>
@@ -450,13 +457,19 @@ export function LivePreview() {
                                     isExpanded ? "lp-tree-toggle expanded" : "lp-tree-toggle"
                                   }
                                   type="button"
-                                  aria-label={`${isExpanded ? "Collapse" : "Expand"} ${event.message}`}
+                                  aria-label={
+                                    isExpanded
+                                      ? t("Collapse {message}", { message: event.message })
+                                      : t("Expand {message}", { message: event.message })
+                                  }
                                   aria-expanded={isExpanded}
                                   disabled={forcedExpansion}
                                   title={
                                     forcedExpansion
-                                      ? "Filters keep matching paths expanded"
-                                      : `${childCount} direct children`
+                                      ? t("Filters keep matching paths expanded")
+                                      : t("{childCount} direct children", {
+                                          childCount: childCount,
+                                        })
                                   }
                                   onClick={() => toggle(event.id)}
                                 >
@@ -472,7 +485,7 @@ export function LivePreview() {
                               <button
                                 type="button"
                                 className={`lp-event-message ${event.kind} ${event.level}`}
-                                aria-label={`Inspect ${event.message}`}
+                                aria-label={t("Inspect {message}", { message: event.message })}
                                 aria-pressed={currentSelection?.id === event.id}
                                 onClick={(click) => {
                                   lastSelection.current = click.currentTarget
@@ -484,11 +497,11 @@ export function LivePreview() {
                               {event.status === "running" && (
                                 <span className="lp-running-label">
                                   <span />
-                                  running
+                                  {t("running")}
                                 </span>
                               )}
                               {event.status === "error" && (
-                                <span className="lp-row-error">error</span>
+                                <span className="lp-row-error">{t("error")}</span>
                               )}
                             </div>
                           </td>
@@ -522,8 +535,8 @@ export function LivePreview() {
                 {rows.length === 0 && (
                   <div className="lp-empty">
                     <Glyph name="search" size={24} />
-                    <strong>No matching events</strong>
-                    <p>Try another message, service, or time window.</p>
+                    <strong>{t("No matching events")}</strong>
+                    <p>{t("Try another message, service, or time window.")}</p>
                     <button
                       type="button"
                       onClick={() => {
@@ -532,7 +545,7 @@ export function LivePreview() {
                         setErrorsOnly(false)
                       }}
                     >
-                      Reset filters
+                      {t("Reset filters")}
                     </button>
                   </div>
                 )}
@@ -540,39 +553,41 @@ export function LivePreview() {
               {!follow && pending > 0 && (
                 <button type="button" className="lp-new-events" onClick={() => setFollow(true)}>
                   <Glyph name="arrow-down" size={14} />
-                  {pending} new events · Jump to latest
+                  {t("{count} new events · Jump to latest", { count: pending })}
                 </button>
               )}
               <div className="lp-feed-footer">
                 <span>
                   <span className={live ? "lp-footer-dot" : "lp-footer-dot paused"} />
-                  {live ? "Receiving simulated events" : "Simulation paused"}
+                  {live ? t("Receiving simulated events") : t("Simulation paused")}
                   <span className="lp-footer-separator">·</span>
+                  {updatesBefore}
                   <span className="lp-mono" data-testid="preview-tick">
                     {session.tick}
-                  </span>{" "}
-                  updates
+                  </span>
+                  {updatesAfter}
                 </span>
                 <span>
-                  {rows.length} rows shown <span className="lp-footer-separator">·</span>
+                  {t("{count} rows shown", { count: rows.length })}{" "}
+                  <span className="lp-footer-separator">·</span>
                   <label>
                     <input
                       type="checkbox"
                       checked={follow}
                       onChange={(event) => setFollow(event.target.checked)}
                     />
-                    Follow latest
+                    {t("Follow latest")}
                   </label>
                 </span>
               </div>
             </section>
             <div className="lp-bottom-note">
               <span className="lp-keyboard-hint">
-                <kbd>/</kbd> search <span>·</span> <kbd>esc</kbd> close details
+                <kbd>/</kbd> {t("search")} <span>·</span> <kbd>{t("esc")}</kbd> {t("close details")}
               </span>
               <span>
-                Design preview <span>·</span> Sample data only <span>·</span> Up to 24 traces
-                retained
+                {t("Design preview")} <span>·</span> {t("Sample data only")} <span>·</span>{" "}
+                {t("Up to 24 traces retained")}
               </span>
             </div>
           </main>

@@ -1,5 +1,6 @@
 import type { FormEvent } from "react"
 import { useState } from "react"
+import { useI18n } from "./i18n"
 import { projectPath } from "./project-path"
 import {
   filterResetHref,
@@ -11,6 +12,7 @@ import {
 } from "./telemetry"
 
 export function FilterForm({ route }: { route: Route }) {
+  const { t } = useI18n()
   const [range, setRange] = useState<Range>(route.range)
   const logs = route.page === "logs"
   const filters = route.filters
@@ -36,7 +38,7 @@ export function FilterForm({ route }: { route: Route }) {
   return (
     <form
       className="filter-form"
-      aria-label={logs ? "Log filters" : "Trace filters"}
+      aria-label={logs ? t("Log filters") : t("Trace filters")}
       action={projectPath(logs ? "/logs" : "/traces")}
       method="get"
       onSubmit={submit}
@@ -46,57 +48,61 @@ export function FilterForm({ route }: { route: Route }) {
       <input type="hidden" name="limit" value={filters.limit} />
       <div className="filter-fields">
         <label>
-          Time range
+          {t("Time range")}
           <select
             name="range"
             value={range}
             onChange={(event) => setRange(event.target.value as Range)}
           >
-            {route.range === "fixed" && <option value="fixed">Fixed window</option>}
+            {route.range === "fixed" && <option value="fixed">{t("Fixed window")}</option>}
             {Object.entries(ranges).map(([value, item]) => (
               <option key={value} value={value}>
-                {item.label}
+                {t(item.label)}
               </option>
             ))}
           </select>
         </label>
         <label>
-          Service
+          {t("Service")}
           <input
             name="service"
             defaultValue={filters.service}
-            placeholder="All services (exact match)"
+            placeholder={t("All services (exact match)")}
             autoComplete="off"
           />
         </label>
         <label className="search-field">
-          Search
+          {t("Search")}
           <input
             type="search"
             name="search"
             defaultValue={filters.search}
-            placeholder={logs ? "Log body text" : "Span name or trace ID"}
+            placeholder={logs ? t("Log body text") : t("Span name or trace ID")}
           />
         </label>
         {logs ? (
           <label>
-            Minimum severity
+            {t("Minimum severity")}
             <select name="minSeverity" defaultValue={filters.minSeverity}>
-              {[
-                [0, "All severities"],
-                [1, "Trace"],
-                [5, "Debug"],
-                [9, "Info"],
-                [13, "Warn"],
-                [17, "Error"],
-                [21, "Fatal"],
-              ].map(([value, label]) => (
+              {(
+                [
+                  [0, "All severities"],
+                  [1, "Trace"],
+                  [5, "Debug"],
+                  [9, "Info"],
+                  [13, "Warn"],
+                  [17, "Error"],
+                  [21, "Fatal"],
+                ] as const
+              ).map(([value, label]) => (
                 <option key={value} value={value}>
-                  {label}
+                  {t(label)}
                 </option>
               ))}
               {![0, 1, 5, 9, 13, 17, 21].includes(filters.minSeverity) && (
-                <option value={filters.minSeverity}>Severity ≥ {filters.minSeverity}</option>
+                <option value={filters.minSeverity}>
+                  {t("Severity ≥ {severity}", { severity: filters.minSeverity })}
+                </option>
               )}
             </select>
           </label>
@@ -108,20 +114,20 @@ export function FilterForm({ route }: { route: Route }) {
               value="true"
               defaultChecked={filters.errorsOnly}
             />
-            Errors only
+            {t("Errors only")}
           </label>
         )}
         <button className="button button-primary" type="submit">
-          Apply filters
+          {t("Apply filters")}
         </button>
       </div>
       {logs && (
         <label className="trace-filter">
-          Trace ID{" "}
+          {t("Trace ID")}{" "}
           <input
             name="traceId"
             defaultValue={filters.traceId}
-            placeholder="Optional · 32 hexadecimal digits"
+            placeholder={t("Optional · 32 hexadecimal digits")}
             pattern="[a-fA-F0-9]{32}"
             maxLength={32}
             autoComplete="off"
@@ -130,11 +136,13 @@ export function FilterForm({ route }: { route: Route }) {
       )}
       <div className="filter-footer">
         <p className="filter-note">
-          Filters keep the current window. Refresh moves a relative window forward. No live polling.
+          {t(
+            "Filters keep the current window. Refresh moves a relative window forward. No live polling.",
+          )}
         </p>
         {resetHref && (
           <a className="filter-reset" href={resetHref}>
-            Reset filters
+            {t("Reset filters")}
           </a>
         )}
       </div>

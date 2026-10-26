@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { TimeWindow } from "../api"
+import { useI18n } from "../i18n"
 import { Glyph } from "../preview/icons"
 import { projectPath } from "../project-path"
 import { SaveViewButton } from "../save-view-button"
@@ -24,6 +25,7 @@ function readLocation(): { route: LiveRoute | null; error: string } {
 }
 
 export function LivePage() {
+  const { t } = useI18n()
   const [location, setLocation] = useState(readLocation)
   useEffect(() => {
     const onPop = () => setLocation(readLocation())
@@ -44,10 +46,10 @@ export function LivePage() {
           <LiveWorkspace route={location.route} navigate={navigate} />
         ) : (
           <main id="live-content" className="lv-invalid" tabIndex={-1}>
-            <h1>Invalid Live query</h1>
-            <p>{location.error}</p>
-            <a href={projectPath("/live")}>Reset Live view</a> ·{" "}
-            <a href={projectPath("/traces")}>Open traces</a>
+            <h1>{t("Invalid Live query")}</h1>
+            <p>{t(location.error)}</p>
+            <a href={projectPath("/live")}>{t("Reset Live view")}</a> ·{" "}
+            <a href={projectPath("/traces")}>{t("Open traces")}</a>
           </main>
         )}
       </div>
@@ -62,6 +64,7 @@ function LiveWorkspace({
   route: LiveRoute
   navigate: (route: LiveRoute, replace?: boolean) => void
 }) {
+  const { t } = useI18n()
   const [draft, setDraft] = useState(route)
   const [formError, setFormError] = useState("")
   const [fixedFrom, setFixedFrom] = useState(route.from ?? "")
@@ -269,10 +272,11 @@ function LiveWorkspace({
         <div className="lp-page-title">
           <div>
             <span className="lp-breadcrumb">
-              Explore <span>/</span> Live
+              {t("Explore")} <span>/</span> {t("Live")}
             </span>
             <h1>
-              Live <span className="lp-heading-caption">Every event. In context.</span>
+              {t("Live")}{" "}
+              <span className="lp-heading-caption">{t("Every event. In context.")}</span>
             </h1>
             <SaveViewButton
               definition={captureView(window.location.href, { headers, follow, autoExpand })}
@@ -283,17 +287,19 @@ function LiveWorkspace({
             role="status"
             title={
               state.lastSuccess
-                ? `Last successful update ${new Date(state.lastSuccess).toISOString()}`
-                : "No successful response yet"
+                ? t("Last successful update {timestamp}", {
+                    timestamp: new Date(state.lastSuccess).toISOString(),
+                  })
+                : t("No successful response yet")
             }
           >
-            <strong>{statusText}</strong>
+            <strong>{t(statusText)}</strong>
             <span className={receiving ? "lp-connection-dot" : "lp-connection-dot paused"} />
           </div>
         </div>
         <form
           id="live-query"
-          aria-label="Live filters"
+          aria-label={t("Live filters")}
           className="lv-query lp-querybar"
           onSubmit={(event) => {
             event.preventDefault()
@@ -309,8 +315,8 @@ function LiveWorkspace({
             <Glyph name="search" />
             <input
               ref={search}
-              aria-label="Search live events"
-              placeholder="Search messages, trace or span IDs…"
+              aria-label={t("Search live events")}
+              placeholder={t("Search messages, trace or span IDs…")}
               value={draft.search}
               onChange={(event) => setDraft({ ...draft, search: event.target.value })}
             />
@@ -318,20 +324,20 @@ function LiveWorkspace({
             <button
               type="submit"
               className={queryDirty ? "lv-apply dirty" : "lv-apply"}
-              aria-label="Apply filters"
-              title="Apply filters (Enter)"
+              aria-label={t("Apply filters")}
+              title={t("Apply filters (Enter)")}
             >
-              Apply
+              {t("Apply")}
             </button>
           </label>
           <label className="lv-service-control">
             <input
-              aria-label="Service filter"
-              placeholder="All services"
+              aria-label={t("Service filter")}
+              placeholder={t("All services")}
               list="live-services"
               value={draft.service}
               onChange={(event) => setDraft({ ...draft, service: event.target.value })}
-              title="Exact service name. Suggestions come from the current results."
+              title={t("Exact service name. Suggestions come from the current results.")}
             />
             <datalist id="live-services">
               {services.map((service) => (
@@ -342,31 +348,31 @@ function LiveWorkspace({
           <div className="lp-time-control">
             <Glyph name="clock" size={14} />
             <select
-              aria-label="Time window"
+              aria-label={t("Time window")}
               value={draft.range}
               onChange={(event) =>
                 setDraft({ ...draft, range: event.target.value as LiveRoute["range"] })
               }
             >
-              <option value="1m">Last 1 minute</option>
-              <option value="5m">Last 5 minutes</option>
-              <option value="15m">Last 15 minutes</option>
+              <option value="1m">{t("Last 1 minute")}</option>
+              <option value="5m">{t("Last 5 minutes")}</option>
+              <option value="15m">{t("Last 15 minutes")}</option>
             </select>
           </div>
           <button
             type="button"
             className={receiving ? "lp-live-button active" : "lp-live-button"}
-            aria-label={route.live ? "Pause live updates" : "Resume live updates"}
+            aria-label={route.live ? t("Pause live updates") : t("Resume live updates")}
             aria-pressed={route.live}
             onClick={toggleLive}
           >
             <Glyph name={route.live ? "pause" : "play"} size={13} />
             <span className="lp-live-dot" />
-            {route.live ? "Live" : "Paused"}
+            {route.live ? t("Live") : t("Paused")}
           </button>
         </form>
         <details className="lv-fixed">
-          <summary>Fixed UTC interval</summary>
+          <summary>{t("Fixed UTC interval")}</summary>
           <form
             onSubmit={(event) => {
               event.preventDefault()
@@ -375,9 +381,9 @@ function LiveWorkspace({
             }}
           >
             <label>
-              From UTC
+              {t("From UTC")}
               <input
-                aria-label="From UTC"
+                aria-label={t("From UTC")}
                 value={fixedFrom}
                 onChange={(event) => {
                   fixedDirty.current = true
@@ -386,9 +392,9 @@ function LiveWorkspace({
               />
             </label>
             <label>
-              To UTC
+              {t("To UTC")}
               <input
-                aria-label="To UTC"
+                aria-label={t("To UTC")}
                 value={fixedTo}
                 onChange={(event) => {
                   fixedDirty.current = true
@@ -396,26 +402,30 @@ function LiveWorkspace({
                 }}
               />
             </label>
-            <button type="submit">Apply fixed interval</button>
-            <span>1 second–15 minutes · from inclusive, to exclusive</span>
+            <button type="submit">{t("Apply fixed interval")}</button>
+            <span>{t("1 second–15 minutes · from inclusive, to exclusive")}</span>
           </form>
         </details>
         {formError && (
           <p role="alert" className="lv-warning">
-            {formError}
+            {t(formError)}
           </p>
         )}
         {snapshot && state.status === "loading" && (
           <p className="lv-warning">
-            Updating query · showing the previous response until the new request succeeds.
+            {t("Updating query · showing the previous response until the new request succeeds.")}
           </p>
         )}
         {state.error && (
           <div role="alert" className="lv-warning">
-            <strong>Telemetry could not be updated.</strong> {state.error.message}{" "}
-            {snapshot && "Showing the last successful response; it can be stale."}{" "}
+            <strong>{t("Telemetry could not be updated.")}</strong>{" "}
+            {state.error instanceof LiveApiError &&
+            /^Live request failed \(\d+\)\.$/.test(state.error.message)
+              ? t("Live request failed ({status}).", { status: state.error.status })
+              : t(state.error.message)}{" "}
+            {snapshot && t("Showing the last successful response; it can be stale.")}{" "}
             <button type="button" onClick={state.refresh}>
-              Try again
+              {t("Try again")}
             </button>
           </div>
         )}
@@ -429,11 +439,17 @@ function LiveWorkspace({
         )}
         {truncated && (
           <p className="lv-warning" role="status">
-            Partial results: {snapshot.spansTruncated && "span limit; "}
-            {snapshot.logsTruncated && "log limit; "}
-            {snapshot.contextTruncated && "context limit; "}
-            {snapshot.traceGroupsTruncated && "trace-group limit; "}narrow the window or filters.
-            Histogram counts are not limited by these row caps.
+            {t(
+              "Partial results: {limits}narrow the window or filters. Histogram counts are not limited by these row caps.",
+              {
+                limits: [
+                  snapshot.spansTruncated ? t("span limit; ") : "",
+                  snapshot.logsTruncated ? t("log limit; ") : "",
+                  snapshot.contextTruncated ? t("context limit; ") : "",
+                  snapshot.traceGroupsTruncated ? t("trace-group limit; ") : "",
+                ].join(""),
+              },
+            )}
           </p>
         )}
         <div className="lp-feed-toolbar">
@@ -446,7 +462,7 @@ function LiveWorkspace({
                 setAutoExpand(false)
               }}
             >
-              <Glyph name="collapse" size={14} /> Collapse all
+              <Glyph name="collapse" size={14} /> {t("Collapse all")}
             </button>
             <button
               type="button"
@@ -459,7 +475,7 @@ function LiveWorkspace({
                 )
               }
             >
-              <Glyph name="expand" size={14} /> Expand all
+              <Glyph name="expand" size={14} /> {t("Expand all")}
             </button>
             <span className="lp-toolbar-divider" />
             <label>
@@ -468,23 +484,25 @@ function LiveWorkspace({
                 checked={draft.errorsOnly}
                 onChange={(event) => setDraft({ ...draft, errorsOnly: event.target.checked })}
               />
-              <span className="lp-error-dot" /> Errors only
+              <span className="lp-error-dot" /> {t("Errors only")}
             </label>
             <select
-              aria-label="Minimum log severity"
+              aria-label={t("Minimum log severity")}
               className="lv-severity"
               value={draft.minSeverity}
               onChange={(event) => setDraft({ ...draft, minSeverity: Number(event.target.value) })}
             >
-              <option value={0}>All severities</option>
-              <option value={1}>Trace+</option>
-              <option value={5}>Debug+</option>
-              <option value={9}>Info+</option>
-              <option value={13}>Warn+</option>
-              <option value={17}>Error+</option>
-              <option value={21}>Fatal+</option>
+              <option value={0}>{t("All severities")}</option>
+              <option value={1}>{t("Trace+")}</option>
+              <option value={5}>{t("Debug+")}</option>
+              <option value={9}>{t("Info+")}</option>
+              <option value={13}>{t("Warn+")}</option>
+              <option value={17}>{t("Error+")}</option>
+              <option value={21}>{t("Fatal+")}</option>
               {![0, 1, 5, 9, 13, 17, 21].includes(draft.minSeverity) && (
-                <option value={draft.minSeverity}>Severity {draft.minSeverity}+</option>
+                <option value={draft.minSeverity}>
+                  {t("Severity {severity}+", { severity: draft.minSeverity })}
+                </option>
               )}
             </select>
           </div>
@@ -496,7 +514,7 @@ function LiveWorkspace({
                 disabled={forced}
                 onChange={(event) => setAutoExpand(event.target.checked)}
               />
-              Auto-expand
+              {t("Auto-expand")}
             </label>
             <label>
               <input
@@ -504,13 +522,13 @@ function LiveWorkspace({
                 checked={headers}
                 onChange={(event) => setHeaders(event.target.checked)}
               />
-              Columns
+              {t("Columns")}
             </label>
             <button
               type="button"
               className="lp-icon-button"
-              aria-label="Refresh"
-              title="Refresh stored events"
+              aria-label={t("Refresh")}
+              title={t("Refresh stored events")}
               onClick={state.refresh}
             >
               <Glyph name="reset" size={14} />
@@ -518,8 +536,8 @@ function LiveWorkspace({
             <button
               type="button"
               className="lp-icon-button"
-              aria-label="Reset view"
-              title="Reset filters and view. Stored telemetry is not deleted."
+              aria-label={t("Reset view")}
+              title={t("Reset filters and view. Stored telemetry is not deleted.")}
               onClick={resetView}
             >
               <Glyph name="layers" size={14} />
@@ -528,19 +546,19 @@ function LiveWorkspace({
         </div>
         {queryDirty && (
           <div className="lv-query-pending">
-            <span role="status">Unapplied filter changes</span>
+            <span role="status">{t("Unapplied filter changes")}</span>
             <button className="lv-pending-apply" type="submit" form="live-query">
-              Apply changes
+              {t("Apply changes")}
             </button>
             <button type="button" onClick={() => setDraft(route)}>
-              Discard changes
+              {t("Discard changes")}
             </button>
           </div>
         )}
         {forced && (
           <div className="lv-filter-context">
             <span>
-              Filters keep matching paths open. Context ancestors do not count as matches.
+              {t("Filters keep matching paths open. Context ancestors do not count as matches.")}
             </span>
             <button
               type="button"
@@ -548,7 +566,7 @@ function LiveWorkspace({
                 apply({ ...route, search: "", service: "", errorsOnly: false, minSeverity: 0 })
               }
             >
-              Reset filters
+              {t("Reset filters")}
             </button>
           </div>
         )}
@@ -568,15 +586,15 @@ function LiveWorkspace({
               <Glyph name={state.status === "loading" ? "activity" : "search"} size={24} />
               <strong>
                 {snapshot
-                  ? "No matching events"
+                  ? t("No matching events")
                   : state.status === "loading"
-                    ? "Loading stored events"
-                    : "No stored results yet"}
+                    ? t("Loading stored events")
+                    : t("No stored results yet")}
               </strong>
               <p>
                 {snapshot
-                  ? "Change the filters or send telemetry through your Collector."
-                  : "Refresh or resume Live to read stored telemetry."}
+                  ? t("Change the filters or send telemetry through your Collector.")
+                  : t("Refresh or resume Live to read stored telemetry.")}
               </p>
             </div>
           }
@@ -585,22 +603,24 @@ function LiveWorkspace({
               <span
                 title={
                   state.lastSuccess
-                    ? `Last successful update ${new Date(state.lastSuccess).toISOString()}`
-                    : "No successful response yet"
+                    ? t("Last successful update {timestamp}", {
+                        timestamp: new Date(state.lastSuccess).toISOString(),
+                      })
+                    : t("No successful response yet")
                 }
               >
                 <span className={receiving ? "lp-footer-dot" : "lp-footer-dot paused"} />
                 {receiving
-                  ? "Polling stored events"
+                  ? t("Polling stored events")
                   : !route.live
-                    ? "Updates paused"
+                    ? t("Updates paused")
                     : state.status === "suspended"
-                      ? "Updates suspended"
+                      ? t("Updates suspended")
                       : state.status === "retrying"
-                        ? "Retry scheduled"
+                        ? t("Retry scheduled")
                         : state.status === "loading"
-                          ? "Reading stored events"
-                          : "Updates stopped"}
+                          ? t("Reading stored events")
+                          : t("Updates stopped")}
                 {state.lastSuccess && (
                   <>
                     <span className="lp-footer-separator">·</span>
@@ -611,7 +631,8 @@ function LiveWorkspace({
                 )}
               </span>
               <span>
-                {rows.length} rows shown <span className="lp-footer-separator">·</span>
+                {t("{count} rows shown", { count: rows.length })}{" "}
+                <span className="lp-footer-separator">·</span>
                 <label>
                   <input
                     type="checkbox"
@@ -621,7 +642,7 @@ function LiveWorkspace({
                       if (event.target.checked) setPending(0)
                     }}
                   />
-                  Follow latest
+                  {t("Follow latest")}
                 </label>
               </span>
             </div>
@@ -645,17 +666,24 @@ function LiveWorkspace({
               setPending(0)
             }}
           >
-            <Glyph name="arrow-down" size={14} /> {pending}
-            {pending === 9999 ? "+" : ""} newly visible records · Jump to latest
+            <Glyph name="arrow-down" size={14} />{" "}
+            {t("{count} newly visible records · Jump to latest", {
+              count: `${pending}${pending === 9999 ? "+" : ""}`,
+            })}
           </button>
         )}
         <footer className="lv-note lp-bottom-note">
           <span className="lp-keyboard-hint">
-            <kbd>/</kbd> search <span>·</span> <kbd>esc</kbd> close details <span>·</span> ↑ ↓
-            navigate
+            <kbd>/</kbd> {t("search")} <span>·</span> <kbd>{t("esc")}</kbd> {t("close details")}{" "}
+            <span>·</span> {t("↑ ↓ navigate")}
           </span>
-          <span title="Bounded window polling. Identical stored content is grouped. No delivery or trace completeness guarantee.">
-            Real telemetry <span>·</span> Stored records <span>·</span> Completeness unknown
+          <span
+            title={t(
+              "Bounded window polling. Identical stored content is grouped. No delivery or trace completeness guarantee.",
+            )}
+          >
+            {t("Real telemetry")} <span>·</span> {t("Stored records")} <span>·</span>{" "}
+            {t("Completeness unknown")}
           </span>
         </footer>
       </main>

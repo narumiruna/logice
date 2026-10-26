@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react"
 import type { ListResult, Log, TraceDetail as TraceDetailData, TraceSummary } from "./api"
 import { ApiError, fetchList, fetchTrace } from "./api"
-import { Notice, WindowLabel } from "./components"
+import { LinkedMessage, Notice, WindowLabel } from "./components"
 import { FilterForm } from "./filters"
+import { useI18n } from "./i18n"
 import { LogList, TraceList } from "./lists"
 import { projectPath } from "./project-path"
 import { SaveViewButton } from "./save-view-button"
@@ -18,6 +19,7 @@ type Result =
   | { kind: "detail"; result: TraceDetailData }
 
 export function App() {
+  const { t } = useI18n()
   // A browser is not required for the initial render or component tests.
   const [route] = useState(() =>
     parseRoute(typeof window === "undefined" ? "/traces" : window.location.href),
@@ -93,19 +95,19 @@ export function App() {
       <main id="main" tabIndex={-1}>
         {detail && (
           <a className="back-link" href={listHref("traces", route.filters)}>
-            ← Back to traces
+            {t("← Back to traces")}
           </a>
         )}
         <div className="page-heading">
           <div>
-            <span className="eyebrow">Telemetry explorer</span>
-            <h1>{title}</h1>
+            <span className="eyebrow">{t("Telemetry explorer")}</span>
+            <h1>{t(title)}</h1>
             <p>
               {detail
-                ? "Inspect span relationships and correlated log records."
+                ? t("Inspect span relationships and correlated log records.")
                 : logs
-                  ? "Search application logs and inspect the records behind each message."
-                  : "Find requests, inspect errors, and follow work across services."}
+                  ? t("Search application logs and inspect the records behind each message.")
+                  : t("Find requests, inspect errors, and follow work across services.")}
             </p>
           </div>
           {valid && (
@@ -114,20 +116,25 @@ export function App() {
               type="button"
               onClick={refresh}
             >
-              <span aria-hidden="true">↻</span> Refresh
+              <span aria-hidden="true">↻</span> {t("Refresh")}
             </button>
           )}
         </div>
         {valid && !detail && <SaveViewButton />}
         {route.page === "not-found" ? (
-          <Notice title="This page does not exist" tone="error">
-            <a href={listHref("traces", route.filters)}>Open traces</a> or{" "}
-            <a href={listHref("logs", route.filters)}>open logs</a>.
+          <Notice title={t("This page does not exist")} tone="error">
+            <LinkedMessage
+              message="{traces} or {logs}."
+              links={{
+                traces: <a href={listHref("traces", route.filters)}>{t("Open traces")}</a>,
+                logs: <a href={listHref("logs", route.filters)}>{t("open logs")}</a>,
+              }}
+            />
           </Notice>
         ) : route.error ? (
-          <Notice title="Invalid query" tone="error">
-            <p>{route.error}</p>
-            <a href={projectPath(logs ? "/logs" : "/traces")}>Reset to the last hour</a>
+          <Notice title={t("Invalid query")} tone="error">
+            <p>{t(route.error)}</p>
+            <a href={projectPath(logs ? "/logs" : "/traces")}>{t("Reset to the last hour")}</a>
           </Notice>
         ) : (
           <>
@@ -136,32 +143,43 @@ export function App() {
             {state.kind === "loading" && (
               <div className="loading-state" role="status" aria-live="polite">
                 <span className="loading-dot" aria-hidden="true" />
-                <strong>Loading {detail ? "trace detail" : logs ? "logs" : "traces"}…</strong>
-                <span>Reading the selected time window.</span>
+                <strong>
+                  {detail
+                    ? t("Loading trace detail…")
+                    : logs
+                      ? t("Loading logs…")
+                      : t("Loading traces…")}
+                </strong>
+                <span>{t("Reading the selected time window.")}</span>
               </div>
             )}
             {state.kind === "error" && (
               <Notice
                 title={
                   state.error instanceof ApiError && state.error.status === 404
-                    ? "Trace not found in this window"
-                    : "Telemetry could not be loaded"
+                    ? t("Trace not found in this window")
+                    : t("Telemetry could not be loaded")
                 }
                 tone="error"
               >
                 <p>
                   {state.error instanceof ApiError
-                    ? state.error.message
-                    : "Cannot reach the API. Check the local API and Collector services, then try again."}
+                    ? state.error.message === `Request failed (${state.error.status}).`
+                      ? t("Request failed ({status}).", { status: state.error.status })
+                      : t(state.error.message)
+                    : t(
+                        "Cannot reach the API. Check the local API and Collector services, then try again.",
+                      )}
                 </p>
                 {state.error instanceof ApiError && state.error.status === 404 && (
                   <p>
-                    No spans or correlated logs were found. This trace can exist outside the
-                    selected window.
+                    {t(
+                      "No spans or correlated logs were found. This trace can exist outside the selected window.",
+                    )}
                   </p>
                 )}
                 <button className="button button-secondary" type="button" onClick={refresh}>
-                  Try again
+                  {t("Try again")}
                 </button>
               </Notice>
             )}
@@ -177,8 +195,8 @@ export function App() {
           </>
         )}
         <footer className="page-footer">
-          <span>Project-scoped telemetry</span>
-          <span>UTC timestamps · No automatic refresh</span>
+          <span>{t("Project-scoped telemetry")}</span>
+          <span>{t("UTC timestamps · No automatic refresh")}</span>
         </footer>
       </main>
     </AppShell>

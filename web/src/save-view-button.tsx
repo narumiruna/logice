@@ -1,9 +1,11 @@
 import { useState } from "react"
+import { useI18n } from "./i18n"
 import { canManageTokens, projectRequest } from "./project-api"
 import { useProject } from "./project-context"
 import { captureView, type ViewDefinition, viewHref } from "./view-definition"
 
 export function SaveViewButton({ definition }: { definition?: ViewDefinition }) {
+  const { t } = useI18n()
   const context = useProject()
   const [open, setOpen] = useState(false)
   const [name, setName] = useState("")
@@ -20,7 +22,7 @@ export function SaveViewButton({ definition }: { definition?: ViewDefinition }) 
           setMessage("")
         }}
       >
-        Save current view
+        {t("Save current view")}
       </button>
       {open && (
         <form
@@ -49,15 +51,21 @@ export function SaveViewButton({ definition }: { definition?: ViewDefinition }) 
           }}
         >
           <label>
-            Saved view name
+            {t("Saved view name")}
             <input value={name} onChange={(e) => setName(e.target.value)} required maxLength={80} />
           </label>
           <button type="submit" className="button button-primary" disabled={busy || !name.trim()}>
-            Save view
+            {t("Save view")}
           </button>
         </form>
       )}
-      {message && <p role="status">{message}</p>}
+      {message && (
+        <p role="status">
+          {/^Project request failed \(\d+\)\.$/.test(message)
+            ? t("Project request failed ({status}).", { status: message.slice(24, -2) })
+            : t(message)}
+        </p>
+      )}
     </div>
   )
 }

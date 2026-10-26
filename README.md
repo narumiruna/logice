@@ -17,6 +17,14 @@ Use **Theme** in the top-right header to select a style for all pages:
 
 The choice persists in this browser across navigation and reloads. Switching does not reset filters, expanded records, the inspector, or paused updates. Classic is the default. If browser storage is unavailable, switching still works until the next page load.
 
+### Languages
+
+Use **Language** in the header or **Account settings → Appearance** to select English, Traditional Chinese, Japanese, Korean, Spanish, French, German, Portuguese, or Italian. The selector is also available before sign-in.
+
+English is the default and the fallback for unknown messages. The choice is stored in this browser as `logice.locale` and persists across navigation and reloads. If browser storage is unavailable, switching still works until the next page load. Switching does not reset form input, telemetry filters, expanded records, inspector selection, paused updates, or the theme.
+
+User content, telemetry values, protocol identifiers, code examples, and exact UTC timestamps are not translated. Language selection does not change API requests or project access.
+
 ## Live explorer
 
 After login, select a project and open **Live** at `/projects/{projectID}/live`. It combines actual exported spans and logs with bounded automatic polling, a server-counted histogram, an expandable hierarchy, and an inspector. Pause freezes the current window. See [Live usage, identity rules, and limits](docs/live-telemetry.md). Each query is authorized against project membership. Running-span streaming is not supported. The query API requires a signed-in session in the authentication release.

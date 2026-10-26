@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from "react"
+import { LanguageSelect, useI18n } from "./i18n"
 import { Glyph } from "./preview/icons"
 import { ThemeSelect } from "./theme"
 import "./styles.css"
@@ -220,6 +221,7 @@ function PasskeyIcon() {
 }
 
 function AuthLayout({ children }: { children: ReactNode }) {
+  const { t } = useI18n()
   return (
     <div className="auth-layout">
       <header className="auth-header">
@@ -229,23 +231,26 @@ function AuthLayout({ children }: { children: ReactNode }) {
           </span>
           <span>Logice</span>
         </div>
-        <span className="auth-access-badge">Private workspace</span>
+        <span className="auth-access-badge">{t("Private workspace")}</span>
+        <LanguageSelect />
         <ThemeSelect />
       </header>
       <main className="auth-page" id="sign-in" tabIndex={-1}>
-        <section className="auth-intro" aria-label="About Logice">
-          <span className="auth-eyebrow">OpenTelemetry explorer</span>
+        <section className="auth-intro" aria-label={t("About Logice")}>
+          <span className="auth-eyebrow">{t("OpenTelemetry explorer")}</span>
           <h2>
-            Trace requests.
+            {t("Trace requests.")}
             <br />
-            Inspect logs.
+            {t("Inspect logs.")}
           </h2>
-          <p>Follow requests across services. Inspect spans and correlated logs in one place.</p>
+          <p>
+            {t("Follow requests across services. Inspect spans and correlated logs in one place.")}
+          </p>
           <div className="auth-trace-preview" aria-hidden="true">
             <div className="auth-trace-heading">
               <Glyph name="activity" size={17} />
-              <span>Example trace</span>
-              <span>Sample data</span>
+              <span>{t("Example trace")}</span>
+              <span>{t("Sample data")}</span>
             </div>
             <div className="auth-trace-row">
               <span>server.request</span>
@@ -269,25 +274,25 @@ function AuthLayout({ children }: { children: ReactNode }) {
           <ul className="auth-features">
             <li>
               <Glyph name="layers" />
-              Trace hierarchy
+              {t("Trace hierarchy")}
             </li>
             <li>
               <Glyph name="code" />
-              Correlated logs
+              {t("Correlated logs")}
             </li>
             <li>
               <Glyph name="activity" />
-              Live events
+              {t("Live events")}
             </li>
           </ul>
         </section>
-        <section className="auth-form-panel" aria-label="Account access">
+        <section className="auth-form-panel" aria-label={t("Account access")}>
           {children}
         </section>
       </main>
       <footer className="auth-footer">
-        <span>Logice · Telemetry explorer</span>
-        <span>Passkey authentication · Invitation only</span>
+        <span>{t("Logice · Telemetry explorer")}</span>
+        <span>{t("Passkey authentication · Invitation only")}</span>
       </footer>
     </div>
   )
@@ -300,6 +305,7 @@ export function SignIn({
   busy: boolean
   onAuthenticate: (invitation?: { token: string }) => void
 }) {
+  const { t } = useI18n()
   const [token, setToken] = useState("")
   function enroll(event: FormEvent) {
     event.preventDefault()
@@ -311,8 +317,8 @@ export function SignIn({
         <PasskeyIcon />
       </span>
       <div className="auth-card-heading">
-        <h1>Sign in to Logice</h1>
-        <p>Use your passkey to access your workspace.</p>
+        <h1>{t("Sign in to Logice")}</h1>
+        <p>{t("Use your passkey to access your workspace.")}</p>
       </div>
       <button
         className="auth-primary auth-passkey-button"
@@ -321,20 +327,26 @@ export function SignIn({
         onClick={() => onAuthenticate()}
       >
         <PasskeyIcon />
-        Sign in with a passkey
+        {t("Sign in with a passkey")}
       </button>
-      <p className="auth-device-note">Use your fingerprint, face, device PIN, or security key.</p>
+      <p className="auth-device-note">
+        {t("Use your fingerprint, face, device PIN, or security key.")}
+      </p>
       <div className="auth-divider">
-        <span>Invitation access</span>
+        <span>{t("Invitation access")}</span>
       </div>
       <details className="auth-enrollment">
         <summary>
-          Accept an invitation
+          {t("Accept an invitation")}
           <Glyph name="chevron" size={17} />
         </summary>
         <form onSubmit={enroll}>
-          <p>Ask your administrator for a one-time invitation. Your account name is already set.</p>
-          <label htmlFor="invitation-token">Invitation token</label>
+          <p>
+            {t(
+              "Ask your administrator for a one-time invitation. Your account name is already set.",
+            )}
+          </p>
+          <label htmlFor="invitation-token">{t("Invitation token")}</label>
           <input
             id="invitation-token"
             type="password"
@@ -342,25 +354,25 @@ export function SignIn({
             autoCapitalize="none"
             spellCheck={false}
             maxLength={43}
-            placeholder="Paste your invitation token"
+            placeholder={t("Paste your invitation token")}
             required
             value={token}
             onChange={(event) => setToken(event.target.value)}
             disabled={busy}
           />
           <button className="auth-secondary" type="submit" disabled={busy || !token.trim()}>
-            Create a passkey
+            {t("Create a passkey")}
           </button>
         </form>
       </details>
       {busy && (
         <p className="auth-pending" role="status">
           <span className="auth-spinner" aria-hidden="true" />
-          Complete the passkey request on your device.
+          {t("Complete the passkey request on your device.")}
         </p>
       )}
       <p className="auth-security-note">
-        Your device verifies your identity. No password is required.
+        {t("Your device verifies your identity. No password is required.")}
       </p>
     </div>
   )
@@ -375,13 +387,14 @@ export function SessionView({
   children: ReactNode
   onRetry: () => void
 }) {
+  const { t } = useI18n()
   if (state.status === "loading")
     return (
       <AuthLayout>
         <div className="auth-card auth-state" role="status">
           <span className="auth-spinner" aria-hidden="true" />
-          <h1>Checking your session…</h1>
-          <p>Your workspace stays locked until your session is verified.</p>
+          <h1>{t("Checking your session…")}</h1>
+          <p>{t("Your workspace stays locked until your session is verified.")}</p>
         </div>
       </AuthLayout>
     )
@@ -392,10 +405,10 @@ export function SessionView({
           <span className="auth-key-mark">
             <PasskeyIcon />
           </span>
-          <h1>Session unavailable</h1>
-          <p role="alert">Your session could not be verified. Telemetry is locked.</p>
+          <h1>{t("Session unavailable")}</h1>
+          <p role="alert">{t("Your session could not be verified. Telemetry is locked.")}</p>
           <button className="auth-primary" type="button" onClick={onRetry}>
-            Retry
+            {t("Retry")}
           </button>
         </div>
       </AuthLayout>
@@ -404,6 +417,7 @@ export function SessionView({
 }
 
 export function SessionGate({ children }: { children: ReactNode }) {
+  const { t } = useI18n()
   const [state, setState] = useState<SessionState>({ status: "loading" })
   const [retry, setRetry] = useState(0)
   const [busy, setBusy] = useState(false)
@@ -497,20 +511,20 @@ export function SessionGate({ children }: { children: ReactNode }) {
           <div className="auth-workspace">
             {message && (
               <p className="auth-message" role="alert">
-                {message}
+                {t(message)}
               </p>
             )}
-            <aside className="account-bar" aria-label="Account">
+            <aside className="account-bar" aria-label={t("Account")}>
               <span className="account-avatar" aria-hidden="true">
                 {state.user.name.slice(0, 1).toUpperCase()}
               </span>
               <span>
                 <strong>{state.user.name}</strong>
-                <small>{state.user.admin ? "Administrator" : "Registered account"}</small>
+                <small>{state.user.admin ? t("Administrator") : t("Registered account")}</small>
               </span>
-              <a href="/account">Account settings</a>
+              <a href="/account">{t("Account settings")}</a>
               <button type="button" onClick={logout} disabled={busy}>
-                Sign out
+                {t("Sign out")}
               </button>
             </aside>
             {children}
@@ -520,12 +534,12 @@ export function SessionGate({ children }: { children: ReactNode }) {
         <AuthLayout>
           {message && (
             <p className="auth-message" role="alert">
-              {message}
+              {t(message)}
             </p>
           )}
           {state.status === "anonymous" && state.expired && (
             <p className="auth-message" role="alert">
-              Your session expired. Sign in again.
+              {t("Your session expired. Sign in again.")}
             </p>
           )}
           <SignIn busy={busy} onAuthenticate={authenticate} />
