@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { useI18n } from "./i18n"
 import { canManageTokens, type Page, type Project, projectRequest } from "./project-api"
 import { AppShell } from "./shell"
 import { viewHref } from "./view-definition"
@@ -12,6 +13,7 @@ interface SavedView {
   updatedAt: string
 }
 export function SavedViews({ project }: { project: Project }) {
+  const { t } = useI18n()
   const [data, setData] = useState<Page<SavedView> | null>(null)
   const [offset, setOffset] = useState(0)
   const [revision, setRevision] = useState(0)
@@ -21,6 +23,7 @@ export function SavedViews({ project }: { project: Project }) {
   const [name, setName] = useState("")
   const [definition, setDefinition] = useState("")
   const [message, setMessage] = useState("")
+  const [messagePath, setMessagePath] = useState("")
   const base = `/${project.id}/views`
   // biome-ignore lint/correctness/useExhaustiveDependencies: Successful mutations and retry refresh the page.
   useEffect(() => {
@@ -80,7 +83,8 @@ export function SavedViews({ project }: { project: Project }) {
       )
       setMessage("Shared link copied. Membership is still required.")
     } catch {
-      setMessage(`Copy failed. Copy this path: /projects/${project.id}/views?open=${id}`)
+      setMessagePath(`/projects/${project.id}/views?open=${id}`)
+      setMessage("Copy failed. Copy this path: {path}")
     }
   }
   return (
@@ -88,16 +92,22 @@ export function SavedViews({ project }: { project: Project }) {
       <main id="main" tabIndex={-1} className="workspace-page">
         <div className="page-heading">
           <div>
-            <h1>Saved views</h1>
+            <h1>{t("Saved views")}</h1>
             <p>
-              Shared project queries. Save a committed Traces, Logs, or Live view from its explorer.
+              {t(
+                "Shared project queries. Save a committed Traces, Logs, or Live view from its explorer.",
+              )}
             </p>
           </div>
         </div>
-        {message && <p role="status">{message}</p>}
+        {message && <p role="status">{t(message, { path: messagePath })}</p>}
         {error && (
           <div role="alert" className="workspace-error">
-            <p>{error}</p>
+            <p>
+              {/^Project request failed \(\d+\)\.$/.test(error)
+                ? t("Project request failed ({status}).", { status: error.slice(24, -2) })
+                : t(error)}
+            </p>
             <button
               className="button button-secondary"
               type="button"
@@ -106,21 +116,25 @@ export function SavedViews({ project }: { project: Project }) {
                 setRevision((n) => n + 1)
               }}
             >
-              Retry saved views
+              {t("Retry saved views")}
             </button>
           </div>
         )}
-        {!data && !error && <p role="status">Loading saved views…</p>}
+        {!data && !error && <p role="status">{t("Loading saved views…")}</p>}
         {data && !data.items.length && (
           <p className="workspace-empty">
-            No saved views on this page. Open an explorer and select Save current view.
+            {t("No saved views on this page. Open an explorer and select Save current view.")}
           </p>
         )}
         {data?.items.map((view) => (
           <section key={view.id} className="settings-card">
             <h2>{view.name}</h2>
             <p>
-              Revision {view.revision} · Updated {view.updatedAt} · Account {view.updaterId}
+              {t("Revision {revision} · Updated {date} · Account {account}", {
+                revision: view.revision,
+                date: view.updatedAt,
+                account: view.updaterId,
+              })}
             </p>
             <div className="dashboard-actions">
               <button
@@ -134,14 +148,14 @@ export function SavedViews({ project }: { project: Project }) {
                   }
                 }}
               >
-                Apply view
+                {t("Apply view")}
               </button>
               <button
                 type="button"
                 className="button button-secondary"
                 onClick={() => void share(view.id)}
               >
-                Share view
+                {t("Share view")}
               </button>
               {canManageTokens(project.role) && (
                 <>
@@ -155,17 +169,17 @@ export function SavedViews({ project }: { project: Project }) {
                       setDefinition(JSON.stringify(view.definition, null, 2))
                     }}
                   >
-                    Edit view
+                    {t("Edit view")}
                   </button>
                   <button
                     type="button"
                     className="button button-secondary"
                     disabled={busy}
                     onClick={() => {
-                      if (confirm("Delete this shared view?")) void mutate(view, "DELETE")
+                      if (confirm(t("Delete this shared view?"))) void mutate(view, "DELETE")
                     }}
                   >
-                    Delete view
+                    {t("Delete view")}
                   </button>
                 </>
               )}
@@ -179,7 +193,7 @@ export function SavedViews({ project }: { project: Project }) {
                 }}
               >
                 <label>
-                  View name
+                  {t("View name")}
                   <input
                     value={name}
                     onChange={(e) => setName(e.target.value)}
@@ -188,7 +202,7 @@ export function SavedViews({ project }: { project: Project }) {
                   />
                 </label>
                 <label>
-                  Typed view definition (JSON)
+                  {t("Typed view definition (JSON)")}
                   <textarea
                     value={definition}
                     onChange={(e) => setDefinition(e.target.value)}
@@ -198,22 +212,23 @@ export function SavedViews({ project }: { project: Project }) {
                   />
                 </label>
                 <p>
-                  Definitions accept supported filters and display settings only. Concurrent changes
-                  require a reload.
+                  {t(
+                    "Definitions accept supported filters and display settings only. Concurrent changes require a reload.",
+                  )}
                 </p>
                 <button
                   type="submit"
                   className="button button-primary"
                   disabled={busy || !name.trim()}
                 >
-                  Update view
+                  {t("Update view")}
                 </button>
                 <button
                   type="button"
                   className="button button-secondary"
                   onClick={() => setEditing(null)}
                 >
-                  Cancel edit
+                  {t("Cancel edit")}
                 </button>
               </form>
             )}
@@ -226,7 +241,7 @@ export function SavedViews({ project }: { project: Project }) {
             disabled={!offset || busy}
             onClick={() => setOffset(offset - 100)}
           >
-            Previous views
+            {t("Previous views")}
           </button>
           <button
             className="button button-secondary"
@@ -234,7 +249,7 @@ export function SavedViews({ project }: { project: Project }) {
             disabled={!data?.hasMore || busy}
             onClick={() => setOffset(offset + 100)}
           >
-            Next views
+            {t("Next views")}
           </button>
         </div>
       </main>

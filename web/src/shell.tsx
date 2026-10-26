@@ -1,4 +1,5 @@
 import type { ReactNode } from "react"
+import { LanguageSelect, useI18n } from "./i18n"
 import { Glyph, type GlyphName } from "./preview/icons"
 import { useProject } from "./project-context"
 import { projectId, projectPath } from "./project-path"
@@ -32,32 +33,38 @@ export function AppShell({
   logsHref?: string
   children: ReactNode
 }) {
+  const { t } = useI18n()
   const context = useProject()
   const preview = page === "preview"
   const project = context?.project
   const scoped =
     Boolean(project || projectId()) || page === "traces" || page === "logs" || page === "live"
   const links: { page: Page; label: string; icon: GlyphName; href: string }[] = [
-    { page: "projects", label: "Projects", icon: "box", href: "/projects" },
+    { page: "projects", label: t("Projects"), icon: "box", href: "/projects" },
     ...(scoped
       ? [
           {
             page: "dashboard" as const,
-            label: "Dashboard",
+            label: t("Dashboard"),
             icon: "activity" as const,
             href: projectPath("/dashboard"),
           },
           {
             page: "live" as const,
-            label: "Live",
+            label: t("Live"),
             icon: "activity" as const,
             href: projectPath("/live"),
           },
-          { page: "traces" as const, label: "Traces", icon: "layers" as const, href: tracesHref },
-          { page: "logs" as const, label: "Logs", icon: "code" as const, href: logsHref },
+          {
+            page: "traces" as const,
+            label: t("Traces"),
+            icon: "layers" as const,
+            href: tracesHref,
+          },
+          { page: "logs" as const, label: t("Logs"), icon: "code" as const, href: logsHref },
           {
             page: "settings" as const,
-            label: "Project settings",
+            label: t("Project settings"),
             icon: "box" as const,
             href: projectPath("/settings"),
           },
@@ -67,7 +74,7 @@ export function AppShell({
       ? [
           {
             page: "setup" as const,
-            label: "Connect application",
+            label: t("Connect application"),
             icon: "box" as const,
             href: projectPath("/setup"),
           },
@@ -77,7 +84,7 @@ export function AppShell({
       ? [
           {
             page: "views" as const,
-            label: "Saved views",
+            label: t("Saved views"),
             icon: "layers" as const,
             href: projectPath("/views"),
           },
@@ -87,34 +94,34 @@ export function AppShell({
       ? [
           {
             page: "alerts" as const,
-            label: "Alerts",
+            label: t("Alerts"),
             icon: "activity" as const,
             href: projectPath("/alerts"),
           },
         ]
       : []),
-    { page: "account", label: "Account", icon: "box", href: "/account" },
-    { page: "preview", label: "Design preview", icon: "box", href: projectPath("/preview") },
+    { page: "account", label: t("Account"), icon: "box", href: "/account" },
+    { page: "preview", label: t("Design preview"), icon: "box", href: projectPath("/preview") },
   ]
   return (
     <div className="application-shell">
       <a href={`#${contentId}`} className="skip-link">
-        Skip to content
+        {t("Skip to content")}
       </a>
-      <a className="shell-brand" href="/projects" aria-label="Logice — Open projects">
+      <a className="shell-brand" href="/projects" aria-label={t("Logice — Open projects")}>
         <span className="shell-brand-mark" aria-hidden="true">
           L
         </span>
         <span>
-          Logice<span className="shell-brand-caption">Telemetry explorer</span>
+          Logice<span className="shell-brand-caption">{t("Telemetry explorer")}</span>
         </span>
       </a>
       <header className="shell-header">
         {project && context ? (
           <label className="shell-switcher">
-            <span>Project</span>
+            <span>{t("Project")}</span>
             <select
-              aria-label="Project"
+              aria-label={t("Project")}
               value={project.id}
               onChange={(e) => window.location.assign(`/projects/${e.target.value}/traces`)}
             >
@@ -130,30 +137,34 @@ export function AppShell({
           </label>
         ) : (
           <span className="shell-workspace">
-            Workspace <span aria-hidden="true">/</span>{" "}
-            <strong>{page === "account" ? "Your account" : "Project workspace"}</strong>
+            {" "}
+            {t("Workspace")} <span aria-hidden="true">/</span>{" "}
+            <strong>{page === "account" ? t("Your account") : t("Project workspace")}</strong>
           </span>
         )}
         <span className="shell-badge">
           {preview
-            ? "DESIGN PREVIEW"
+            ? t("DESIGN PREVIEW")
             : project
-              ? project.role
+              ? t(project.role)
               : page === "live"
-                ? "REAL TELEMETRY"
-                : "Project-scoped telemetry"}
+                ? t("REAL TELEMETRY")
+                : t("Project-scoped telemetry")}
         </span>
+        <LanguageSelect />
         <ThemeSelect />
       </header>
-      <aside className="shell-sidebar" aria-label="Application navigation">
+      <aside className="shell-sidebar" aria-label={t("Application navigation")}>
         <div className="shell-project">
           <Glyph name="box" size={20} />
           <div>
-            <strong>{project?.name ?? "Project workspace"}</strong>
-            <span>{project ? `${project.role} access` : "Project-scoped access"}</span>
+            <strong>{project?.name ?? t("Project workspace")}</strong>
+            <span>
+              {project ? t("{role} access", { role: t(project.role) }) : t("Project-scoped access")}
+            </span>
           </div>
         </div>
-        <span className="shell-nav-label">Workspace</span>
+        <span className="shell-nav-label">{t("Workspace")}</span>
         <nav>
           {links.map((link) => (
             <a
@@ -168,11 +179,11 @@ export function AppShell({
           ))}
         </nav>
         <div className="shell-note">
-          <strong>{preview ? "Simulated data" : "Stored OpenTelemetry data"}</strong>
+          <strong>{preview ? t("Simulated data") : t("Stored OpenTelemetry data")}</strong>
           <p>
             {preview
-              ? "This preview does not read or write your telemetry."
-              : "Project-scoped traces and logs. Access is checked on every request."}
+              ? t("This preview does not read or write your telemetry.")
+              : t("Project-scoped traces and logs. Access is checked on every request.")}
           </p>
         </div>
       </aside>

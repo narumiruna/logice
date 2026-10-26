@@ -1,12 +1,14 @@
 import { type FormEvent, useEffect, useState } from "react"
 import { flushSync } from "react-dom"
 import { useAccount } from "./auth"
+import { LanguageSelect, useI18n } from "./i18n"
 import { PasskeySettings } from "./passkey-settings"
 import { AppShell } from "./shell"
 import { ThemeSelect } from "./theme"
 import "./projects.css"
 
 export function AccountSettings() {
+  const { t } = useI18n()
   const { user, busy, saveName, invite, logout } = useAccount()
   const [name, setName] = useState(user.name)
   const [saved, setSaved] = useState(false)
@@ -42,28 +44,28 @@ export function AccountSettings() {
       <main id="main" tabIndex={-1} className="workspace-page">
         <div className="page-heading">
           <div>
-            <span className="eyebrow">Your workspace</span>
-            <h1>Account settings</h1>
-            <p>Manage your profile, appearance, and account access.</p>
+            <span className="eyebrow">{t("Your workspace")}</span>
+            <h1>{t("Account settings")}</h1>
+            <p>{t("Manage your profile, appearance, and account access.")}</p>
           </div>
         </div>
         <div className="settings-layout">
-          <nav className="settings-nav" aria-label="Account settings sections">
-            <a href="#profile">Profile</a>
-            <a href="#appearance">Appearance</a>
-            <a href="#security">Security</a>
-            <a href="#passkeys">Passkeys</a>
-            {user.admin && <a href="#invitations">Invitations</a>}
+          <nav className="settings-nav" aria-label={t("Account settings sections")}>
+            <a href="#profile">{t("Profile")}</a>
+            <a href="#appearance">{t("Appearance")}</a>
+            <a href="#security">{t("Security")}</a>
+            <a href="#passkeys">{t("Passkeys")}</a>
+            {user.admin && <a href="#invitations">{t("Invitations")}</a>}
           </nav>
           <div className="settings-panels">
             <section className="settings-card" id="profile">
               <div className="settings-card-heading">
-                <h2>Profile</h2>
-                <p>Your display name appears in project member lists.</p>
+                <h2>{t("Profile")}</h2>
+                <p>{t("Your display name appears in project member lists.")}</p>
               </div>
               <form onSubmit={(event) => void save(event)} className="settings-form">
                 <label>
-                  Display name
+                  {t("Display name")}
                   <input
                     value={name}
                     onChange={(e) => {
@@ -81,63 +83,70 @@ export function AccountSettings() {
                   className="button button-primary"
                   disabled={busy || !name.trim() || name.trim() === user.name}
                 >
-                  Save changes
+                  {t("Save changes")}
                 </button>
                 {saved && (
                   <p role="status" className="settings-success">
-                    Profile saved.
+                    {t("Profile saved.")}
                   </p>
                 )}
               </form>
               <div className="identity-field">
-                <span>Account UUID</span>
+                <span>{t("Account UUID")}</span>
                 <code>{user.id}</code>
                 <button
                   className="button button-secondary"
                   type="button"
                   onClick={() => void copyID()}
                 >
-                  Copy account UUID
+                  {t("Copy account UUID")}
                 </button>
-                {copyState && <p role="status">{copyState}</p>}
+                {copyState && <p role="status">{t(copyState)}</p>}
               </div>
               <p className="settings-hint">
-                Share this UUID with a project Owner to request membership. Changing your name does
-                not change your UUID or permissions.
+                {t(
+                  "Share this UUID with a project Owner to request membership. Changing your name does not change your UUID or permissions.",
+                )}
               </p>
             </section>
             <section className="settings-card" id="appearance">
               <div className="settings-card-heading">
-                <h2>Appearance</h2>
-                <p>Your theme is stored in this browser. Telemetry filters stay unchanged.</p>
+                <h2>{t("Appearance")}</h2>
+                <p>
+                  {t("Your theme is stored in this browser. Telemetry filters stay unchanged.")}
+                </p>
               </div>
               <div className="appearance-options">
-                <span>Choose Classic for wider spacing, or Studio for a compact workspace.</span>
-                <ThemeSelect label="Appearance theme" />
+                <span>
+                  {t("Choose Classic for wider spacing, or Studio for a compact workspace.")}
+                </span>
+                <ThemeSelect label={t("Appearance theme")} />
+                <LanguageSelect />
               </div>
             </section>
             <section className="settings-card" id="security">
               <div className="settings-card-heading">
-                <h2>Security and access</h2>
-                <p>Sign in with a user-verified Passkey. No password is stored.</p>
+                <h2>{t("Security and access")}</h2>
+                <p>{t("Sign in with a user-verified Passkey. No password is stored.")}</p>
               </div>
               <dl className="settings-facts">
                 <div>
-                  <dt>Account type</dt>
-                  <dd>{user.admin ? "Administrator" : "Registered account"}</dd>
+                  <dt>{t("Account type")}</dt>
+                  <dd>{user.admin ? t("Administrator") : t("Registered account")}</dd>
                 </div>
                 <div>
-                  <dt>Project permissions</dt>
-                  <dd>Set separately by each project Owner</dd>
+                  <dt>{t("Project permissions")}</dt>
+                  <dd>{t("Set separately by each project Owner")}</dd>
                 </div>
                 <div>
-                  <dt>Session lifetime</dt>
-                  <dd>24 hours idle · 7 days maximum</dd>
+                  <dt>{t("Session lifetime")}</dt>
+                  <dd>{t("24 hours idle · 7 days maximum")}</dd>
                 </div>
               </dl>
               <p className="settings-hint">
-                For a lost Passkey, ask your operator to recover this account UUID. Recovery
-                replaces your sign-in credentials; it does not revoke project ingestion tokens.
+                {t(
+                  "For a lost Passkey, ask your operator to recover this account UUID. Recovery replaces your sign-in credentials; it does not revoke project ingestion tokens.",
+                )}
               </p>
               <button
                 className="button button-secondary"
@@ -145,25 +154,27 @@ export function AccountSettings() {
                 onClick={logout}
                 disabled={busy}
               >
-                Sign out of this browser
+                {t("Sign out of this browser")}
               </button>
             </section>
             <PasskeySettings />
             {user.admin && (
               <section className="settings-card" id="invitations">
                 <div className="settings-card-heading">
-                  <h2>Registration invitations</h2>
+                  <h2>{t("Registration invitations")}</h2>
                   <p>
-                    Invite an account to Logice. Registration does not grant project membership.
+                    {t(
+                      "Invite an account to Logice. Registration does not grant project membership.",
+                    )}
                   </p>
                 </div>
                 <details>
-                  <summary>Create an invitation</summary>
+                  <summary>{t("Create an invitation")}</summary>
                   <form
                     className="settings-form"
                     onSubmit={(event) => void createInvitation(event)}
                   >
-                    <label htmlFor="invitation-name">Invitation name</label>
+                    <label htmlFor="invitation-name">{t("Invitation name")}</label>
                     <input
                       id="invitation-name"
                       value={invitationName}
@@ -177,25 +188,26 @@ export function AccountSettings() {
                       className="button button-primary"
                       disabled={busy || !invitationName.trim()}
                     >
-                      Create invitation
+                      {t("Create invitation")}
                     </button>
                   </form>
                 </details>
                 {invitation && (
                   <div className="secret-card" role="status">
                     <p>
-                      Send this one-time invitation through a secure channel. Do not put it in a
-                      URL.
+                      {t(
+                        "Send this one-time invitation through a secure channel. Do not put it in a URL.",
+                      )}
                     </p>
-                    <label htmlFor="created-invitation">Invitation token</label>
+                    <label htmlFor="created-invitation">{t("Invitation token")}</label>
                     <input id="created-invitation" readOnly value={invitation.token} />
-                    <p>Expires: {invitation.expiresAt}</p>
+                    <p>{t("Expires: {date}", { date: invitation.expiresAt })}</p>
                     <button
                       className="button button-secondary"
                       type="button"
                       onClick={() => setInvitation(null)}
                     >
-                      Dismiss token
+                      {t("Dismiss token")}
                     </button>
                   </div>
                 )}

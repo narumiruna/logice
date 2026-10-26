@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import { flushSync } from "react-dom"
+import { useI18n } from "./i18n"
 import {
   canManageTokens,
   type Member,
@@ -12,6 +13,7 @@ import { ProjectAudit } from "./project-audit"
 import { AppShell } from "./shell"
 
 export function ProjectSettings({ project }: { project: Project }) {
+  const { t } = useI18n()
   const [members, setMembers] = useState<Page<Member> | null>(null)
   const [tokens, setTokens] = useState<Page<Token> | null>(null)
   const [secret, setSecret] = useState("")
@@ -96,72 +98,80 @@ export function ProjectSettings({ project }: { project: Project }) {
     }
   }
   function confirm(message: string): boolean {
-    return window.confirm(message)
+    return window.confirm(t(message))
   }
   return (
     <AppShell page="settings">
       <main id="main" tabIndex={-1} className="workspace-page project-settings">
         <div className="page-heading">
           <div>
-            <span className="eyebrow">Project / Settings</span>
-            <h1>{project.name} settings</h1>
-            <p>Manage project identity, team access, and application credentials.</p>
+            <span className="eyebrow">{t("Project / Settings")}</span>
+            <h1>{t("{project} settings", { project: project.name })}</h1>
+            <p>{t("Manage project identity, team access, and application credentials.")}</p>
           </div>
           <a className="button button-secondary" href={`/projects/${project.id}/dashboard`}>
-            Open dashboard
+            {t("Open dashboard")}
           </a>
         </div>
-        <nav className="settings-tabs" aria-label="Project settings sections">
+        <nav className="settings-tabs" aria-label={t("Project settings sections")}>
           <a href="#general" aria-current={section === "#general" ? "location" : undefined}>
-            General
+            {t("General")}
           </a>
           <a href="#members" aria-current={section === "#members" ? "location" : undefined}>
-            Members
+            {t("Members")}
           </a>
           {manageTokens && (
             <a href="#tokens" aria-current={section === "#tokens" ? "location" : undefined}>
-              Tokens
+              {t("Tokens")}
             </a>
           )}
           {owner && (
             <a href="#danger" aria-current={section === "#danger" ? "location" : undefined}>
-              Danger zone
+              {t("Danger zone")}
             </a>
           )}
         </nav>
-        {owner && <a href="#audit">Audit history</a>}
+        {owner && <a href="#audit">{t("Audit history")}</a>}
         <section id="general" className="settings-card">
           <div className="settings-card-heading">
-            <h2>Project identity</h2>
-            <p>Stable identifiers keep your telemetry and credentials scoped to this project.</p>
+            <h2>{t("Project identity")}</h2>
+            <p>
+              {t("Stable identifiers keep your telemetry and credentials scoped to this project.")}
+            </p>
           </div>
           <p>
-            Project ID: <code>{project.id}</code>
+            {t("Project ID:")} <code>{project.id}</code>
           </p>
-          <p>Your role: {project.role}</p>
-          <a href={`/projects/${project.id}/setup`}>Connect an application to this project</a> ·{" "}
-          <a href={`/projects/${project.id}/alerts`}>Manage alerts</a>
+          <p>{t("Your role: {role}", { role: t(project.role) })}</p>
+          <a href={`/projects/${project.id}/setup`}>
+            {t("Connect an application to this project")}
+          </a>{" "}
+          · <a href={`/projects/${project.id}/alerts`}>{t("Manage alerts")}</a>
         </section>
         {error && (
           <div className="workspace-error" role="alert">
-            <p>{error}</p>
+            <p>
+              {/^Project request failed \(\d+\)\.$/.test(error)
+                ? t("Project request failed ({status}).", { status: error.slice(24, -2) })
+                : t(error)}
+            </p>
             <button
               className="button button-secondary"
               type="button"
               onClick={() => setRevision((v) => v + 1)}
             >
-              Retry settings
+              {t("Retry settings")}
             </button>
           </div>
         )}
         {!members && !error && (
           <p className="workspace-loading" role="status">
-            Loading project settings…
+            {t("Loading project settings…")}
           </p>
         )}
         {owner && (
           <section className="settings-card">
-            <h2>Project name</h2>
+            <h2>{t("Project name")}</h2>
             <form
               onSubmit={(event) => {
                 event.preventDefault()
@@ -171,7 +181,7 @@ export function ProjectSettings({ project }: { project: Project }) {
               }}
             >
               <label>
-                Project name{" "}
+                {t("Project name")}{" "}
                 <input
                   value={name}
                   maxLength={80}
@@ -180,17 +190,18 @@ export function ProjectSettings({ project }: { project: Project }) {
                 />
               </label>
               <button disabled={busy} type="submit">
-                Rename project
+                {t("Rename project")}
               </button>
             </form>
           </section>
         )}
         <section id="members" className="settings-card">
           <div className="settings-card-heading">
-            <h2>Members</h2>
+            <h2>{t("Members")}</h2>
             <p>
-              Owners manage membership. Developers manage ingestion tokens. Viewers inspect
-              telemetry.
+              {t(
+                "Owners manage membership. Developers manage ingestion tokens. Viewers inspect telemetry.",
+              )}
             </p>
           </div>
           {owner && (
@@ -201,29 +212,33 @@ export function ProjectSettings({ project }: { project: Project }) {
               }}
             >
               <label>
-                Registered account UUID{" "}
+                {t("Registered account UUID")}{" "}
                 <input value={userId} required onChange={(e) => setUserId(e.target.value)} />
               </label>
               <label>
-                Role{" "}
-                <select aria-label="Role" value={role} onChange={(e) => setRole(e.target.value)}>
-                  <option>Viewer</option>
-                  <option>Developer</option>
+                {t("Role")}{" "}
+                <select
+                  aria-label={t("Role")}
+                  value={role}
+                  onChange={(e) => setRole(e.target.value)}
+                >
+                  <option value="Viewer">{t("Viewer")}</option>
+                  <option value="Developer">{t("Developer")}</option>
                 </select>
               </label>
               <button disabled={busy} type="submit">
-                Add member
+                {t("Add member")}
               </button>
             </form>
           )}
           <ul>
             {members?.items.map((member) => (
               <li key={member.userId}>
-                <strong>{member.name}</strong> <code>{member.userId}</code> — {member.role}
+                <strong>{member.name}</strong> <code>{member.userId}</code> — {t(member.role)}
                 {owner && member.role !== "Owner" && (
                   <>
                     <label>
-                      Member role{" "}
+                      {t("Member role")}{" "}
                       <select
                         disabled={busy}
                         value={member.role}
@@ -233,8 +248,8 @@ export function ProjectSettings({ project }: { project: Project }) {
                           })
                         }
                       >
-                        <option>Viewer</option>
-                        <option>Developer</option>
+                        <option value="Viewer">{t("Viewer")}</option>
+                        <option value="Developer">{t("Developer")}</option>
                       </select>
                     </label>
                     <button
@@ -245,7 +260,7 @@ export function ProjectSettings({ project }: { project: Project }) {
                           void mutate(`/members/${member.userId}`, "DELETE", {})
                       }}
                     >
-                      Remove member
+                      {t("Remove member")}
                     </button>
                     <button
                       disabled={busy}
@@ -259,7 +274,7 @@ export function ProjectSettings({ project }: { project: Project }) {
                           })
                       }}
                     >
-                      Transfer ownership
+                      {t("Transfer ownership")}
                     </button>
                   </>
                 )}
@@ -271,33 +286,35 @@ export function ProjectSettings({ project }: { project: Project }) {
             disabled={memberOffset === 0 || busy}
             onClick={() => setMemberOffset(memberOffset - 100)}
           >
-            Previous members
+            {t("Previous members")}
           </button>
           <button
             type="button"
             disabled={!members?.hasMore || busy}
             onClick={() => setMemberOffset(memberOffset + 100)}
           >
-            Next members
+            {t("Next members")}
           </button>
         </section>
         {manageTokens && (
           <section id="tokens" className="settings-card">
             <div className="settings-card-heading">
-              <h2>Ingestion tokens</h2>
+              <h2>{t("Ingestion tokens")}</h2>
               <p>
-                Separate credentials for your applications. A browser session is not an ingestion
-                credential.
+                {t(
+                  "Separate credentials for your applications. A browser session is not an ingestion credential.",
+                )}
               </p>
             </div>
             <p>
-              Tokens belong to this project. Removing their creator does not revoke them. Tokens
-              allow writes only.
+              {t(
+                "Tokens belong to this project. Removing their creator does not revoke them. Tokens allow writes only.",
+              )}
             </p>
             <p>
-              OTLP HTTP endpoint:{" "}
-              <code>{typeof window === "undefined" ? "" : window.location.origin}</code>. Use Bearer
-              authorization with your project token.
+              {t("OTLP HTTP endpoint:")}{" "}
+              <code>{typeof window === "undefined" ? "" : window.location.origin}</code>.{" "}
+              {t("Use Bearer authorization with your project token.")}
             </p>
             <form
               onSubmit={(event) => {
@@ -314,7 +331,7 @@ export function ProjectSettings({ project }: { project: Project }) {
               }}
             >
               <label>
-                Token name{" "}
+                {t("Token name")}{" "}
                 <input
                   value={tokenName}
                   maxLength={80}
@@ -323,7 +340,7 @@ export function ProjectSettings({ project }: { project: Project }) {
                 />
               </label>
               <label>
-                Expiry UTC (optional){" "}
+                {t("Expiry UTC (optional)")}{" "}
                 <input
                   type="datetime-local"
                   value={expiry}
@@ -331,25 +348,29 @@ export function ProjectSettings({ project }: { project: Project }) {
                 />
               </label>
               <button disabled={busy} type="submit">
-                Create token
+                {t("Create token")}
               </button>
             </form>
             {secret && (
               <div className="secret-card" role="status">
-                <strong>Copy this token now. It will not be shown again.</strong>
-                <pre role="note" aria-label="New ingestion token">
+                <strong>{t("Copy this token now. It will not be shown again.")}</strong>
+                <pre role="note" aria-label={t("New ingestion token")}>
                   {secret}
                 </pre>
                 <button type="button" onClick={() => setSecret("")}>
-                  Dismiss token
+                  {t("Dismiss token")}
                 </button>
               </div>
             )}
             <ul>
               {tokens?.items.map((token) => (
                 <li key={token.id}>
-                  <strong>{token.name}</strong> — {token.status} · expiry:{" "}
-                  {token.expiresAt ?? "none"} · creator: <code>{token.creatorId}</code>
+                  <strong>{token.name}</strong> —{" "}
+                  {t("{status} · expiry: {expiry} · creator: {creator}", {
+                    status: t(token.status),
+                    expiry: token.expiresAt ?? t("none"),
+                    creator: token.creatorId,
+                  })}
                   <button
                     disabled={busy || token.status === "revoked"}
                     type="button"
@@ -362,7 +383,7 @@ export function ProjectSettings({ project }: { project: Project }) {
                         void mutate(`/tokens/${token.id}/revoke`, "POST", {})
                     }}
                   >
-                    Revoke token
+                    {t("Revoke token")}
                   </button>
                 </li>
               ))}
@@ -372,24 +393,25 @@ export function ProjectSettings({ project }: { project: Project }) {
               disabled={tokenOffset === 0 || busy}
               onClick={() => setTokenOffset(tokenOffset - 100)}
             >
-              Previous tokens
+              {t("Previous tokens")}
             </button>
             <button
               type="button"
               disabled={!tokens?.hasMore || busy}
               onClick={() => setTokenOffset(tokenOffset + 100)}
             >
-              Next tokens
+              {t("Next tokens")}
             </button>
           </section>
         )}
         {owner && <ProjectAudit project={project} />}
         {owner && (
           <section id="danger" className="settings-card danger-card">
-            <h2>Delete project</h2>
+            <h2>{t("Delete project")}</h2>
             <p>
-              Deletion blocks access and revokes tokens. Stored telemetry remains until its normal
-              retention expiry.
+              {t(
+                "Deletion blocks access and revokes tokens. Stored telemetry remains until its normal retention expiry.",
+              )}
             </p>
             <button
               disabled={busy}
@@ -401,7 +423,7 @@ export function ProjectSettings({ project }: { project: Project }) {
                   })
               }}
             >
-              Delete project
+              {t("Delete project")}
             </button>
           </section>
         )}

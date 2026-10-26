@@ -1,5 +1,6 @@
 import type { ListResult, Log, TimeWindow, TraceSummary } from "./api"
 import { Attributes, Badge, EmptyState, Timestamp, Truncation } from "./components"
+import { useI18n } from "./i18n"
 import { formatDuration, isTraceId, severity, traceHref } from "./telemetry"
 
 export function TraceList({
@@ -11,49 +12,53 @@ export function TraceList({
   window: TimeWindow
   resetHref?: string
 }) {
+  const { t, number } = useI18n()
   const errors = result.items.reduce((total, trace) => total + trace.errorCount, 0)
   const services = new Set(result.items.map((trace) => trace.serviceName)).size
   return (
     <>
-      <section className="metrics" aria-label="Returned trace statistics">
+      <section className="metrics" aria-label={t("Returned trace statistics")}>
         <div>
-          <span>Traces returned</span>
-          <strong>{result.items.length}</strong>
+          <span>{t("Traces returned")}</span>
+          <strong>{number(result.items.length, { useGrouping: false })}</strong>
         </div>
         <div>
-          <span>Services in results</span>
-          <strong>{services}</strong>
+          <span>{t("Services in results")}</span>
+          <strong>{number(services, { useGrouping: false })}</strong>
         </div>
         <div>
-          <span>Error spans in results</span>
-          <strong className={errors ? "text-error" : ""}>{errors}</strong>
+          <span>{t("Error spans in results")}</span>
+          <strong className={errors ? "text-error" : ""}>
+            {number(errors, { useGrouping: false })}
+          </strong>
         </div>
       </section>
       <section className="panel" aria-labelledby="trace-results">
         <div className="panel-heading">
           <h2 id="trace-results">
-            Traces <span className="count">{result.items.length}</span>
+            {t("Traces")}{" "}
+            <span className="count">{number(result.items.length, { useGrouping: false })}</span>
           </h2>
-          <span className="muted">Window-bounded summaries</span>
+          <span className="muted">{t("Window-bounded summaries")}</span>
         </div>
         {result.items.length === 0 ? (
           <EmptyState kind="traces" resetHref={resetHref} />
         ) : (
           <div className="table-scroll">
             <table className="data-table record-table trace-table">
-              <caption className="sr-only">Traces in the selected time window</caption>
+              <caption className="sr-only">{t("Traces in the selected time window")}</caption>
               <thead>
                 <tr>
-                  <th scope="col">Trace / span name</th>
-                  <th scope="col">Service</th>
-                  <th scope="col">Started (UTC)</th>
+                  <th scope="col">{t("Trace / span name")}</th>
+                  <th scope="col">{t("Service")}</th>
+                  <th scope="col">{t("Started (UTC)")}</th>
                   <th scope="col" className="numeric">
-                    Duration
+                    {t("Duration")}
                   </th>
                   <th scope="col" className="numeric">
-                    Spans
+                    {t("Spans")}
                   </th>
-                  <th scope="col">Errors</th>
+                  <th scope="col">{t("Errors")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -63,32 +68,40 @@ export function TraceList({
                       <div className="record-name">
                         {isTraceId(trace.traceId) ? (
                           <a href={traceHref(trace.traceId, window)}>
-                            {trace.name || "Unnamed span"}
+                            {trace.name || t("Unnamed span")}
                           </a>
                         ) : (
-                          trace.name || "Unnamed span"
+                          trace.name || t("Unnamed span")
                         )}
                       </div>
                       <code className="secondary-id">{trace.traceId}</code>
                     </td>
-                    <td data-label="Service">
-                      <span className="service-name">{trace.serviceName || "Unknown service"}</span>
+                    <td data-label={t("Service")}>
+                      <span className="service-name">
+                        {trace.serviceName || t("Unknown service")}
+                      </span>
                     </td>
-                    <td className="time-cell" data-label="Started (UTC)">
+                    <td className="time-cell" data-label={t("Started (UTC)")}>
                       <Timestamp value={trace.startTime} />
                     </td>
-                    <td className="numeric duration" data-label="Duration">
+                    <td className="numeric duration" data-label={t("Duration")}>
                       {formatDuration(trace.durationNs)}
                     </td>
-                    <td className="numeric" data-label="Spans">
-                      {trace.spanCount}
+                    <td className="numeric" data-label={t("Spans")}>
+                      {number(trace.spanCount, { useGrouping: false })}
                     </td>
-                    <td data-label="Errors">
+                    <td data-label={t("Errors")}>
                       <Badge
                         label={
                           trace.errorCount
-                            ? `${trace.errorCount} error${trace.errorCount === 1 ? "" : "s"}`
-                            : "No errors"
+                            ? trace.errorCount === 1
+                              ? t("{count} error", {
+                                  count: number(trace.errorCount, { useGrouping: false }),
+                                })
+                              : t("{count} errors", {
+                                  count: number(trace.errorCount, { useGrouping: false }),
+                                })
+                            : t("No errors")
                         }
                         tone={trace.errorCount ? "error" : "neutral"}
                       />
@@ -102,61 +115,63 @@ export function TraceList({
       </section>
       {result.hasMore && (
         <Truncation>
-          The trace list reached its limit. Narrow the time window or filters to see other traces.
-          No total count is available.
+          {t(
+            "The trace list reached its limit. Narrow the time window or filters to see other traces. No total count is available.",
+          )}
         </Truncation>
       )}
       <p className="footnote">
-        Only spans in this query window contribute to each summary. Traces can be partial.
+        {t("Only spans in this query window contribute to each summary. Traces can be partial.")}
       </p>
     </>
   )
 }
 
 export function LogRecord({ log, window }: { log: Log; window: TimeWindow }) {
+  const { t } = useI18n()
   return (
     <div className="record-detail">
-      <h4>Log record</h4>
+      <h4>{t("Log record")}</h4>
       <dl className="metadata">
         <div>
-          <dt>Timestamp</dt>
+          <dt>{t("Timestamp")}</dt>
           <dd>
             <Timestamp value={log.timestamp} />
           </dd>
         </div>
         <div>
-          <dt>Service</dt>
-          <dd>{log.serviceName || "Unknown service"}</dd>
+          <dt>{t("Service")}</dt>
+          <dd>{log.serviceName || t("Unknown service")}</dd>
         </div>
         <div>
-          <dt>Severity</dt>
+          <dt>{t("Severity")}</dt>
           <dd>
             <Badge {...severity(log)} /> <span className="muted">({log.severityNumber})</span>
           </dd>
         </div>
         <div>
-          <dt>Trace ID</dt>
+          <dt>{t("Trace ID")}</dt>
           <dd>
             {isTraceId(log.traceId) ? (
               <a className="mono" href={traceHref(log.traceId, window)}>
                 {log.traceId}
               </a>
             ) : (
-              <code>{log.traceId || "Not recorded"}</code>
+              <code>{log.traceId || t("Not recorded")}</code>
             )}
           </dd>
         </div>
         <div>
-          <dt>Span ID</dt>
+          <dt>{t("Span ID")}</dt>
           <dd>
-            <code>{log.spanId || "Not recorded"}</code>
+            <code>{log.spanId || t("Not recorded")}</code>
           </dd>
         </div>
       </dl>
-      <h4>Body</h4>
-      <pre className="log-body">{log.body || "(Empty body)"}</pre>
-      <Attributes title="Resource attributes" values={log.resourceAttributes} />
-      <Attributes title="Log attributes" values={log.attributes} />
+      <h4>{t("Body")}</h4>
+      <pre className="log-body">{log.body || t("(Empty body)")}</pre>
+      <Attributes title={t("Resource attributes")} values={log.resourceAttributes} />
+      <Attributes title={t("Log attributes")} values={log.attributes} />
     </div>
   )
 }
@@ -172,41 +187,42 @@ export function LogTable({
   correlated?: boolean
   resetHref?: string
 }) {
+  const { t } = useI18n()
   if (logs.length === 0)
     return <EmptyState kind={correlated ? "correlated logs" : "logs"} resetHref={resetHref} />
   return (
     <div className="table-scroll">
       <table className="data-table record-table log-table">
         <caption className="sr-only">
-          {correlated ? "Correlated logs" : "Logs in the selected time window"}
+          {correlated ? t("Correlated logs") : t("Logs in the selected time window")}
         </caption>
         <thead>
           <tr>
-            <th scope="col">Timestamp (UTC)</th>
-            <th scope="col">Severity</th>
-            <th scope="col">Service</th>
-            <th scope="col">Body / record details</th>
+            <th scope="col">{t("Timestamp (UTC)")}</th>
+            <th scope="col">{t("Severity")}</th>
+            <th scope="col">{t("Service")}</th>
+            <th scope="col">{t("Body / record details")}</th>
           </tr>
         </thead>
         <tbody>
           {logs.map((log, index) => (
             // biome-ignore lint/suspicious/noArrayIndexKey: This immutable response has no stable log ID; loading unmounts the table before replacement.
             <tr key={`${log.timestamp}-${index}`}>
-              <td className="time-cell" data-label="Timestamp (UTC)">
+              <td className="time-cell" data-label={t("Timestamp (UTC)")}>
                 <Timestamp value={log.timestamp} />
               </td>
-              <td data-label="Severity">
+              <td data-label={t("Severity")}>
                 <Badge {...severity(log)} />
               </td>
-              <td data-label="Service">
-                <span className="service-name">{log.serviceName || "Unknown service"}</span>
+              <td data-label={t("Service")}>
+                <span className="service-name">{log.serviceName || t("Unknown service")}</span>
               </td>
               <td className="log-content">
-                <pre className="body-preview">{log.body || "(Empty body)"}</pre>
+                <pre className="body-preview">{log.body || t("(Empty body)")}</pre>
                 <details className="log-expansion">
                   <summary>
-                    <span className="log-show-label">Show log details</span>
-                    <span className="log-hide-label">Hide log details</span>
+                    <span className="log-show-label">{t("Show log details")}</span>
+                    <span className="log-hide-label">{t("Hide log details")}</span>
                   </summary>
                   <LogRecord log={log} window={window} />
                 </details>
@@ -228,25 +244,28 @@ export function LogList({
   window: TimeWindow
   resetHref?: string
 }) {
+  const { t, number } = useI18n()
   return (
     <>
       <section className="panel" aria-labelledby="log-results">
         <div className="panel-heading">
           <h2 id="log-results">
-            Logs <span className="count">{result.items.length}</span>
+            {t("Logs")}{" "}
+            <span className="count">{number(result.items.length, { useGrouping: false })}</span>
           </h2>
-          <span className="muted">Expand a record to inspect attributes</span>
+          <span className="muted">{t("Expand a record to inspect attributes")}</span>
         </div>
         <LogTable logs={result.items} window={window} resetHref={resetHref} />
       </section>
       {result.hasMore && (
         <Truncation>
-          The log list reached its limit. Narrow the time window or filters to see other logs. No
-          total count is available.
+          {t(
+            "The log list reached its limit. Narrow the time window or filters to see other logs. No total count is available.",
+          )}
         </Truncation>
       )}
       <p className="footnote">
-        Showing returned records only. Trace links use this same time window.
+        {t("Showing returned records only. Trace links use this same time window.")}
       </p>
     </>
   )

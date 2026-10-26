@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react"
 import { fetchList, type ListResult, type Log, type TraceSummary } from "./api"
+import { useI18n } from "./i18n"
 import { canManageTokens, type Project } from "./project-api"
 import { ProjectOverview } from "./project-overview"
 import { AppShell } from "./shell"
 import { formatDuration, isTraceId, listHref, relativeWindow, traceHref } from "./telemetry"
 
 export function ProjectDashboard({ project }: { project: Project }) {
+  const { t, number } = useI18n()
   const [service, setService] = useState("")
   const [draftService, setDraftService] = useState("")
   const [range, setRange] = useState<"15m" | "1h" | "24h">("1h")
@@ -52,18 +54,19 @@ export function ProjectDashboard({ project }: { project: Project }) {
       <main id="main" tabIndex={-1} className="workspace-page">
         <div className="page-heading">
           <div>
-            <span className="eyebrow">{project.name} / Overview</span>
-            <h1>Dashboard</h1>
+            <span className="eyebrow">{t("{project} / Overview", { project: project.name })}</span>
+            <h1>{t("Dashboard")}</h1>
             <p>
-              Stored project telemetry across the selected UTC window, with recent records for
-              investigation.
+              {t(
+                "Stored project telemetry across the selected UTC window, with recent records for investigation.",
+              )}
             </p>
           </div>
           <div className="dashboard-actions">
             <label>
-              Time range
+              {t("Time range")}
               <select
-                aria-label="Dashboard time range"
+                aria-label={t("Dashboard time range")}
                 value={range}
                 onChange={(e) => {
                   const next = e.target.value as typeof range
@@ -72,9 +75,9 @@ export function ProjectDashboard({ project }: { project: Project }) {
                   setWindow(relativeWindow(next))
                 }}
               >
-                <option value="15m">Last 15 minutes</option>
-                <option value="1h">Last hour</option>
-                <option value="24h">Last 24 hours</option>
+                <option value="15m">{t("Last 15 minutes")}</option>
+                <option value="1h">{t("Last hour")}</option>
+                <option value="24h">{t("Last 24 hours")}</option>
               </select>
             </label>
             <button
@@ -85,12 +88,12 @@ export function ProjectDashboard({ project }: { project: Project }) {
                 setWindow(relativeWindow(range))
               }}
             >
-              Refresh dashboard
+              {t("Refresh dashboard")}
             </button>
           </div>
         </div>
         <p className="dashboard-window">
-          UTC window: <time>{window.from}</time> – <time>{window.to}</time>
+          {t("UTC window: {from} – {to}", { from: window.from, to: window.to })}
         </p>
         <form
           className="settings-form"
@@ -102,7 +105,7 @@ export function ProjectDashboard({ project }: { project: Project }) {
           }}
         >
           <label>
-            Dashboard service
+            {t("Dashboard service")}
             <input
               value={draftService}
               onChange={(e) => setDraftService(e.target.value)}
@@ -110,45 +113,47 @@ export function ProjectDashboard({ project }: { project: Project }) {
             />
           </label>
           <button className="button button-secondary" type="submit">
-            Apply dashboard service
+            {t("Apply dashboard service")}
           </button>
         </form>
         <ProjectOverview window={window} service={service} />
         <p className="settings-hint">
-          Up to 5 most recent matching records are shown below. Sample counts are not a project-wide
-          error rate.
+          {t(
+            "Up to 5 most recent matching records are shown below. Sample counts are not a project-wide error rate.",
+          )}
         </p>
         {busy && (
           <p className="workspace-loading" role="status">
-            Loading dashboard…
+            {t("Loading dashboard…")}
           </p>
         )}
         {error && (
           <div className="workspace-error" role="alert">
-            <h2>Dashboard unavailable</h2>
-            <p>{error}</p>
+            <h2>{t("Dashboard unavailable")}</h2>
+            <p>{t(error)}</p>
             <button
               className="button button-secondary"
               type="button"
               onClick={() => setWindow(relativeWindow(range))}
             >
-              Retry dashboard
+              {t("Retry dashboard")}
             </button>
           </div>
         )}
         {data && (
-          <section className="dashboard-grid" aria-label="Recent telemetry sample">
+          <section className="dashboard-grid" aria-label={t("Recent telemetry sample")}>
             <section className="settings-card">
               <div className="settings-card-heading">
-                <h2>Recent traces</h2>
+                <h2>{t("Recent traces")}</h2>
                 <small>
-                  {data.traces.items.length}
-                  {data.traces.hasMore ? "+" : ""} sampled traces
+                  {t("{count} sampled traces", {
+                    count: `${number(data.traces.items.length)}${data.traces.hasMore ? "+" : ""}`,
+                  })}
                 </small>
                 <a
                   href={`${listHref("traces", window)}${service ? `&service=${encodeURIComponent(service)}` : ""}`}
                 >
-                  View all traces
+                  {t("View all traces")}
                 </a>
               </div>
               {data.traces.items.length ? (
@@ -162,7 +167,7 @@ export function ProjectDashboard({ project }: { project: Project }) {
                       <span
                         className={trace.errorCount ? "record-status is-error" : "record-status"}
                       >
-                        {trace.errorCount ? "Error" : "No recorded errors"}
+                        {trace.errorCount ? t("Error") : t("No recorded errors")}
                       </span>
                       <code>{formatDuration(trace.durationNs)}</code>
                     </li>
@@ -170,17 +175,17 @@ export function ProjectDashboard({ project }: { project: Project }) {
                 </ul>
               ) : (
                 <p className="workspace-empty">
-                  No traces in this window. Send telemetry or select a wider time range.
+                  {t("No traces in this window. Send telemetry or select a wider time range.")}
                 </p>
               )}
             </section>
             <section className="settings-card">
               <div className="settings-card-heading">
-                <h2>Recent logs</h2>
+                <h2>{t("Recent logs")}</h2>
                 <a
                   href={`${listHref("logs", window)}${service ? `&service=${encodeURIComponent(service)}` : ""}`}
                 >
-                  View all logs
+                  {t("View all logs")}
                 </a>
               </div>
               {data.logs.items.length ? (
@@ -191,18 +196,18 @@ export function ProjectDashboard({ project }: { project: Project }) {
                       <div>
                         <p className="dashboard-message">{log.body}</p>
                         <small>
-                          {log.serviceName} · {log.severityText || "Unspecified severity"}
+                          {log.serviceName} · {log.severityText || t("Unspecified severity")}
                         </small>
                       </div>
                       {isTraceId(log.traceId) && (
-                        <a href={traceHref(log.traceId, window)}>Open trace</a>
+                        <a href={traceHref(log.traceId, window)}>{t("Open trace")}</a>
                       )}
                     </li>
                   ))}
                 </ul>
               ) : (
                 <p className="workspace-empty">
-                  No logs in this window. Logs with trace IDs can link to their traces.
+                  {t("No logs in this window. Logs with trace IDs can link to their traces.")}
                 </p>
               )}
             </section>
@@ -210,14 +215,15 @@ export function ProjectDashboard({ project }: { project: Project }) {
         )}
         <section className="settings-card ingestion-guide">
           <div>
-            <span className="eyebrow">Connect your application</span>
-            <h2>Send telemetry to this project</h2>
+            <span className="eyebrow">{t("Connect your application")}</span>
+            <h2>{t("Send telemetry to this project")}</h2>
             <p>
-              Use OTLP HTTP protobuf at the application origin. Project tokens allow writes only;
-              browser sessions do not authorize ingestion.
+              {t(
+                "Use OTLP HTTP protobuf at the application origin. Project tokens allow writes only; browser sessions do not authorize ingestion.",
+              )}
             </p>
             <code>
-              {typeof location === "undefined" ? "Logice application origin" : location.origin}
+              {typeof location === "undefined" ? t("Logice application origin") : location.origin}
             </code>
           </div>
           <div>
@@ -229,16 +235,20 @@ export function ProjectDashboard({ project }: { project: Project }) {
                   : `${base}/settings#members`
               }
             >
-              {canManageTokens(project.role) ? "Manage ingestion tokens" : "View project members"}
+              {canManageTokens(project.role)
+                ? t("Manage ingestion tokens")
+                : t("View project members")}
             </a>
             <a className="button button-secondary" href={`${base}/setup`}>
-              Start project setup
+              {t("Start project setup")}
             </a>
             <a className="button button-secondary" href={`${base}/live`}>
-              Open Live
+              {t("Open Live")}
             </a>
             {!canManageTokens(project.role) && (
-              <p className="settings-hint">Ask an Owner or Developer for an ingestion token.</p>
+              <p className="settings-hint">
+                {t("Ask an Owner or Developer for an ingestion token.")}
+              </p>
             )}
           </div>
         </section>

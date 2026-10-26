@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { useI18n } from "./i18n"
 import { type Project, projectRequest } from "./project-api"
 
 interface AuditPage {
@@ -36,6 +37,7 @@ const actions = [
   "view_DELETE",
 ]
 export function ProjectAudit({ project }: { project: Project }) {
+  const { t } = useI18n()
   const [from, setFrom] = useState(() => new Date(Date.now() - 86_400_000).toISOString())
   const [to, setTo] = useState(() => new Date().toISOString())
   const [action, setAction] = useState("")
@@ -71,10 +73,11 @@ export function ProjectAudit({ project }: { project: Project }) {
   return (
     <section id="audit" className="settings-card">
       <div className="settings-card-heading">
-        <h2>Audit history</h2>
+        <h2>{t("Audit history")}</h2>
         <p>
-          Successful project changes. Actor names are current names, not historical snapshots. This
-          database history is not tamper-proof compliance storage.
+          {t(
+            "Successful project changes. Actor names are current names, not historical snapshots. This database history is not tamper-proof compliance storage.",
+          )}
         </p>
       </div>
       <form
@@ -85,51 +88,56 @@ export function ProjectAudit({ project }: { project: Project }) {
         }}
       >
         <label>
-          Audit from UTC
+          {t("Audit from UTC")}
           <input value={from} onChange={(e) => setFrom(e.target.value)} required />
         </label>
         <label>
-          Audit to UTC
+          {t("Audit to UTC")}
           <input value={to} onChange={(e) => setTo(e.target.value)} required />
         </label>
         <label>
-          Audit action
+          {t("Audit action")}
           <select value={action} onChange={(e) => setAction(e.target.value)}>
-            <option value="">All actions</option>
+            <option value="">{t("All actions")}</option>
             {actions.map((a) => (
-              <option key={a}>{a}</option>
+              <option key={a} value={a}>
+                {t(a)}
+              </option>
             ))}
           </select>
         </label>
-        <button type="submit">Apply audit filters</button>
+        <button type="submit">{t("Apply audit filters")}</button>
       </form>
       {error && (
         <div role="alert">
-          <p>{error}</p>
+          <p>{t(error)}</p>
           <button type="button" onClick={() => setRetry((n) => n + 1)}>
-            Retry audit
+            {t("Retry audit")}
           </button>
         </div>
       )}
-      {!data && !error && <p role="status">Loading audit history…</p>}
+      {!data && !error && <p role="status">{t("Loading audit history…")}</p>}
       {data && !data.items.length && (
         <p>
-          No audit events in this page and window. Older changes may not have historical records.
+          {t(
+            "No audit events in this page and window. Older changes may not have historical records.",
+          )}
         </p>
       )}
       <ul>
         {data?.items.map((event) => (
           <li key={event.id}>
-            <strong>{event.action}</strong>
+            <strong>{t(event.action)}</strong>
             <time>{event.occurredAt}</time>
             <span>
-              {event.actorKind === "operator" ? "Operator" : "Actor (current name)"}:{" "}
-              {event.actorName}
+              {event.actorKind === "operator"
+                ? t("Operator: {name}", { name: event.actorName })
+                : t("Actor (current name): {name}", { name: event.actorName })}
             </span>
             <code>{event.actorId}</code>
-            <span>Target:</span>
+            <span>{t("Target:")}</span>
             <code>{event.target}</code>
-            <span>Event {event.id}</span>
+            <span>{t("Event {id}", { id: event.id })}</span>
           </li>
         ))}
       </ul>
@@ -138,7 +146,7 @@ export function ProjectAudit({ project }: { project: Project }) {
         disabled={cursors.length === 1 || !data}
         onClick={() => setCursors((items) => items.slice(0, -1))}
       >
-        Previous audit events
+        {t("Previous audit events")}
       </button>
       <button
         type="button"
@@ -147,11 +155,12 @@ export function ProjectAudit({ project }: { project: Project }) {
           if (data?.nextCursor) setCursors((items) => [...items, data.nextCursor])
         }}
       >
-        Next audit events
+        {t("Next audit events")}
       </button>
       <p className="settings-hint">
-        New events are excluded above the first page's event ID. Each page checks current ownership.
-        Existing history is retained; no automatic cleanup is enabled.
+        {t(
+          "New events are excluded above the first page's event ID. Each page checks current ownership. Existing history is retained; no automatic cleanup is enabled.",
+        )}
       </p>
     </section>
   )

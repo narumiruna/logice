@@ -17,7 +17,8 @@
 
 .auth-header {
   min-height: 88px;
-  gap: 24px;
+  gap: 20px;
+  flex-wrap: wrap;
 }
 
 .auth-brand {
@@ -49,8 +50,15 @@
   font-size: 11px;
 }
 
-.auth-header .theme-select {
+.auth-header .language-select {
   margin-left: auto;
+}
+
+.auth-header .language-select,
+.auth-header .theme-select {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
 }
 
 .auth-header .theme-select select {
@@ -488,6 +496,11 @@
   .auth-header {
     min-height: 76px;
     gap: 12px;
+    padding: 12px 0;
+  }
+  .auth-header .language-select select,
+  .auth-header .theme-select select {
+    width: 90px;
   }
   .auth-access-badge {
     display: none;

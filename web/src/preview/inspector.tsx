@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react"
+import { useI18n } from "../i18n"
 import { Glyph } from "./icons"
 import { durationMs, type PreviewEvent } from "./model"
 
@@ -15,6 +16,7 @@ export function PreviewInspector({
   now: number
   onClose: () => void
 }) {
+  const { t } = useI18n()
   const [tab, setTab] = useState<"attributes" | "raw">("attributes")
   const [copied, setCopied] = useState("")
   const heading = useRef<HTMLHeadingElement>(null)
@@ -39,34 +41,36 @@ export function PreviewInspector({
     }
   }
   return (
-    <aside className="lp-inspector" aria-label="Event details">
+    <aside className="lp-inspector" aria-label={t("Event details")}>
       <div className="lp-inspector-top">
         <span>
-          <span className="lp-detail-dot" /> Event details
+          <span className="lp-detail-dot" /> {t("Event details")}
         </span>
         <button
           className="lp-icon-button"
           type="button"
           onClick={onClose}
-          aria-label="Close event details"
+          aria-label={t("Close event details")}
         >
           <Glyph name="close" />
         </button>
       </div>
       <div className="lp-inspector-content">
-        <div className="lp-section-label">{event.kind === "span" ? "SPAN" : "LOG RECORD"}</div>
+        <div className="lp-section-label">
+          {event.kind === "span" ? t("SPAN") : t("LOG RECORD")}
+        </div>
         <h2 ref={heading} tabIndex={-1}>
           {event.message}
         </h2>
         <div className="lp-detail-tags">
           <span className={`lp-status-tag ${event.status}`}>
             {event.status === "running"
-              ? "Running"
+              ? t("Running")
               : event.status === "error"
-                ? "Error"
+                ? t("Error")
                 : event.kind === "log"
                   ? event.level.toUpperCase()
-                  : "OK"}
+                  : t("OK")}
           </span>
           <span className="lp-soft-tag">{event.service}</span>
           {event.kind === "span" && (
@@ -81,21 +85,21 @@ export function PreviewInspector({
         </p>
         <dl className="lp-detail-ids">
           <div>
-            <dt>Trace ID</dt>
+            <dt>{t("Trace ID")}</dt>
             <dd>{event.traceId}</dd>
           </div>
           <div>
-            <dt>Span ID</dt>
+            <dt>{t("Span ID")}</dt>
             <dd>{event.spanId}</dd>
           </div>
           {event.parentId && (
             <div>
-              <dt>Parent event</dt>
+              <dt>{t("Parent event")}</dt>
               <dd>{event.parentId}</dd>
             </div>
           )}
         </dl>
-        <div className="lp-detail-tabs" role="tablist" aria-label="Event detail view">
+        <div className="lp-detail-tabs" role="tablist" aria-label={t("Event detail view")}>
           {(["attributes", "raw"] as const).map((item) => (
             <button
               key={item}
@@ -115,7 +119,7 @@ export function PreviewInspector({
                 }
               }}
             >
-              {item === "attributes" ? "Attributes" : "Raw data"}
+              {item === "attributes" ? t("Attributes") : t("Raw data")}
             </button>
           ))}
         </div>
@@ -124,8 +128,8 @@ export function PreviewInspector({
           {tab === "attributes" ? (
             <>
               <div className="lp-property-heading">
-                <h3>Event attributes</h3>
-                <span>{Object.keys(event.attributes).length} fields</span>
+                <h3>{t("Event attributes")}</h3>
+                <span>{t("{count} fields", { count: Object.keys(event.attributes).length })}</span>
               </div>
               <div className="lp-property-list">
                 {Object.entries(event.attributes).map(([key, value]) => (
@@ -138,10 +142,11 @@ export function PreviewInspector({
               <div className="lp-code-note">
                 <Glyph name="code" />
                 <div>
-                  <strong>Connected by context</strong>
+                  <strong>{t("Connected by context")}</strong>
                   <p>
-                    Logs stay with the span that created them. Select a parent or child to inspect
-                    the same trace.
+                    {t(
+                      "Logs stay with the span that created them. Select a parent or child to inspect the same trace.",
+                    )}
                   </p>
                 </div>
               </div>
@@ -151,15 +156,15 @@ export function PreviewInspector({
           )}
         </div>
         <button className="lp-copy-button" type="button" onClick={() => void copy()}>
-          <Glyph name="copy" size={14} /> Copy event JSON
+          <Glyph name="copy" size={14} /> {t("Copy event JSON")}
         </button>
         <span className="lp-copy-status" role="status">
-          {copied}
+          {t(copied)}
         </span>
         <div className="lp-detail-preview-note">
-          Design preview · generated sample data
+          {t("Design preview · generated sample data")}
           <br />
-          No production telemetry is being read.
+          {t("No production telemetry is being read.")}
         </div>
       </div>
     </aside>

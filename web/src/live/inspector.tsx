@@ -1,6 +1,8 @@
 // biome-ignore-all lint/a11y/noNoninteractiveTabindex: The inspector tabpanel is a keyboard entry point for static content.
+
 import { useEffect, useMemo, useRef, useState } from "react"
 import type { TimeWindow } from "../api"
+import { useI18n } from "../i18n"
 import { Glyph } from "../preview/icons"
 import { formatDuration, severity, spanStatus, traceHref } from "../telemetry"
 import type { LiveRecord } from "./api"
@@ -13,19 +15,26 @@ const tabs = ["attributes", "raw"] as const
 function CopyButton({
   label,
   value,
+  attributeKey,
   onCopy,
 }: {
   label: string
   value: string
-  onCopy: (value: string, label: string) => Promise<void>
+  attributeKey?: string
+  onCopy: (value: string, label: string, attributeKey?: string) => Promise<void>
 }) {
+  const { t } = useI18n()
+  const translatedLabel =
+    attributeKey === undefined
+      ? t(label)
+      : t("{group}: {key}", { group: t(label), key: attributeKey })
   return (
     <button
       type="button"
       className="lv-detail-copy"
-      aria-label={`Copy ${label}`}
-      title={`Copy ${label}`}
-      onClick={() => void onCopy(value, label)}
+      aria-label={t("Copy {label}", { label: translatedLabel })}
+      title={t("Copy {label}", { label: translatedLabel })}
+      onClick={() => void onCopy(value, label, attributeKey)}
     >
       <Glyph name="copy" size={13} />
     </button>
@@ -43,13 +52,18 @@ export function Inspector({
   outside: boolean
   onClose: () => void
 }) {
+  const { t, number } = useI18n()
   const dialog = useRef<HTMLDialogElement>(null)
   const heading = useRef<HTMLHeadingElement>(null)
   const selection = useRef(record.id)
   selection.current = record.id
   const [tab, setTab] = useState<(typeof tabs)[number]>("attributes")
   const [filter, setFilter] = useState("")
-  const [copyStatus, setCopyStatus] = useState("")
+  const [copyStatus, setCopyStatus] = useState<{
+    message: string
+    label?: string
+    attributeKey?: string
+  } | null>(null)
   const storedJSON = useMemo(() => JSON.stringify(record.stored, null, 2), [record.stored])
   useEffect(() => {
     const element = dialog.current
@@ -75,7 +89,7 @@ export function Inspector({
   // biome-ignore lint/correctness/useExhaustiveDependencies: Selection identity controls focus.
   useEffect(() => {
     heading.current?.focus({ preventScroll: true })
-    setCopyStatus("")
+    setCopyStatus(null)
     setFilter("")
   }, [record.id])
   useEffect(() => {
@@ -115,13 +129,14 @@ export function Inspector({
     document.addEventListener("keydown", onKey)
     return () => document.removeEventListener("keydown", onKey)
   }, [onClose])
-  async function copy(value: string, label: string) {
+  async function copy(value: string, label: string, attributeKey?: string) {
     const id = record.id
     try {
       await navigator.clipboard.writeText(value)
-      if (selection.current === id) setCopyStatus(`${label} copied`)
+      if (selection.current === id)
+        setCopyStatus({ message: "{label} copied", label, attributeKey })
     } catch {
-      if (selection.current === id) setCopyStatus("Clipboard is not available")
+      if (selection.current === id) setCopyStatus({ message: "Clipboard is not available" })
     }
   }
   const status = record.kind === "span" ? spanStatus(record.statusCode) : severity(record)
@@ -144,7 +159,7 @@ export function Inspector({
     <dialog
       ref={dialog}
       className="lv-inspector lp-inspector"
-      aria-label="Event details"
+      aria-label={t("Event details")}
       onCancel={(event) => {
         event.preventDefault()
         dialog.current?.close()
@@ -153,12 +168,12 @@ export function Inspector({
     >
       <div className="lp-inspector-top">
         <span>
-          <span className="lp-detail-dot" aria-hidden="true" /> Event details
+          <span className="lp-detail-dot" aria-hidden="true" /> {t("Event details")}
         </span>
         <button
           type="button"
           className="lp-icon-button"
-          aria-label="Close event details"
+          aria-label={t("Close event details")}
           onClick={() => {
             dialog.current?.close()
             onClose()
@@ -169,16 +184,25 @@ export function Inspector({
       </div>
       <div className="lp-inspector-content">
         <span className="lp-section-label">
-          {record.kind === "span" ? "EXPORTED SPAN" : "STORED LOG RECORD"}
+          {record.kind === "span" ? t("EXPORTED SPAN") : t("STORED LOG RECORD")}
         </span>
         <h2 ref={heading} tabIndex={-1}>
-          {record.kind === "span" ? record.name || "Unnamed span" : record.body || "(Empty body)"}
+          {record.kind === "span"
+            ? record.name || t("Unnamed span")
+            : record.body || t("(Empty body)")}
         </h2>
         <div className="lp-detail-tags">
-          <span className={`lp-status-tag lv-detail-tone-${status.tone}`}>{status.label}</span>
-          <span className="lp-soft-tag">{record.serviceName || "Unknown service"}</span>
+          <span className={`lp-status-tag lv-detail-tone-${status.tone}`}>
+            {record.kind === "span" && ["Error", "OK", "Unset"].includes(status.label)
+              ? t(status.label)
+              : status.label}
+          </span>
+          <span className="lp-soft-tag">{record.serviceName || t("Unknown service")}</span>
           {record.kind === "span" && (
-            <span className="lp-soft-tag lp-mono" title={`${record.durationNs} ns`}>
+            <span
+              className="lp-soft-tag lp-mono"
+              title={t("{duration} ns", { duration: record.durationNs })}
+            >
               {formatDuration(record.durationNs)}
             </span>
           )}
@@ -186,37 +210,41 @@ export function Inspector({
         <div className="lp-detail-time">
           <Glyph name="clock" size={14} />
           <div>
-            <span className="lv-detail-time-label">Timestamp (UTC)</span>
+            <span className="lv-detail-time-label">{t("Timestamp (UTC)")}</span>
             <time dateTime={record.startTime}>{record.startTime}</time>
           </div>
           <CopyButton label="timestamp" value={record.startTime} onCopy={copy} />
         </div>
         <div className="lv-detail-notices">
-          {outside && <p className="lv-warning">Outside current results · retained selection</p>}
-          {record.contextOnly && <p>Context only · not a matching row</p>}
+          {outside && (
+            <p className="lv-warning">{t("Outside current results · retained selection")}</p>
+          )}
+          {record.contextOnly && <p>{t("Context only · not a matching row")}</p>}
           {record.conflict && (
             <p className="lv-warning">
-              Conflicting exports · deterministic representative, not a latest version
+              {t("Conflicting exports · deterministic representative, not a latest version")}
             </p>
           )}
           {record.parentConflict && (
-            <p className="lv-warning">Ambiguous parent · no parent edge is inferred</p>
+            <p className="lv-warning">{t("Ambiguous parent · no parent edge is inferred")}</p>
           )}
           {BigInt(record.occurrences) > 1n && (
             <p>
-              {record.occurrences} stored occurrences · identical emissions and retries cannot be
-              distinguished
+              {t(
+                "{count} stored occurrences · identical emissions and retries cannot be distinguished",
+                { count: record.occurrences },
+              )}
             </p>
           )}
         </div>
         <dl className="lp-detail-ids">
           <div>
-            <dt>Trace ID</dt>
+            <dt>{t("Trace ID")}</dt>
             <dd>
               {isLinkable(record) ? (
                 <a href={traceHref(record.traceId, window)}>{record.traceId}</a>
               ) : (
-                record.traceId || "Not recorded"
+                record.traceId || t("Not recorded")
               )}
               {record.traceId && (
                 <CopyButton label="Trace ID" value={record.traceId} onCopy={copy} />
@@ -224,15 +252,15 @@ export function Inspector({
             </dd>
           </div>
           <div>
-            <dt>Span ID</dt>
+            <dt>{t("Span ID")}</dt>
             <dd>
-              <span>{record.spanId || "Not recorded"}</span>
+              <span>{record.spanId || t("Not recorded")}</span>
               {record.spanId && <CopyButton label="Span ID" value={record.spanId} onCopy={copy} />}
             </dd>
           </div>
           {record.parentSpanId && (
             <div>
-              <dt>Recorded parent span</dt>
+              <dt>{t("Recorded parent span")}</dt>
               <dd>
                 <span>{record.parentSpanId}</span>
                 <CopyButton label="parent Span ID" value={record.parentSpanId} onCopy={copy} />
@@ -240,44 +268,44 @@ export function Inspector({
             </div>
           )}
           <div>
-            <dt>Scope</dt>
-            <dd>{record.scopeName || "Not recorded"}</dd>
+            <dt>{t("Scope")}</dt>
+            <dd>{record.scopeName || t("Not recorded")}</dd>
           </div>
           {record.scopeVersion && (
             <div>
-              <dt>Scope version</dt>
+              <dt>{t("Scope version")}</dt>
               <dd>{record.scopeVersion}</dd>
             </div>
           )}
           {record.kind === "span" ? (
             <>
               <div>
-                <dt>Duration (ns)</dt>
+                <dt>{t("Duration (ns)")}</dt>
                 <dd>{record.durationNs}</dd>
               </div>
               <div>
-                <dt>Status code</dt>
-                <dd>{record.statusCode || "Not recorded"}</dd>
+                <dt>{t("Status code")}</dt>
+                <dd>{record.statusCode || t("Not recorded")}</dd>
               </div>
             </>
           ) : (
             <div>
-              <dt>Severity number</dt>
+              <dt>{t("Severity number")}</dt>
               <dd>{record.severityNumber}</dd>
             </div>
           )}
           {record.statusMessage && (
             <div>
-              <dt>Status message</dt>
+              <dt>{t("Status message")}</dt>
               <dd>{record.statusMessage}</dd>
             </div>
           )}
           <div>
-            <dt>Stored occurrences</dt>
+            <dt>{t("Stored occurrences")}</dt>
             <dd>{record.occurrences}</dd>
           </div>
         </dl>
-        <div className="lp-detail-tabs" role="tablist" aria-label="Event detail view">
+        <div className="lp-detail-tabs" role="tablist" aria-label={t("Event detail view")}>
           {tabs.map((item, index) => (
             <button
               key={item}
@@ -300,7 +328,7 @@ export function Inspector({
                 document.getElementById(`live-tab-${next}`)?.focus()
               }}
             >
-              {item === "raw" ? "Stored record JSON" : "Attributes"}
+              {item === "raw" ? t("Stored record JSON") : t("Attributes")}
             </button>
           ))}
         </div>
@@ -313,16 +341,18 @@ export function Inspector({
           {tab === "raw" ? (
             <>
               <div className="lp-property-heading">
-                <h3>Stored projection</h3>
-                <span>Not original OTLP</span>
+                <h3>{t("Stored projection")}</h3>
+                <span>{t("Not original OTLP")}</span>
               </div>
               {storedJSON.length > JSON_PREVIEW_LIMIT && (
                 <p className="lv-detail-empty">
-                  Preview limited to {JSON_PREVIEW_LIMIT.toLocaleString("en-US")} characters. Copy
-                  stored record JSON for the full stored projection.
+                  {t(
+                    "Preview limited to {count} characters. Copy stored record JSON for the full stored projection.",
+                    { count: number(JSON_PREVIEW_LIMIT) },
+                  )}
                 </p>
               )}
-              <section aria-label="Stored record JSON preview">
+              <section aria-label={t("Stored record JSON preview")}>
                 <pre className="lp-raw-data" tabIndex={0}>
                   {storedJSON.slice(0, JSON_PREVIEW_LIMIT)}
                 </pre>
@@ -331,14 +361,14 @@ export function Inspector({
           ) : (
             <>
               <div className="lp-property-heading">
-                <h3>Event attributes</h3>
-                <span>{attributeCount} fields</span>
+                <h3>{t("Event attributes")}</h3>
+                <span>{t("{attributeCount} fields", { attributeCount: attributeCount })}</span>
               </div>
               <div className="lv-detail-filter">
                 <Glyph name="search" size={14} />
                 <input
-                  aria-label="Filter attributes"
-                  placeholder="Filter by key or value…"
+                  aria-label={t("Filter attributes")}
+                  placeholder={t("Filter by key or value…")}
                   type="search"
                   value={filter}
                   onChange={(event) => setFilter(event.target.value)}
@@ -346,7 +376,7 @@ export function Inspector({
                 {filter && (
                   <button
                     type="button"
-                    aria-label="Clear attribute filter"
+                    aria-label={t("Clear attribute filter")}
                     onClick={() => setFilter("")}
                   >
                     <Glyph name="close" size={13} />
@@ -356,15 +386,19 @@ export function Inspector({
               {query && (
                 <p className="lv-detail-empty" role="status">
                   {matchCount === 0
-                    ? "No matching attributes"
-                    : `${matchCount} matching attributes`}
+                    ? t("No matching attributes")
+                    : t("{matchCount} matching attributes", { matchCount: matchCount })}
                 </p>
               )}
               {matches.map(({ title, total, entries }) => (
                 <details className="lv-detail-group" key={title} open>
                   <summary>
-                    {title}
-                    <span>{query ? `${entries.length} / ${total}` : `${total} fields`}</span>
+                    {t(title)}
+                    <span>
+                      {query
+                        ? `${entries.length} / ${total}`
+                        : t("{total} fields", { total: total })}
+                    </span>
                   </summary>
                   {entries.length ? (
                     <div className="lp-property-list">
@@ -372,33 +406,38 @@ export function Inspector({
                         <div className="lp-property" key={key}>
                           <div className="lv-detail-property-key">
                             <code>{key}</code>
-                            <CopyButton label={`${title}: ${key}`} value={value} onCopy={copy} />
+                            <CopyButton
+                              label={title}
+                              attributeKey={key}
+                              value={value}
+                              onCopy={copy}
+                            />
                           </div>
-                          <span>{value || "(Empty string)"}</span>
+                          <span>{value || t("(Empty string)")}</span>
                         </div>
                       ))}
                     </div>
                   ) : (
                     <p className="lv-detail-empty">
-                      {total ? "No matches in this group" : "No attributes recorded"}
+                      {total ? t("No matches in this group") : t("No attributes recorded")}
                     </p>
                   )}
                 </details>
               ))}
               <details className="lv-detail-group">
-                <summary>Export metadata</summary>
+                <summary>{t("Export metadata")}</summary>
                 <dl className="lp-detail-ids">
                   <div>
-                    <dt>Trace flags</dt>
+                    <dt>{t("Trace flags")}</dt>
                     <dd>{record.traceFlags}</dd>
                   </div>
                   <div>
-                    <dt>Resource schema URL</dt>
-                    <dd>{record.resourceSchemaUrl || "Not recorded"}</dd>
+                    <dt>{t("Resource schema URL")}</dt>
+                    <dd>{record.resourceSchemaUrl || t("Not recorded")}</dd>
                   </div>
                   <div>
-                    <dt>Scope schema URL</dt>
-                    <dd>{record.scopeSchemaUrl || "Not recorded"}</dd>
+                    <dt>{t("Scope schema URL")}</dt>
+                    <dd>{record.scopeSchemaUrl || t("Not recorded")}</dd>
                   </div>
                 </dl>
               </details>
@@ -410,18 +449,29 @@ export function Inspector({
           className="lp-copy-button"
           onClick={() => void copy(storedJSON, "Stored record JSON")}
         >
-          <Glyph name="copy" size={14} /> Copy stored record JSON
+          <Glyph name="copy" size={14} /> {t("Copy stored record JSON")}
         </button>
         <span className="lp-copy-status" role="status">
-          {copyStatus}
+          {copyStatus &&
+            t(copyStatus.message, {
+              label: copyStatus.label
+                ? copyStatus.attributeKey === undefined
+                  ? t(copyStatus.label)
+                  : t("{group}: {key}", {
+                      group: t(copyStatus.label),
+                      key: copyStatus.attributeKey,
+                    })
+                : "",
+            })}
         </span>
         <div className="lp-code-note">
           <Glyph name="code" size={16} />
           <div>
-            <strong>Stored projection, not original OTLP</strong>
+            <strong>{t("Stored projection, not original OTLP")}</strong>
             <p>
-              Attribute types use the exporter's string representation. Trace completeness is
-              unknown.
+              {t(
+                "Attribute types use the exporter's string representation. Trace completeness is unknown.",
+              )}
             </p>
           </div>
         </div>

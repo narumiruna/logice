@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import { flushSync } from "react-dom"
+import { useI18n } from "./i18n"
 import { canManageTokens, type Project, projectRequest } from "./project-api"
 import { AppShell } from "./shell"
 
@@ -37,6 +38,7 @@ const blankRule = {
   enabled: true,
 }
 export function ProjectAlerts({ project }: { project: Project }) {
+  const { t } = useI18n()
   const [rules, setRules] = useState<Rule[]>([])
   const [destinations, setDestinations] = useState<Destination[]>([])
   const [incidents, setIncidents] = useState<History | null>(null)
@@ -113,43 +115,51 @@ export function ProjectAlerts({ project }: { project: Project }) {
       <main id="main" tabIndex={-1} className="workspace-page">
         <div className="page-heading">
           <div>
-            <h1>Alerts</h1>
-            <p>Project-scoped stored-data conditions and durable Webhook delivery history.</p>
+            <h1>{t("Alerts")}</h1>
+            <p>
+              {t("Project-scoped stored-data conditions and durable Webhook delivery history.")}
+            </p>
           </div>
           <button
             className="button button-secondary"
             type="button"
             onClick={() => setRevision((n) => n + 1)}
           >
-            Refresh alerts
+            {t("Refresh alerts")}
           </button>
         </div>
         <p className="settings-hint">
-          A separate alert worker must be running. State reflects the last evaluation, not current
-          application health. Five-minute windows close after a 30-second export delay. New rules
-          have a five-minute grace period; three consecutive breaches fire, two healthy windows
-          recover, with a five-minute notification cooldown. Outages and insufficient populations
-          are unknown, not healthy. Delivery can repeat; receivers must deduplicate event IDs.
+          {t(
+            "A separate alert worker must be running. State reflects the last evaluation, not current application health. Five-minute windows close after a 30-second export delay. New rules have a five-minute grace period; three consecutive breaches fire, two healthy windows recover, with a five-minute notification cooldown. Outages and insufficient populations are unknown, not healthy. Delivery can repeat; receivers must deduplicate event IDs.",
+          )}
         </p>
         {error && (
           <p role="alert" className="workspace-error">
-            {error}
+            {/^Project request failed \(\d+\)\.$/.test(error)
+              ? t("Project request failed ({status}).", { status: error.slice(24, -2) })
+              : t(error)}
           </p>
         )}
-        {message && <p role="status">{message}</p>}
+        {message && <p role="status">{t(message)}</p>}
         <section className="settings-card">
-          <h2>Rules</h2>
+          <h2>{t("Rules")}</h2>
           {incidents !== null && !rules.length && (
-            <p>No alert rules. An Owner must first approve a Webhook destination.</p>
+            <p>{t("No alert rules. An Owner must first approve a Webhook destination.")}</p>
           )}
           {rules.map((r) => (
             <div key={r.id} className="settings-card">
               <h3>{r.name}</h3>
               <p>
-                {r.enabled ? r.state : "disabled"} · {r.kind} · Service:{" "}
-                {r.service || "all services"} · Revision {r.revision}
+                {t("{state} · {kind} · Service: {service} · Revision {revision}", {
+                  state: r.enabled ? t(r.state) : t("disabled"),
+                  kind: t(r.kind),
+                  service: r.service || t("all services"),
+                  revision: r.revision,
+                })}
                 <br />
-                Last evaluated window: {r.lastWindowTo ?? "Not evaluated yet"}
+                {t("Last evaluated window: {date}", {
+                  date: r.lastWindowTo ?? t("Not evaluated yet"),
+                })}
               </p>
               {canManageTokens(project.role) && (
                 <div className="dashboard-actions">
@@ -170,18 +180,18 @@ export function ProjectAlerts({ project }: { project: Project }) {
                       })
                     }}
                   >
-                    Edit alert rule
+                    {t("Edit alert rule")}
                   </button>
                   <button
                     type="button"
                     className="button button-secondary"
                     disabled={busy || !r.enabled}
                     onClick={() => {
-                      if (confirm("Disable this rule and cancel undelivered notifications?"))
+                      if (confirm(t("Disable this rule and cancel undelivered notifications?")))
                         void mutate(`/rules/${r.id}`, "DELETE", { revision: r.revision })
                     }}
                   >
-                    Disable alert rule
+                    {t("Disable alert rule")}
                   </button>
                 </div>
               )}
@@ -203,9 +213,9 @@ export function ProjectAlerts({ project }: { project: Project }) {
                 )
               }}
             >
-              <h3>{editingRule ? "Edit rule" : "Create rule"}</h3>
+              <h3>{editingRule ? t("Edit rule") : t("Create rule")}</h3>
               <label>
-                Alert rule name
+                {t("Alert rule name")}
                 <input
                   value={rule.name}
                   onChange={(e) => setRule({ ...rule, name: e.target.value })}
@@ -214,13 +224,13 @@ export function ProjectAlerts({ project }: { project: Project }) {
                 />
               </label>
               <label>
-                Approved destination
+                {t("Approved destination")}
                 <select
                   value={rule.destinationId}
                   onChange={(e) => setRule({ ...rule, destinationId: e.target.value })}
                   required
                 >
-                  <option value="">Select destination</option>
+                  <option value="">{t("Select destination")}</option>
                   {destinations
                     .filter((d) => !d.disabled)
                     .map((d) => (
@@ -231,7 +241,7 @@ export function ProjectAlerts({ project }: { project: Project }) {
                 </select>
               </label>
               <label>
-                Alert condition
+                {t("Alert condition")}
                 <select
                   value={rule.kind}
                   onChange={(e) =>
@@ -247,13 +257,13 @@ export function ProjectAlerts({ project }: { project: Project }) {
                     })
                   }
                 >
-                  <option value="error_ratio">Error trace proportion</option>
-                  <option value="root_p95">Exported root-span p95</option>
-                  <option value="no_data">No stored telemetry</option>
+                  <option value="error_ratio">{t("Error trace proportion")}</option>
+                  <option value="root_p95">{t("Exported root-span p95")}</option>
+                  <option value="no_data">{t("No stored telemetry")}</option>
                 </select>
               </label>
               <label>
-                Alert service (optional)
+                {t("Alert service (optional)")}
                 <input
                   value={rule.service}
                   maxLength={200}
@@ -261,7 +271,7 @@ export function ProjectAlerts({ project }: { project: Project }) {
                 />
               </label>
               <label>
-                Threshold (ratio 0–1, or latency in nanoseconds)
+                {t("Threshold (ratio 0–1, or latency in nanoseconds)")}
                 <input
                   value={rule.threshold}
                   onChange={(e) => setRule({ ...rule, threshold: e.target.value })}
@@ -270,7 +280,7 @@ export function ProjectAlerts({ project }: { project: Project }) {
                 />
               </label>
               <label>
-                Minimum population (ignored for no-data)
+                {t("Minimum population (ignored for no-data)")}
                 <input
                   type="number"
                   min={1}
@@ -286,14 +296,14 @@ export function ProjectAlerts({ project }: { project: Project }) {
                   checked={rule.enabled}
                   onChange={(e) => setRule({ ...rule, enabled: e.target.checked })}
                 />
-                Rule enabled
+                {t("Rule enabled")}
               </label>
               <button
                 className="button button-primary"
                 type="submit"
                 disabled={busy || !rule.name.trim() || !rule.destinationId}
               >
-                Save alert rule
+                {t("Save alert rule")}
               </button>
               {editingRule && (
                 <button
@@ -304,27 +314,28 @@ export function ProjectAlerts({ project }: { project: Project }) {
                     setRule(blankRule)
                   }}
                 >
-                  Cancel rule edit
+                  {t("Cancel rule edit")}
                 </button>
               )}
               <p>
-                Limits: 20 retained rule slots per project. Disable and edit existing slots to reuse
-                them.
+                {t(
+                  "Limits: 20 retained rule slots per project. Disable and edit existing slots to reuse them.",
+                )}
               </p>
             </form>
           )}
         </section>
         <section className="settings-card">
-          <h2>Webhook destinations</h2>
+          <h2>{t("Webhook destinations")}</h2>
           <p>
-            Public HTTPS on port 443 only. URLs remain encrypted and are never returned. Private
-            addresses, redirects, and untrusted TLS are rejected. Editing a destination cancels
-            pending notifications; disabling it also disables its rules.
+            {t(
+              "Public HTTPS on port 443 only. URLs remain encrypted and are never returned. Private addresses, redirects, and untrusted TLS are rejected. Editing a destination cancels pending notifications; disabling it also disables its rules.",
+            )}
           </p>
           {destinations.map((d) => (
             <div key={d.id}>
               <strong>{d.name}</strong>
-              <span> · {d.disabled ? "disabled" : "approved"}</span>
+              <span> · {d.disabled ? t("disabled") : t("approved")}</span>
               {project.role === "Owner" && (
                 <div className="dashboard-actions">
                   <button
@@ -337,7 +348,7 @@ export function ProjectAlerts({ project }: { project: Project }) {
                       setURL("")
                     }}
                   >
-                    Edit destination
+                    {t("Edit destination")}
                   </button>
                   <button
                     className="button button-secondary"
@@ -345,18 +356,18 @@ export function ProjectAlerts({ project }: { project: Project }) {
                     disabled={busy || d.disabled}
                     onClick={() => void mutate(`/destinations/${d.id}/test`, "POST", {})}
                   >
-                    Queue test notification
+                    {t("Queue test notification")}
                   </button>
                   <button
                     className="button button-secondary"
                     type="button"
                     disabled={busy || d.disabled}
                     onClick={() => {
-                      if (confirm("Disable this destination and its rules?"))
+                      if (confirm(t("Disable this destination and its rules?")))
                         void mutate(`/destinations/${d.id}`, "DELETE", { revision: d.revision })
                     }}
                   >
-                    Disable destination
+                    {t("Disable destination")}
                   </button>
                 </div>
               )}
@@ -380,7 +391,7 @@ export function ProjectAlerts({ project }: { project: Project }) {
               }}
             >
               <label>
-                Destination name
+                {t("Destination name")}
                 <input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
@@ -389,7 +400,7 @@ export function ProjectAlerts({ project }: { project: Project }) {
                 />
               </label>
               <label>
-                Destination HTTPS URL
+                {t("Destination HTTPS URL")}
                 <input
                   type="password"
                   value={url}
@@ -400,15 +411,16 @@ export function ProjectAlerts({ project }: { project: Project }) {
                 />
               </label>
               <p>
-                For an edit, leave URL empty to keep it. Supply a new URL to re-enable a disabled
-                destination. URLs can contain secrets; never put them in shared logs or screenshots.
+                {t(
+                  "For an edit, leave URL empty to keep it. Supply a new URL to re-enable a disabled destination. URLs can contain secrets; never put them in shared logs or screenshots.",
+                )}
               </p>
               <button
                 className="button button-primary"
                 type="submit"
                 disabled={busy || !name.trim()}
               >
-                Save destination
+                {t("Save destination")}
               </button>
               {editingDestination && (
                 <button
@@ -420,33 +432,44 @@ export function ProjectAlerts({ project }: { project: Project }) {
                     setURL("")
                   }}
                 >
-                  Cancel destination edit
+                  {t("Cancel destination edit")}
                 </button>
               )}
-              <p>Limits: five retained destination slots per project.</p>
+              <p>{t("Limits: five retained destination slots per project.")}</p>
             </form>
           )}
         </section>
         <section className="settings-card">
-          <h2>Incident and delivery history</h2>
+          <h2>{t("Incident and delivery history")}</h2>
           <p>
-            History is retained for up to 30 days. Pending delivery expires after 24 hours or eight
-            failed attempts. In-flight delivery can finish after a disable or deletion.
+            {t(
+              "History is retained for up to 30 days. Pending delivery expires after 24 hours or eight failed attempts. In-flight delivery can finish after a disable or deletion.",
+            )}
           </p>
-          {incidents === null && !error && <p role="status">Loading alert history…</p>}
-          <h3>Incidents</h3>
+          {incidents === null && !error && <p role="status">{t("Loading alert history…")}</p>}
+          <h3>{t("Incidents")}</h3>
           <ul>
             {incidents?.items.map((i) => (
               <li key={i.id}>
-                {i.createdAt} · {i.state} · Rule {i.ruleId} · Event {i.id}
+                {t("{date} · {state} · Rule {rule} · Event {event}", {
+                  date: i.createdAt,
+                  state: t(i.state),
+                  rule: i.ruleId ?? "",
+                  event: i.id,
+                })}
               </li>
             ))}
           </ul>
-          <h3>Deliveries</h3>
+          <h3>{t("Deliveries")}</h3>
           <ul>
             {deliveries?.items.map((i) => (
               <li key={i.id}>
-                {i.createdAt} · {i.state} · {i.result || "not attempted"} · Event {i.id}
+                {t("{date} · {state} · {result} · Event {event}", {
+                  date: i.createdAt,
+                  state: t(i.state),
+                  result: i.result ? t(i.result) : t("not attempted"),
+                  event: i.id,
+                })}
               </li>
             ))}
           </ul>
@@ -457,7 +480,7 @@ export function ProjectAlerts({ project }: { project: Project }) {
               disabled={!offset || busy}
               onClick={() => setOffset(offset - 100)}
             >
-              Previous alert history
+              {t("Previous alert history")}
             </button>
             <button
               className="button button-secondary"
@@ -465,7 +488,7 @@ export function ProjectAlerts({ project }: { project: Project }) {
               disabled={busy || (!incidents?.hasMore && !deliveries?.hasMore)}
               onClick={() => setOffset(offset + 100)}
             >
-              Next alert history
+              {t("Next alert history")}
             </button>
           </div>
         </section>
