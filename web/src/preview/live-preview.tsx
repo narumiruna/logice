@@ -352,7 +352,7 @@ export function LivePreview() {
                     checked={headers}
                     onChange={(event) => setHeaders(event.target.checked)}
                   />
-                  {t("Columns")}
+                  {t("Column headers")}
                 </label>
                 <button
                   className="lp-icon-button"

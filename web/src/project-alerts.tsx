@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 import { flushSync } from "react-dom"
 import { useI18n } from "./i18n"
 import { canManageTokens, type Project, projectRequest } from "./project-api"
+import { alertConditionLabel, alertConditions, alertDeliveryResultLabel } from "./project-labels"
 import { AppShell } from "./shell"
 
 interface Destination {
@@ -54,6 +55,7 @@ export function ProjectAlerts({ project }: { project: Project }) {
   const [name, setName] = useState("")
   const [url, setURL] = useState("")
   const base = `/${project.id}/alerts`
+  const condition = alertConditions.find((item) => item.value === rule.kind)
   useEffect(() => {
     const clear = () => flushSync(() => setURL(""))
     window.addEventListener("pagehide", clear)
@@ -117,7 +119,7 @@ export function ProjectAlerts({ project }: { project: Project }) {
           <div>
             <h1>{t("Alerts")}</h1>
             <p>
-              {t("Project-scoped stored-data conditions and durable Webhook delivery history.")}
+              {t("Project-scoped stored-data conditions and durable webhook delivery history.")}
             </p>
           </div>
           <button
@@ -144,7 +146,7 @@ export function ProjectAlerts({ project }: { project: Project }) {
         <section className="settings-card">
           <h2>{t("Rules")}</h2>
           {incidents !== null && !rules.length && (
-            <p>{t("No alert rules. An Owner must first approve a Webhook destination.")}</p>
+            <p>{t("No alert rules. An Owner must first approve a webhook destination.")}</p>
           )}
           {rules.map((r) => (
             <div key={r.id} className="settings-card">
@@ -152,7 +154,7 @@ export function ProjectAlerts({ project }: { project: Project }) {
               <p>
                 {t("{state} · {kind} · Service: {service} · Revision {revision}", {
                   state: r.enabled ? t(r.state) : t("disabled"),
-                  kind: t(r.kind),
+                  kind: t(alertConditionLabel(r.kind)),
                   service: r.service || t("all services"),
                   revision: r.revision,
                 })}
@@ -257,9 +259,11 @@ export function ProjectAlerts({ project }: { project: Project }) {
                     })
                   }
                 >
-                  <option value="error_ratio">{t("Error trace proportion")}</option>
-                  <option value="root_p95">{t("Exported root-span p95")}</option>
-                  <option value="no_data">{t("No stored telemetry")}</option>
+                  {alertConditions.map(({ value, label }) => (
+                    <option key={value} value={value}>
+                      {t(label)}
+                    </option>
+                  ))}
                 </select>
               </label>
               <label>
@@ -271,7 +275,7 @@ export function ProjectAlerts({ project }: { project: Project }) {
                 />
               </label>
               <label>
-                {t("Threshold (ratio 0–1, or latency in nanoseconds)")}
+                {t(condition?.thresholdLabel ?? "Threshold")}
                 <input
                   value={rule.threshold}
                   onChange={(e) => setRule({ ...rule, threshold: e.target.value })}
@@ -280,7 +284,7 @@ export function ProjectAlerts({ project }: { project: Project }) {
                 />
               </label>
               <label>
-                {t("Minimum population (ignored for no-data)")}
+                {t(condition?.populationLabel ?? "Minimum sample size")}
                 <input
                   type="number"
                   min={1}
@@ -467,7 +471,7 @@ export function ProjectAlerts({ project }: { project: Project }) {
                 {t("{date} · {state} · {result} · Event {event}", {
                   date: i.createdAt,
                   state: t(i.state),
-                  result: i.result ? t(i.result) : t("not attempted"),
+                  result: i.result ? t(alertDeliveryResultLabel(i.result)) : t("not attempted"),
                   event: i.id,
                 })}
               </li>

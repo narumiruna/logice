@@ -32,7 +32,7 @@ export async function passkeyRequest(path: string, body?: unknown): Promise<unkn
   if (!response.ok)
     throw new Error(
       response.status === 409
-        ? "Passkey limit reached, or this is your last Passkey. Reload and add a backup before removing it."
+        ? "Passkey limit reached, or this is your last passkey. Reload and add a backup before removing it."
         : "Passkey operation could not be completed. Reload and try again.",
     )
   return response.json()
@@ -40,7 +40,7 @@ export async function passkeyRequest(path: string, body?: unknown): Promise<unkn
 export function PasskeySettings() {
   const { t } = useI18n()
   const [keys, setKeys] = useState<Passkey[] | null>(null)
-  const [name, setName] = useState("Backup Passkey")
+  const [name, setName] = useState("Backup passkey")
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState("")
   const [message, setMessage] = useState("")
@@ -109,7 +109,7 @@ export function PasskeySettings() {
       if (mounted.current && !c.signal.aborted) {
         setMessage(
           operation === "add"
-            ? "Backup Passkey added."
+            ? "Backup passkey added."
             : "Passkey removed. Other account sessions were signed out.",
         )
         setRevision((n) => n + 1)
@@ -140,7 +140,7 @@ export function PasskeySettings() {
         setRevision((n) => n + 1)
       }
     } catch {
-      if (mounted.current) setError("Could not rename this Passkey.")
+      if (mounted.current) setError("Could not rename this passkey.")
     } finally {
       active.current = false
       if (mounted.current) setBusy(false)
@@ -152,7 +152,7 @@ export function PasskeySettings() {
         <h2>{t("Passkeys")}</h2>
         <p>
           {t(
-            "Add a backup before removing a Passkey. Adding or removing requires fresh user verification. Synced Passkeys are not distinct physical devices.",
+            "Add a backup before removing a passkey. Adding or removing requires fresh user verification. Synced passkeys are not distinct physical devices.",
           )}
         </p>
       </div>
@@ -164,12 +164,12 @@ export function PasskeySettings() {
             type="button"
             onClick={() => setRevision((n) => n + 1)}
           >
-            {t("Retry Passkeys")}
+            {t("Retry passkeys")}
           </button>
         </div>
       )}
       {message && <p role="status">{t(message)}</p>}
-      {keys === null && !error && <p role="status">{t("Loading Passkeys…")}</p>}
+      {keys === null && !error && <p role="status">{t("Loading passkeys…")}</p>}
       {keys?.map((key) => (
         <div key={key.id} className="settings-card">
           <form
@@ -191,18 +191,18 @@ export function PasskeySettings() {
               })}
             </p>
             <button type="submit" className="button button-secondary" disabled={busy}>
-              {t("Rename Passkey")}
+              {t("Rename passkey")}
             </button>
             <button
               type="button"
               className="button button-secondary"
               disabled={busy || keys.length <= 1}
               onClick={() => {
-                if (confirm(t("Remove this Passkey and sign out other account sessions?")))
+                if (confirm(t("Remove this passkey and sign out other account sessions?")))
                   void perform("remove", key.id)
               }}
             >
-              {t("Remove Passkey")}
+              {t("Remove passkey")}
             </button>
           </form>
         </div>
@@ -215,7 +215,7 @@ export function PasskeySettings() {
         }}
       >
         <label>
-          {t("New Passkey name")}
+          {t("New passkey name")}
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -229,7 +229,7 @@ export function PasskeySettings() {
           className="button button-primary"
           disabled={busy || !name.trim() || (keys?.length ?? 0) >= 8}
         >
-          {t("Add backup Passkey")}
+          {t("Add backup passkey")}
         </button>
         {busy && (
           <button
@@ -242,13 +242,13 @@ export function PasskeySettings() {
               )
             }}
           >
-            {t("Cancel Passkey operation")}
+            {t("Cancel passkey operation")}
           </button>
         )}
       </form>
       <p className="settings-hint">
         {t(
-          "At most eight Passkeys. Removing the last one is rejected by the server. For lost access, use operator recovery for this same account UUID; project tokens are not revoked by account recovery.",
+          "At most eight passkeys. Removing the last one is rejected by the server. For lost access, use operator recovery for this same account UUID; ingestion tokens are not revoked by account recovery.",
         )}
       </p>
     </section>

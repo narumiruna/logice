@@ -125,7 +125,7 @@ describe("telemetry views", () => {
     }
   })
 
-  it("renders empty states with Collector guidance, not fake records", () => {
+  it("renders empty states with project setup guidance, not fake records", () => {
     const traces = renderToStaticMarkup(
       <TraceList result={{ items: [], hasMore: false }} window={window} />,
     )
@@ -135,8 +135,12 @@ describe("telemetry views", () => {
     expect(traces).toContain("No traces in this window")
     expect(logs).toContain("No logs in this window")
     for (const html of [traces, logs]) {
-      expect(html).toContain("send OTLP traces and logs")
-      expect(html).toContain("Collector")
+      expect(html).toContain(
+        "Connect your application to send OTLP traces and logs to this project.",
+      )
+      expect(html).toContain('href="/setup"')
+      expect(html).toContain("Connect application")
+      expect(html).not.toContain("validation project")
       expect(html).not.toContain("More records are available")
       expect(html).not.toContain("GET /checkout")
     }

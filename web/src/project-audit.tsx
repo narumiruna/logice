@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { useI18n } from "./i18n"
 import { type Project, projectRequest } from "./project-api"
+import { auditActionLabel, auditActions } from "./project-labels"
 
 interface AuditPage {
   items: {
@@ -16,26 +17,6 @@ interface AuditPage {
   from: string
   to: string
 }
-const actions = [
-  "create_alert_destination",
-  "change_alert_destination",
-  "test_alert_destination",
-  "create_alert_rule",
-  "change_alert_rule",
-  "create",
-  "patch",
-  "delete",
-  "member_post",
-  "member_patch",
-  "member_delete",
-  "transfer_owner",
-  "create_token",
-  "revoke_token",
-  "operator_account_recovery",
-  "create_view",
-  "view_PATCH",
-  "view_DELETE",
-]
 export function ProjectAudit({ project }: { project: Project }) {
   const { t } = useI18n()
   const [from, setFrom] = useState(() => new Date(Date.now() - 86_400_000).toISOString())
@@ -99,9 +80,9 @@ export function ProjectAudit({ project }: { project: Project }) {
           {t("Audit action")}
           <select value={action} onChange={(e) => setAction(e.target.value)}>
             <option value="">{t("All actions")}</option>
-            {actions.map((a) => (
-              <option key={a} value={a}>
-                {t(a)}
+            {auditActions.map(({ value, label }) => (
+              <option key={value} value={value}>
+                {t(label)}
               </option>
             ))}
           </select>
@@ -127,7 +108,7 @@ export function ProjectAudit({ project }: { project: Project }) {
       <ul>
         {data?.items.map((event) => (
           <li key={event.id}>
-            <strong>{t(event.action)}</strong>
+            <strong>{t(auditActionLabel(event.action))}</strong>
             <time>{event.occurredAt}</time>
             <span>
               {event.actorKind === "operator"

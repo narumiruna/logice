@@ -81,7 +81,7 @@ export function SavedViews({ project }: { project: Project }) {
       await navigator.clipboard.writeText(
         `${location.origin}/projects/${project.id}/views?open=${id}`,
       )
-      setMessage("Shared link copied. Membership is still required.")
+      setMessage("View link copied. Project membership is still required.")
     } catch {
       setMessagePath(`/projects/${project.id}/views?open=${id}`)
       setMessage("Copy failed. Copy this path: {path}")
@@ -95,7 +95,7 @@ export function SavedViews({ project }: { project: Project }) {
             <h1>{t("Saved views")}</h1>
             <p>
               {t(
-                "Shared project queries. Save a committed Traces, Logs, or Live view from its explorer.",
+                "Save the applied filters and display settings from Traces, Logs, or Live. Project members can open these saved views.",
               )}
             </p>
           </div>
@@ -148,14 +148,14 @@ export function SavedViews({ project }: { project: Project }) {
                   }
                 }}
               >
-                {t("Apply view")}
+                {t("Open view")}
               </button>
               <button
                 type="button"
                 className="button button-secondary"
                 onClick={() => void share(view.id)}
               >
-                {t("Share view")}
+                {t("Copy link")}
               </button>
               {canManageTokens(project.role) && (
                 <>

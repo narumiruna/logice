@@ -33,10 +33,10 @@ Live uses the Design preview's compact query row, service color chips, connected
 - Row timestamps show UTC seconds. Tooltips and the inspector retain the exact recorded timestamp.
 - Timing bars use one shared duration scale, shown in the column heading, with an offset relative to the earliest retained record in each trace. Error spans have red bars and an error badge. Logs have a severity-colored time marker and no duration.
 - Collapse all also disables Auto-expand. With query filters applied, expansion controls are disabled while matching ancestry paths remain open. Context ancestors do not count as matches.
-- Columns hides or shows column headings; it does not remove records or clear selection. Narrow feeds omit timing and duration columns; exact values remain available in the inspector.
+- Use **Column headers** to show or hide column headings. This does not remove records or clear selection. Narrow feeds omit timing and duration columns; exact values remain available in the inspector.
 - Newly arrived records receive a short highlight. Reduced-motion mode disables this animation without stopping polling.
 - The feed footer shows update state, last successful update time, visible row count, and Follow latest. The count describes expanded logical rows, not histogram volume or a complete trace.
-- Refresh reads the represented query again. Reset view restores the five-minute Live query, clears filters and selection, and enables Auto-expand, Columns, and Follow latest. It does not delete stored telemetry.
+- Refresh reads the represented query again. Reset view restores the five-minute Live query, clears filters and selection, and enables Auto-expand, Column headers, and Follow latest. It does not delete stored telemetry.
 - `/` focuses search outside text controls and the inspector. Tree arrow keys navigate and expand records; Enter opens details. Inspector tabs support arrow keys, Home, and End. On narrow screens the inspector is a modal dialog.
 
 SDKs normally export spans after they end. Live shows stored spans; it does not infer Running status or increase durations on a timer. `Unset`, `Ok`, and `Error` are different statuses. An incomplete trace is not evidence that a span is still running.

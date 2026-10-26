@@ -20,9 +20,9 @@ test("project setup observes only fresh stored data and clears one-time credenti
   await expect(page.locator("pre").filter({ hasText: "OTEL_EXPORTER_OTLP_HEADERS" })).toContainText(
     "LOGICE_PROJECT_TOKEN",
   )
-  await page.getByLabel("Setup token name").fill("Setup browser test")
-  await page.getByRole("button", { name: "Create setup token", exact: true }).click()
-  const token = await page.getByRole("note", { name: "Setup ingestion token" }).textContent()
+  await page.getByLabel("Token name").fill("Setup browser test")
+  await page.getByRole("button", { name: "Create ingestion token", exact: true }).click()
+  const token = await page.getByRole("note", { name: "New ingestion token" }).textContent()
   expect(token).toBeTruthy()
   await expect(
     page.locator("pre").filter({ hasText: "OTEL_EXPORTER_OTLP_HEADERS" }),
@@ -74,7 +74,7 @@ test("project setup observes only fresh stored data and clears one-time credenti
   ).toBeVisible({ timeout: 15_000 })
   await page.getByRole("link", { name: "Open dashboard", exact: true }).click()
   await page.goBack()
-  await expect(page.getByRole("note", { name: "Setup ingestion token" })).toHaveCount(0)
+  await expect(page.getByRole("note", { name: "New ingestion token" })).toHaveCount(0)
 })
 
 test("project setup never accepts another project's receipt", async ({ page, context }) => {
@@ -159,13 +159,19 @@ test("shared views restore typed filters and reject stale updates", async ({ pag
   const card = page
     .locator("section.settings-card")
     .filter({ has: page.getByRole("heading", { name, exact: true }) })
+  await card.getByRole("button", { name: "Open view", exact: true }).click()
+  await expect(page).toHaveURL(new RegExp(`/projects/${id}/traces\\?`))
+  expect(new URL(page.url()).searchParams.get("service")).toBe("workflow-service")
+  expect(new URL(page.url()).searchParams.get("search")).toBe("timeout")
+  await page.goBack()
+  await expect(card).toBeVisible()
   await page.evaluate(() =>
     Object.defineProperty(navigator.clipboard, "writeText", {
       configurable: true,
       value: () => Promise.reject(new Error("denied")),
     }),
   )
-  await card.getByRole("button", { name: "Share view", exact: true }).click()
+  await card.getByRole("button", { name: "Copy link", exact: true }).click()
   await expect(
     page.getByText(`Copy failed. Copy this path: /projects/${id}/views?open=${saved.id}`, {
       exact: true,
@@ -182,7 +188,7 @@ test("shared views restore typed filters and reject stale updates", async ({ pag
   })
   expect(stale.status()).toBe(409)
   await page.goto(`/projects/${id}/settings#audit`)
-  await expect(page.locator("#audit")).toContainText("create_view")
+  await expect(page.locator("#audit")).toContainText("Saved view created")
   await expect(page.locator("#audit")).not.toContainText("workflow-service")
 })
 
@@ -243,7 +249,7 @@ test("backup Passkey enrollment requires reauthentication and removed credential
     const saved = await memberContext.storageState()
     await staleContext.addCookies(saved.cookies)
     await page.goto("/account")
-    await page.getByLabel("New Passkey name", { exact: true }).fill("USB backup")
+    await page.getByLabel("New passkey name", { exact: true }).fill("USB backup")
     let switched = false
     await page.route("**/api/auth/passkeys/authorize/finish", async (route) => {
       const response = await route.fetch()
@@ -256,8 +262,8 @@ test("backup Passkey enrollment requires reauthentication and removed credential
       }
       await route.fulfill({ response })
     })
-    await page.getByRole("button", { name: "Add backup Passkey", exact: true }).click()
-    await expect(page.getByText("Backup Passkey added.", { exact: true })).toBeVisible()
+    await page.getByRole("button", { name: "Add backup passkey", exact: true }).click()
+    await expect(page.getByText("Backup passkey added.", { exact: true })).toBeVisible()
     await page.unroute("**/api/auth/passkeys/authorize/finish")
     expect(
       (await (await memberContext.request.get("/api/auth/passkeys")).json()).items,
@@ -272,7 +278,7 @@ test("backup Passkey enrollment requires reauthentication and removed credential
     await page
       .locator("#passkeys .settings-card")
       .nth(index)
-      .getByRole("button", { name: "Remove Passkey", exact: true })
+      .getByRole("button", { name: "Remove passkey", exact: true })
       .click()
     await expect(
       page.getByText("Passkey removed. Other account sessions were signed out.", { exact: true }),
@@ -281,7 +287,7 @@ test("backup Passkey enrollment requires reauthentication and removed credential
     expect((await (await memberContext.request.get("/api/auth/session")).json()).user.id).toBe(
       subject,
     )
-    await expect(page.getByRole("button", { name: "Remove Passkey", exact: true })).toBeDisabled()
+    await expect(page.getByRole("button", { name: "Remove passkey", exact: true })).toBeDisabled()
     const adminCSRF = (await (await context.request.get("/api/auth/csrf")).json()).csrfToken
     const membership = await context.request.post(
       `/api/projects/${workspace().project.id}/members`,
@@ -292,9 +298,9 @@ test("backup Passkey enrollment requires reauthentication and removed credential
     )
     expect(membership.status()).toBe(200)
     await page.goto(`/projects/${workspace().project.id}/setup`)
-    await expect(page.getByRole("button", { name: "Create setup token", exact: true })).toHaveCount(
-      0,
-    )
+    await expect(
+      page.getByRole("button", { name: "Create ingestion token", exact: true }),
+    ).toHaveCount(0)
     await expect(
       page.getByText(
         "Ask a project Owner or Developer for an ingestion token. Viewer access cannot create tokens.",

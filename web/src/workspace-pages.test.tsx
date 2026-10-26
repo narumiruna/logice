@@ -39,7 +39,7 @@ describe("workspace page structure and permissions", () => {
       expect(html).toContain("Appearance")
       expect(html).toContain("Sign out of this browser")
       expect(html.includes("Registration invitations")).toBe(admin)
-      expect(html).not.toContain("Create token")
+      expect(html).not.toContain("Create ingestion token")
     },
   )
   it("escapes account names as text", () => {
@@ -87,7 +87,7 @@ describe("workspace page structure and permissions", () => {
       )
       expect(html).toContain("Project identity")
       expect(html).toContain("Members")
-      expect(html.includes("Create token")).toBe(role !== "Viewer")
+      expect(html.includes("Create ingestion token")).toBe(role !== "Viewer")
       expect(html.includes("Add member")).toBe(role === "Owner")
       expect(html.includes("Delete project")).toBe(role === "Owner")
       expect(html).toContain("Loading project settings")

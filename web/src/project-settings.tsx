@@ -107,7 +107,7 @@ export function ProjectSettings({ project }: { project: Project }) {
           <div>
             <span className="eyebrow">{t("Project / Settings")}</span>
             <h1>{t("{project} settings", { project: project.name })}</h1>
-            <p>{t("Manage project identity, team access, and application credentials.")}</p>
+            <p>{t("Manage project identity, team access, and ingestion tokens.")}</p>
           </div>
           <a className="button button-secondary" href={`/projects/${project.id}/dashboard`}>
             {t("Open dashboard")}
@@ -136,7 +136,9 @@ export function ProjectSettings({ project }: { project: Project }) {
           <div className="settings-card-heading">
             <h2>{t("Project identity")}</h2>
             <p>
-              {t("Stable identifiers keep your telemetry and credentials scoped to this project.")}
+              {t(
+                "Stable identifiers keep your telemetry and ingestion tokens scoped to this project.",
+              )}
             </p>
           </div>
           <p>
@@ -256,7 +258,7 @@ export function ProjectSettings({ project }: { project: Project }) {
                       disabled={busy}
                       type="button"
                       onClick={() => {
-                        if (confirm("Remove this member? Project tokens remain active."))
+                        if (confirm("Remove this member? Ingestion tokens remain active."))
                           void mutate(`/members/${member.userId}`, "DELETE", {})
                       }}
                     >
@@ -302,19 +304,19 @@ export function ProjectSettings({ project }: { project: Project }) {
               <h2>{t("Ingestion tokens")}</h2>
               <p>
                 {t(
-                  "Separate credentials for your applications. A browser session is not an ingestion credential.",
+                  "Use ingestion tokens to send telemetry from your applications. Browser sessions cannot send telemetry.",
                 )}
               </p>
             </div>
             <p>
               {t(
-                "Tokens belong to this project. Removing their creator does not revoke them. Tokens allow writes only.",
+                "Ingestion tokens belong to this project. Removing their creator does not revoke them. They allow writes only.",
               )}
             </p>
             <p>
               {t("OTLP HTTP endpoint:")}{" "}
               <code>{typeof window === "undefined" ? "" : window.location.origin}</code>.{" "}
-              {t("Use Bearer authorization with your project token.")}
+              {t("Use Bearer authorization with your ingestion token.")}
             </p>
             <form
               onSubmit={(event) => {
@@ -348,7 +350,7 @@ export function ProjectSettings({ project }: { project: Project }) {
                 />
               </label>
               <button disabled={busy} type="submit">
-                {t("Create token")}
+                {t("Create ingestion token")}
               </button>
             </form>
             {secret && (
@@ -377,7 +379,7 @@ export function ProjectSettings({ project }: { project: Project }) {
                     onClick={() => {
                       if (
                         confirm(
-                          "Revoke this project token? Applications that use it will no longer write telemetry.",
+                          "Revoke this ingestion token? Applications that use it will no longer be able to send telemetry.",
                         )
                       )
                         void mutate(`/tokens/${token.id}/revoke`, "POST", {})
@@ -417,7 +419,7 @@ export function ProjectSettings({ project }: { project: Project }) {
               disabled={busy}
               type="button"
               onClick={() => {
-                if (confirm("Delete this project and revoke all its tokens?"))
+                if (confirm("Delete this project and revoke all its ingestion tokens?"))
                   void mutate("", "DELETE", {}).then((ok) => {
                     if (ok) window.location.assign("/projects")
                   })
