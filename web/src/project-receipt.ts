@@ -16,11 +16,16 @@ export async function queryReceipt(window: ReceiptWindow, signal: AbortSignal): 
     minSeverity: 0,
     traceId: "",
   }
-  const [traces, logs] = await Promise.all([
+  const results = await Promise.allSettled([
     fetchList("traces", filters, signal),
     fetchList("logs", filters, signal),
   ])
-  return traces.items.length > 0 || logs.items.length > 0
+  signal.throwIfAborted()
+  if (results.some((result) => result.status === "fulfilled" && result.value.items.length > 0))
+    return true
+  const failure = results.find((result) => result.status === "rejected")
+  if (failure) throw failure.reason
+  return false
 }
 
 // A fixed observation window is not proof of a particular token's use.

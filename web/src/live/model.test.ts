@@ -105,6 +105,32 @@ describe("real Live hierarchy", () => {
     expect(isLinkable(data[4])).toBe(false)
     expect(isLinkable(record("r6", { spanId: "0".repeat(16) }))).toBe(false)
   })
+  it.each(["", "broken", "0".repeat(16)])(
+    "keeps a trace link without inventing a log parent for span ID %j",
+    (spanId) => {
+      const root = record("r1")
+      const log = record("r2", { kind: "log", spanId, durationNs: "0" })
+      const output = rows([root, log])
+      expect(isLinkable(log)).toBe(true)
+      expect(output.find((row) => row.record.id === root.id)?.childCount).toBe(0)
+      expect(output.find((row) => row.record.id === log.id)).toMatchObject({
+        parentId: null,
+        depth: 0,
+        issue: spanId ? "Invalid identifiers" : null,
+      })
+    },
+  )
+  it.each(["", "broken", "0".repeat(32)])(
+    "does not link a log with invalid trace ID %j",
+    (traceId) => {
+      const log = record("r1", { kind: "log", traceId, spanId: "" })
+      expect(isLinkable(log)).toBe(false)
+      expect(rows([log])[0]).toMatchObject({
+        parentId: null,
+        issue: traceId ? "Invalid identifiers" : "Uncorrelated log",
+      })
+    },
+  )
   it("detaches ambiguous/conflicting parents, self-links and duplicate parent identities without hiding records", () => {
     const first = record("r1", {
       parentSpanId: "0000000000000002",
