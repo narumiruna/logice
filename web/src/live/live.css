@@ -518,8 +518,34 @@
     row-gap: 4px;
   }
   .lp-root .lv-severity {
-    width: 88px;
-    font-size: 8px;
+    width: 120px;
+    height: 44px;
+    min-height: 44px;
+    font-size: 12px;
+  }
+  .lp-root .lv-query .lv-apply {
+    min-width: 44px;
+    min-height: 44px;
+    font-size: 12px;
+  }
+  .lv-query .lv-service-control input,
+  .lp-root .lv-fixed input {
+    min-height: 44px;
+    font-size: 16px;
+  }
+  .lv-fixed {
+    font-size: 12px;
+  }
+  .lv-fixed summary {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+  }
+  .lp-root .lv-fixed button,
+  .lp-root .lv-query-pending button,
+  .lp-root .lv-filter-context button {
+    min-height: 44px;
+    font-size: 12px;
   }
   .lv-main .lp-feed-options > label:last-of-type {
     display: inline-flex;

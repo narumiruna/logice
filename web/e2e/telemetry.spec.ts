@@ -201,6 +201,8 @@ test("retain usable filters on a narrow screen and show an unknown trace error",
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto(projectHref("/logs"))
+  await expect(page.locator(".filter-form")).toBeHidden()
+  await page.locator(".filter-toggle").click()
   await expect(page.getByLabel("Search", { exact: true })).toBeVisible()
   await expect(page.getByRole("button", { name: "Apply filters" })).toBeVisible()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(

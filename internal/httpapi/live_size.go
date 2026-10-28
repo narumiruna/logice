@@ -15,6 +15,13 @@ var errLiveEncoding = errors.New("invalid live JSON value")
 var liveTimeType = reflect.TypeFor[time.Time]()
 var liveRawType = reflect.TypeFor[json.RawMessage]()
 
+// Legacy JSON emits invalid UTF-8 as "\ufffd"; jsonv2 uses the UTF-8
+// replacement character. Measure the active encoder once, not per input byte.
+var liveInvalidUTF8Size = func() int {
+	raw, _ := json.Marshal("\xff")
+	return len(raw) - 2 // Exclude the surrounding quotes.
+}()
+
 // liveEncodedSize counts the encoder's compact, HTML-escaped JSON, including
 // its final newline. Large strings and raw fields are scanned without copying.
 // The second capped writer remains an independent final output check.
@@ -185,7 +192,9 @@ func (c *liveJSONSize) string(s string) error {
 			r, width := utf8.DecodeRuneInString(s[i:])
 			advance = width
 			n = width
-			if (r == utf8.RuneError && width == 1) || r == '\u2028' || r == '\u2029' {
+			if r == utf8.RuneError && width == 1 {
+				n = liveInvalidUTF8Size
+			} else if r == '\u2028' || r == '\u2029' {
 				n = 6
 			}
 		}
