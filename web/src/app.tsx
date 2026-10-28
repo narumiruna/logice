@@ -92,7 +92,7 @@ export function App() {
       tracesHref={listHref("traces", route.filters)}
       logsHref={listHref("logs", route.filters)}
     >
-      <main id="main" tabIndex={-1}>
+      <main id="main" tabIndex={-1} className={!detail ? "telemetry-list-page" : undefined}>
         {detail && (
           <a className="back-link" href={listHref("traces", route.filters)}>
             {t("← Back to traces")}
@@ -110,17 +110,19 @@ export function App() {
                   : t("Find requests, inspect errors, and follow work across services.")}
             </p>
           </div>
-          {valid && (
-            <button
-              className="button button-secondary refresh-button"
-              type="button"
-              onClick={refresh}
-            >
-              <span aria-hidden="true">↻</span> {t("Refresh")}
-            </button>
-          )}
+          <div className="page-actions">
+            {valid && !detail && <SaveViewButton />}
+            {valid && (
+              <button
+                className="button button-secondary refresh-button"
+                type="button"
+                onClick={refresh}
+              >
+                <span aria-hidden="true">↻</span> {t("Refresh")}
+              </button>
+            )}
+          </div>
         </div>
-        {valid && !detail && <SaveViewButton />}
         {route.page === "not-found" ? (
           <Notice title={t("This page does not exist")} tone="error">
             <LinkedMessage

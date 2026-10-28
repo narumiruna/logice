@@ -1,4 +1,5 @@
 export type GlyphName =
+  | "menu"
   | "activity"
   | "search"
   | "chevron"
@@ -17,6 +18,7 @@ export type GlyphName =
   | "arrow-left"
 
 const paths: Record<GlyphName, string> = {
+  menu: "M3 6h18 M3 12h18 M3 18h18",
   activity: "M3 12h4l3-8 4 16 3-8h4",
   search: "M21 21l-5-5 M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0",
   chevron: "m9 5 7 7-7 7",

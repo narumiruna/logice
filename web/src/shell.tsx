@@ -1,4 +1,4 @@
-import type { ReactNode } from "react"
+import { type ReactNode, useEffect, useRef } from "react"
 import { LanguageSelect, useI18n } from "./i18n"
 import { Glyph, type GlyphName } from "./preview/icons"
 import { useProject } from "./project-context"
@@ -35,6 +35,16 @@ export function AppShell({
 }) {
   const { t } = useI18n()
   const context = useProject()
+  const navigation = useRef<HTMLDialogElement>(null)
+  const menu = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    const desktop = window.matchMedia("(min-width: 701px)")
+    const closeOnDesktop = () => {
+      if (desktop.matches) navigation.current?.close()
+    }
+    desktop.addEventListener("change", closeOnDesktop)
+    return () => desktop.removeEventListener("change", closeOnDesktop)
+  }, [])
   const preview = page === "preview"
   const project = context?.project
   const scoped =
@@ -103,6 +113,21 @@ export function AppShell({
     { page: "account", label: t("Account"), icon: "box", href: "/account" },
     { page: "preview", label: t("Design preview"), icon: "box", href: projectPath("/preview") },
   ]
+  const navigationLinks = (
+    <nav>
+      {links.map((link) => (
+        <a
+          key={link.page}
+          href={link.href}
+          aria-current={page === link.page ? "page" : undefined}
+          title={link.label}
+        >
+          <Glyph name={link.icon} size={19} />
+          <span>{link.label}</span>
+        </a>
+      ))}
+    </nav>
+  )
   return (
     <div className="application-shell">
       <a href={`#${contentId}`} className="skip-link">
@@ -116,6 +141,36 @@ export function AppShell({
           Logice<span className="shell-brand-caption">{t("Telemetry explorer")}</span>
         </span>
       </a>
+      <button
+        ref={menu}
+        className="shell-menu-button"
+        type="button"
+        aria-label={t("Application navigation")}
+        aria-haspopup="dialog"
+        aria-controls="mobile-navigation"
+        onClick={() => navigation.current?.showModal()}
+      >
+        <Glyph name="menu" size={24} />
+      </button>
+      <dialog
+        ref={navigation}
+        id="mobile-navigation"
+        className="shell-mobile-navigation"
+        aria-label={t("Application navigation")}
+        onClose={() => menu.current?.focus()}
+      >
+        <div className="shell-navigation-heading">
+          <strong>{t("Application navigation")}</strong>
+          <button
+            type="button"
+            aria-label={t("Close navigation")}
+            onClick={() => navigation.current?.close()}
+          >
+            <Glyph name="close" size={22} />
+          </button>
+        </div>
+        <div className="shell-sidebar">{navigationLinks}</div>
+      </dialog>
       <header className="shell-header">
         {project && context ? (
           <label className="shell-switcher">
@@ -165,19 +220,7 @@ export function AppShell({
           </div>
         </div>
         <span className="shell-nav-label">{t("Workspace")}</span>
-        <nav>
-          {links.map((link) => (
-            <a
-              key={link.page}
-              href={link.href}
-              aria-current={page === link.page ? "page" : undefined}
-              title={link.label}
-            >
-              <Glyph name={link.icon} size={19} />
-              <span>{link.label}</span>
-            </a>
-          ))}
-        </nav>
+        {navigationLinks}
         <div className="shell-note">
           <strong>{preview ? t("Simulated data") : t("Stored OpenTelemetry data")}</strong>
           <p>

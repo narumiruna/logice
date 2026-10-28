@@ -1174,6 +1174,13 @@
 @media (max-width: 700px) {
   .lp-main {
     padding: 15px 11px 9px;
+    overflow: auto;
+  }
+  .lp-main > * {
+    flex-shrink: 0;
+  }
+  .lp-main > .lp-feed {
+    min-height: 240px;
   }
   .lp-page-title {
     margin-bottom: 14px;
@@ -1197,15 +1204,22 @@
   }
   .lp-search {
     flex-basis: 100%;
-    min-height: 34px;
+    min-height: 44px;
   }
   .lp-root .lp-search input {
-    font-size: 9px;
+    min-height: 44px;
+    font-size: 16px;
+  }
+  .lp-search kbd {
+    display: none;
   }
   .lp-root .lp-select {
-    width: 88px;
-    min-width: 80px;
-    font-size: 9px;
+    flex: 1;
+    width: 110px;
+    min-width: 100px;
+    height: 44px;
+    min-height: 44px;
+    font-size: 12px;
     padding-left: 7px;
   }
   .lp-time-control {
@@ -1215,14 +1229,17 @@
   }
   .lp-root .lp-time-control select {
     width: 100%;
-    font-size: 9px;
+    height: 44px;
+    min-height: 44px;
+    font-size: 12px;
     padding-left: 0;
   }
   .lp-time-control svg {
     width: 11px;
   }
   .lp-root .lp-live-button {
-    font-size: 9px;
+    min-height: 44px;
+    font-size: 12px;
     padding: 0 7px;
     min-width: 64px;
     gap: 4px;
@@ -1252,25 +1269,27 @@
   }
   .lp-feed-actions,
   .lp-feed-options {
-    gap: 9px;
+    flex-wrap: wrap;
+    gap: 4px 12px;
   }
   .lp-feed-toolbar button,
   .lp-feed-toolbar label {
-    font-size: 8px;
-    gap: 3px;
+    min-height: 44px;
+    min-width: 44px;
+    font-size: 12px;
+    gap: 6px;
   }
-  .lp-feed-toolbar button svg {
-    width: 11px;
+  .lp-root .lp-icon-button {
+    min-width: 44px;
+    min-height: 44px;
   }
-  .lp-root .lp-feed-toolbar input[type="checkbox"] {
-    width: 10px;
-    height: 10px;
+  .lp-root .lp-feed-toolbar input[type="checkbox"],
+  .lp-root .lp-feed-footer input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
   }
   .lp-feed-options {
-    margin-left: auto;
-  }
-  .lp-feed-options > label:last-of-type {
-    display: none;
+    margin-left: 0;
   }
   .lp-event-table {
     min-width: 470px;
@@ -1317,8 +1336,10 @@
     display: none;
   }
   .lp-feed-footer {
+    min-height: 44px;
+    flex-wrap: wrap;
     padding: 0 7px;
-    font-size: 8px;
+    font-size: 11px;
   }
   .lp-feed-footer > span:first-child {
     max-width: 52%;
@@ -1332,7 +1353,9 @@
     font-size: 0;
   }
   .lp-feed-footer label {
-    font-size: 8px;
+    min-height: 44px;
+    font-size: 12px;
+    gap: 6px;
   }
   .lp-feed-footer > span:last-child .lp-footer-separator {
     display: none;

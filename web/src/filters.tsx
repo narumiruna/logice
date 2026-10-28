@@ -1,5 +1,5 @@
 import type { FormEvent } from "react"
-import { useState } from "react"
+import { useId, useState } from "react"
 import { useI18n } from "./i18n"
 import { projectPath } from "./project-path"
 import {
@@ -14,9 +14,23 @@ import {
 export function FilterForm({ route }: { route: Route }) {
   const { t } = useI18n()
   const [range, setRange] = useState<Range>(route.range)
+  const [expanded, setExpanded] = useState(false)
+  const formId = useId()
   const logs = route.page === "logs"
   const filters = route.filters
   const resetHref = filterResetHref(route)
+  const summary = [
+    route.range === "fixed" ? t("Fixed window") : t(ranges[route.range].label),
+    filters.service ? `${t("Service")}: ${filters.service}` : t("All services"),
+    filters.search && `${t("Search")}: ${filters.search}`,
+    !logs && filters.errorsOnly && t("Errors only"),
+    logs &&
+      filters.minSeverity > 0 &&
+      t("Severity ≥ {severity}", { severity: filters.minSeverity }),
+    logs && filters.traceId && `${t("Trace ID")}: ${filters.traceId}`,
+  ]
+    .filter(Boolean)
+    .join(" · ")
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const data = new FormData(event.currentTarget)
@@ -36,116 +50,130 @@ export function FilterForm({ route }: { route: Route }) {
     window.location.assign(routeHref(next))
   }
   return (
-    <form
-      className="filter-form"
-      aria-label={logs ? t("Log filters") : t("Trace filters")}
-      action={projectPath(logs ? "/logs" : "/traces")}
-      method="get"
-      onSubmit={submit}
-    >
-      <input type="hidden" name="from" value={filters.from} />
-      <input type="hidden" name="to" value={filters.to} />
-      <input type="hidden" name="limit" value={filters.limit} />
-      <div className="filter-fields">
-        <label>
-          {t("Time range")}
-          <select
-            name="range"
-            value={range}
-            onChange={(event) => setRange(event.target.value as Range)}
-          >
-            {route.range === "fixed" && <option value="fixed">{t("Fixed window")}</option>}
-            {Object.entries(ranges).map(([value, item]) => (
-              <option key={value} value={value}>
-                {t(item.label)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          {t("Service")}
-          <input
-            name="service"
-            defaultValue={filters.service}
-            placeholder={t("All services (exact match)")}
-            autoComplete="off"
-          />
-        </label>
-        <label className="search-field">
-          {t("Search")}
-          <input
-            type="search"
-            name="search"
-            defaultValue={filters.search}
-            placeholder={logs ? t("Log body text") : t("Span name or trace ID")}
-          />
-        </label>
-        {logs ? (
+    <div className="filter-panel" data-expanded={expanded}>
+      <button
+        className="filter-toggle"
+        type="button"
+        aria-expanded={expanded}
+        aria-controls={formId}
+        onClick={() => setExpanded(!expanded)}
+      >
+        <strong>{t("Filters")}</strong>
+        <span>{summary}</span>
+        <span aria-hidden="true">{expanded ? "−" : "+"}</span>
+      </button>
+      <form
+        id={formId}
+        className="filter-form"
+        aria-label={logs ? t("Log filters") : t("Trace filters")}
+        action={projectPath(logs ? "/logs" : "/traces")}
+        method="get"
+        onSubmit={submit}
+      >
+        <input type="hidden" name="from" value={filters.from} />
+        <input type="hidden" name="to" value={filters.to} />
+        <input type="hidden" name="limit" value={filters.limit} />
+        <div className="filter-fields">
           <label>
-            {t("Minimum severity")}
-            <select name="minSeverity" defaultValue={filters.minSeverity}>
-              {(
-                [
-                  [0, "All severities"],
-                  [1, "Trace"],
-                  [5, "Debug"],
-                  [9, "Info"],
-                  [13, "Warn"],
-                  [17, "Error"],
-                  [21, "Fatal"],
-                ] as const
-              ).map(([value, label]) => (
+            {t("Time range")}
+            <select
+              name="range"
+              value={range}
+              onChange={(event) => setRange(event.target.value as Range)}
+            >
+              {route.range === "fixed" && <option value="fixed">{t("Fixed window")}</option>}
+              {Object.entries(ranges).map(([value, item]) => (
                 <option key={value} value={value}>
-                  {t(label)}
+                  {t(item.label)}
                 </option>
               ))}
-              {![0, 1, 5, 9, 13, 17, 21].includes(filters.minSeverity) && (
-                <option value={filters.minSeverity}>
-                  {t("Severity ≥ {severity}", { severity: filters.minSeverity })}
-                </option>
-              )}
             </select>
           </label>
-        ) : (
-          <label className="checkbox-field">
+          <label>
+            {t("Service")}
             <input
-              type="checkbox"
-              name="errorsOnly"
-              value="true"
-              defaultChecked={filters.errorsOnly}
+              name="service"
+              defaultValue={filters.service}
+              placeholder={t("All services (exact match)")}
+              autoComplete="off"
             />
-            {t("Errors only")}
+          </label>
+          <label className="search-field">
+            {t("Search")}
+            <input
+              type="search"
+              name="search"
+              defaultValue={filters.search}
+              placeholder={logs ? t("Log body text") : t("Span name or trace ID")}
+            />
+          </label>
+          {logs ? (
+            <label>
+              {t("Minimum severity")}
+              <select name="minSeverity" defaultValue={filters.minSeverity}>
+                {(
+                  [
+                    [0, "All severities"],
+                    [1, "Trace"],
+                    [5, "Debug"],
+                    [9, "Info"],
+                    [13, "Warn"],
+                    [17, "Error"],
+                    [21, "Fatal"],
+                  ] as const
+                ).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {t(label)}
+                  </option>
+                ))}
+                {![0, 1, 5, 9, 13, 17, 21].includes(filters.minSeverity) && (
+                  <option value={filters.minSeverity}>
+                    {t("Severity ≥ {severity}", { severity: filters.minSeverity })}
+                  </option>
+                )}
+              </select>
+            </label>
+          ) : (
+            <label className="checkbox-field">
+              <input
+                type="checkbox"
+                name="errorsOnly"
+                value="true"
+                defaultChecked={filters.errorsOnly}
+              />
+              {t("Errors only")}
+            </label>
+          )}
+          <button className="button button-primary" type="submit">
+            {t("Apply filters")}
+          </button>
+        </div>
+        {logs && (
+          <label className="trace-filter">
+            {t("Trace ID")}{" "}
+            <input
+              name="traceId"
+              defaultValue={filters.traceId}
+              placeholder={t("Optional · 32 hexadecimal digits")}
+              pattern="[a-fA-F0-9]{32}"
+              maxLength={32}
+              autoComplete="off"
+            />
           </label>
         )}
-        <button className="button button-primary" type="submit">
-          {t("Apply filters")}
-        </button>
-      </div>
-      {logs && (
-        <label className="trace-filter">
-          {t("Trace ID")}{" "}
-          <input
-            name="traceId"
-            defaultValue={filters.traceId}
-            placeholder={t("Optional · 32 hexadecimal digits")}
-            pattern="[a-fA-F0-9]{32}"
-            maxLength={32}
-            autoComplete="off"
-          />
-        </label>
-      )}
-      <div className="filter-footer">
-        <p className="filter-note">
-          {t(
-            "Filters keep the current window. Refresh moves a relative window forward. No live polling.",
+        <div className="filter-footer">
+          <p className="filter-note">
+            {t(
+              "Filters keep the current window. Refresh moves a relative window forward. No live polling.",
+            )}
+          </p>
+          {resetHref && (
+            <a className="filter-reset" href={resetHref}>
+              {t("Reset filters")}
+            </a>
           )}
-        </p>
-        {resetHref && (
-          <a className="filter-reset" href={resetHref}>
-            {t("Reset filters")}
-          </a>
-        )}
-      </div>
-    </form>
+        </div>
+      </form>
+    </div>
   )
 }

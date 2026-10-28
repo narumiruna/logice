@@ -134,9 +134,13 @@ for (const theme of ["classic", "studio"] as const) {
       for (const [index, path] of routes.entries()) {
         await page.goto(path)
         await expect(page.getByRole("heading", { level: 1 })).toBeVisible()
+        if (width === 390)
+          await page.getByRole("button", { name: "Application navigation", exact: true }).click()
         await expect(
           page.getByRole("navigation").getByRole("link", { name: "Projects", exact: true }),
         ).toBeVisible()
+        if (width === 390)
+          await page.getByRole("button", { name: "Close navigation", exact: true }).click()
         await expect(page.locator("html")).toHaveAttribute("data-theme", theme)
         const scroll = await page.evaluate(() => ({
           viewport: innerWidth,

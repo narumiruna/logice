@@ -38,7 +38,7 @@ func TestLivePreflightExactSizeAndAllocation(t *testing.T) {
 		}
 		n, err := liveEncodedSize(context.Background(), r)
 		if err != nil || n != len(raw)+1 {
-			t.Fatalf("size %d expected %d: %v", n, len(raw)+1, err)
+			t.Fatalf("body %q: size %d expected %d: %v", body, n, len(raw)+1, err)
 		}
 	}
 	// Input is allocated before measurement. The preflight must not allocate
@@ -75,6 +75,31 @@ func TestLivePreflightExactSizeAndAllocation(t *testing.T) {
 		t.Fatal("preflight did not check cancellation during a large string scan")
 	}
 	t.Logf("oversized preflight: %.0f allocations, %d allocated bytes/op", allocs, result.AllocedBytesPerOp())
+}
+
+func TestLiveEncodedSizeUTF8(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		value any
+	}{
+		{"invalid byte", "\xff"},
+		{"truncated sequence", "\xe2\x82"},
+		{"mixed text", "valid é \xff \ufffd"},
+		{"map keys and values", map[string]string{"\xff": "\xfe"}},
+		{"raw invalid byte", json.RawMessage("\"\xff\"")},
+		{"raw valid replacement", json.RawMessage("\"\ufffd\"")},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw, err := json.Marshal(tc.value)
+			if err != nil {
+				t.Fatal(err)
+			}
+			size, err := liveEncodedSize(context.Background(), tc.value)
+			if err != nil || size != len(raw)+1 {
+				t.Fatalf("size %d expected %d for %s: %v", size, len(raw)+1, raw, err)
+			}
+		})
+	}
 }
 
 func TestLiveEncodedLimit(t *testing.T) {
