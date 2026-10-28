@@ -205,12 +205,16 @@ test("Dashboard statistics fail explicitly, retry, and keep range and service in
   await expect(stats.locator("strong")).toHaveCount(0)
   await page.unroute("**/overview?*")
   await page.getByRole("button", { name: "Retry statistics", exact: true }).click()
-  await expect(stats.getByText("Stored traces", { exact: true })).toBeVisible()
+  await expect(
+    stats.locator(".dashboard-stats").getByText("Stored traces", { exact: true }),
+  ).toBeVisible()
   await page.getByLabel("Dashboard time range", { exact: true }).selectOption("15m")
   await page.getByLabel("Dashboard service", { exact: true }).fill("scope-not-present")
-  await page.getByRole("button", { name: "Apply dashboard service", exact: true }).click()
-  await expect(stats.getByText("Stored traces", { exact: true })).toBeVisible()
-  await stats.locator("summary").click()
+  await page.getByRole("button", { name: "Apply filters", exact: true }).click()
+  await expect(
+    stats.locator(".dashboard-stats").getByText("Stored traces", { exact: true }),
+  ).toBeVisible()
+  await stats.locator(".dashboard-buckets summary").click()
   const href = await stats.locator("tbody a").first().getAttribute("href")
   const link = new URL(href ?? "", page.url())
   expect(link.pathname).toBe(`/projects/${id}/traces`)
@@ -219,7 +223,11 @@ test("Dashboard statistics fail explicitly, retry, and keep range and service in
     Date.parse(link.searchParams.get("to") ?? "") - Date.parse(link.searchParams.get("from") ?? ""),
   ).toBe(15_000)
   await expect(
-    stats.getByText("Error trace proportion", { exact: true }).locator("..").locator("strong"),
+    stats
+      .locator(".dashboard-stats")
+      .getByText("Error trace proportion", { exact: true })
+      .locator("..")
+      .locator("strong"),
   ).toHaveText("—")
 })
 

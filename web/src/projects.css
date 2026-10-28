@@ -456,94 +456,6 @@
   flex-wrap: wrap;
   gap: 12px;
 }
-.dashboard-window {
-  font-size: 10px;
-  color: var(--color-muted);
-  margin-bottom: 20px;
-}
-.dashboard-stats {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-  margin-bottom: 24px;
-}
-.dashboard-stats article {
-  padding: 22px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-}
-.dashboard-stats span,
-.dashboard-stats small {
-  display: block;
-  color: var(--color-muted);
-  font-size: 11px;
-}
-.dashboard-stats strong {
-  display: block;
-  font-size: 32px;
-  line-height: 1.5;
-  color: var(--color-heading);
-}
-.dashboard-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 20px;
-}
-.dashboard-records {
-  list-style: none;
-  padding: 0;
-}
-.dashboard-records li {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-  border-top: 1px solid var(--color-border-soft);
-  padding: 14px 0;
-  font-size: 12px;
-}
-.dashboard-records li > div {
-  flex: 1;
-  min-width: 0;
-}
-.dashboard-records small {
-  display: block;
-  color: var(--color-muted);
-  font-size: 10px;
-  margin-top: 6px;
-}
-.dashboard-message {
-  margin: 0;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.record-status {
-  color: var(--color-muted);
-  font-size: 10px;
-}
-.record-status.is-error {
-  color: var(--color-error);
-}
-.ingestion-guide {
-  display: grid;
-  grid-template-columns: 1fr minmax(200px, 0.6fr);
-  gap: 28px;
-}
-.ingestion-guide > div:last-child {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 12px;
-}
-.ingestion-guide code {
-  display: block;
-  padding: 12px;
-  border-radius: 6px;
-  background: var(--color-surface-subtle);
-}
 :root[data-theme="studio"] .workspace-page {
   padding: 24px;
 }
@@ -552,9 +464,7 @@
   border-radius: 7px;
 }
 @media (max-width: 900px) {
-  .project-create,
-  .dashboard-grid,
-  .ingestion-guide {
+  .project-create {
     grid-template-columns: 1fr;
   }
   .settings-layout {
@@ -599,16 +509,6 @@
   .settings-card,
   .project-card {
     padding: 18px;
-  }
-  .dashboard-stats {
-    grid-template-columns: 1fr;
-    gap: 10px;
-  }
-  .dashboard-stats article {
-    padding: 15px;
-  }
-  .dashboard-stats strong {
-    font-size: 26px;
   }
   .project-list-toolbar {
     flex-direction: column;
