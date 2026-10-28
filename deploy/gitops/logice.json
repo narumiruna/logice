@@ -17,14 +17,14 @@
         "valuesObject": {
           "api": {
             "image": {
-              "digest": "sha256:e8c93fd75f5b105623f25c1128d32d2e0926777388a105089adaeb155b8c2001",
+              "digest": "sha256:d61f20f2662aa065dae549e4a86c68ecf7c2f9946e0f22d7ab272eb0a7a9d396",
               "repository": "ghcr.io/narumiruna/logice-api",
               "tag": ""
             }
           },
           "web": {
             "image": {
-              "digest": "sha256:29928b37c6a154a50e289fc085199270c3d2a8ce620b82ea732d585484540c1d",
+              "digest": "sha256:65ba20b7c9131a53109ac29e52bac240e7768ca9229f2044ed61d097541ff6fd",
               "repository": "ghcr.io/narumiruna/logice-web",
               "tag": ""
             }
@@ -33,7 +33,7 @@
       },
       "path": "charts/logice",
       "repoURL": "https://github.com/narumiruna/logice",
-      "targetRevision": "e022ad6b2a5fdaf3e03c913b18b5e33af6b5439c"
+      "targetRevision": "eac11e52a34e82b142482dec6996f9043a70ab7f"
     },
     "syncPolicy": {
       "automated": {
