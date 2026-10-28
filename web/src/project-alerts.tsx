@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { flushSync } from "react-dom"
 import { useI18n } from "./i18n"
-import { canManageTokens, type Project, projectRequest } from "./project-api"
+import { canManageTokens, type Project, projectErrorMessage, projectRequest } from "./project-api"
 import { alertConditionLabel, alertConditions, alertDeliveryResultLabel } from "./project-labels"
 import { AppShell } from "./shell"
 
@@ -47,7 +47,7 @@ export function ProjectAlerts({ project }: { project: Project }) {
   const [offset, setOffset] = useState(0)
   const [revision, setRevision] = useState(0)
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState("")
+  const [error, setError] = useState<Error | string>("")
   const [message, setMessage] = useState("")
   const [editingRule, setEditingRule] = useState<Rule | null>(null)
   const [rule, setRule] = useState(blankRule)
@@ -107,7 +107,7 @@ export function ProjectAlerts({ project }: { project: Project }) {
         "Change saved. Notifications are processed by the separate worker; queue acceptance is not delivery confirmation.",
       )
     } catch (error) {
-      setError(error instanceof Error ? error.message : "Alert update failed.")
+      setError(error instanceof Error ? error : "Alert update failed.")
     } finally {
       setBusy(false)
     }
@@ -137,9 +137,7 @@ export function ProjectAlerts({ project }: { project: Project }) {
         </p>
         {error && (
           <p role="alert" className="workspace-error">
-            {/^Project request failed \(\d+\)\.$/.test(error)
-              ? t("Project request failed ({status}).", { status: error.slice(24, -2) })
-              : t(error)}
+            {projectErrorMessage(error, t)}
           </p>
         )}
         {message && <p role="status">{t(message)}</p>}

@@ -6,6 +6,7 @@ import {
   type Member,
   type Page,
   type Project,
+  projectErrorMessage,
   projectRequest,
   type Token,
 } from "./project-api"
@@ -17,7 +18,7 @@ export function ProjectSettings({ project }: { project: Project }) {
   const [members, setMembers] = useState<Page<Member> | null>(null)
   const [tokens, setTokens] = useState<Page<Token> | null>(null)
   const [secret, setSecret] = useState("")
-  const [error, setError] = useState("")
+  const [error, setError] = useState<Error | string>("")
   const [busy, setBusy] = useState(false)
   const [tokenName, setTokenName] = useState("")
   const [expiry, setExpiry] = useState("")
@@ -77,7 +78,7 @@ export function ProjectSettings({ project }: { project: Project }) {
         }
       })
       .catch((error) => {
-        if (!controller.signal.aborted) setError(error.message)
+        if (!controller.signal.aborted) setError(error)
       })
     return () => controller.abort()
   }, [base, manageTokens, memberOffset, tokenOffset, revision])
@@ -91,7 +92,7 @@ export function ProjectSettings({ project }: { project: Project }) {
       setRevision((value) => value + 1)
       return true
     } catch (error) {
-      setError(error instanceof Error ? error.message : "Request failed.")
+      setError(error instanceof Error ? error : "Request failed.")
       return false
     } finally {
       setBusy(false)
@@ -152,11 +153,7 @@ export function ProjectSettings({ project }: { project: Project }) {
         </section>
         {error && (
           <div className="workspace-error" role="alert">
-            <p>
-              {/^Project request failed \(\d+\)\.$/.test(error)
-                ? t("Project request failed ({status}).", { status: error.slice(24, -2) })
-                : t(error)}
-            </p>
+            <p>{projectErrorMessage(error, t)}</p>
             <button
               className="button button-secondary"
               type="button"

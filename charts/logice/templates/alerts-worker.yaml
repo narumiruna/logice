@@ -35,13 +35,7 @@ spec:
           imagePullPolicy: {{ .Values.api.image.pullPolicy }}
           args: ["alerts-worker"]
           securityContext:
-            runAsNonRoot: true
-            runAsUser: 65532
-            runAsGroup: 65532
-            readOnlyRootFilesystem: true
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop: [ALL]
+            {{- include "logice.apiSecurityContext" . | nindent 12 }}
           env:
             - name: CLICKHOUSE_ADDR
               value: {{ include "logice.name" . }}-clickhouse:9000

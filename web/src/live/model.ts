@@ -276,19 +276,19 @@ export function reconcileSelection(
 export function reconcileAnchor(
   previous: readonly LiveRow[],
   next: readonly LiveRow[],
-  id: string,
-): { id: string | null; evicted: boolean } {
-  const retained = new Set(next.map((row) => row.record.id))
-  if (retained.has(id)) return { id, evicted: false }
-  const position = previous.findIndex((row) => row.record.id === id)
-  for (let distance = 1; position >= 0 && distance < previous.length; distance += 1) {
-    for (const index of [position + distance, position - distance]) {
-      const candidate = previous[index]?.record.id
-      if (candidate && retained.has(candidate)) return { id: candidate, evicted: true }
+  anchor: { id: string; index: number },
+): { index: number; evicted: boolean } {
+  const retained = new Map(next.map((row, index) => [row.record.id, index]))
+  const current = retained.get(anchor.id)
+  if (current !== undefined) return { index: current, evicted: false }
+  // Use the saved position even if the anchor is absent from previous rows.
+  // At equal distances, prefer the forward neighbor.
+  for (let distance = 1; distance < previous.length; distance += 1) {
+    for (const position of [anchor.index + distance, anchor.index - distance]) {
+      const candidate = previous[position]?.record.id
+      const index = candidate ? retained.get(candidate) : undefined
+      if (index !== undefined) return { index, evicted: true }
     }
   }
-  return {
-    id: next[Math.min(Math.max(position, 0), next.length - 1)]?.record.id ?? null,
-    evicted: true,
-  }
+  return { index: Math.min(anchor.index, next.length - 1), evicted: true }
 }

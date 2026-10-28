@@ -212,7 +212,7 @@ func liveAttributes(raw json.RawMessage) (map[string]string, error) {
 }
 
 func liveRetainTraces(result *LiveSnapshot) []string {
-	latest := map[string]time.Time{}
+	latest := map[string]int64{}
 	for _, records := range [][]LiveRecord{result.Spans, result.Logs} {
 		for _, r := range records {
 			// Invalid identifiers are content records, not trace-linkable records.
@@ -221,9 +221,8 @@ func liveRetainTraces(result *LiveSnapshot) []string {
 			}
 			// SQL always supplies this value. Unix epoch zero is a valid latest
 			// timestamp, not an absent-value sentinel.
-			eventTime := time.Unix(0, r.latestMatchingNs)
-			if t, ok := latest[r.TraceID]; !ok || eventTime.After(t) {
-				latest[r.TraceID] = eventTime
+			if ns, ok := latest[r.TraceID]; !ok || r.latestMatchingNs > ns {
+				latest[r.TraceID] = r.latestMatchingNs
 			}
 		}
 	}
@@ -233,10 +232,10 @@ func liveRetainTraces(result *LiveSnapshot) []string {
 	}
 	sort.Slice(traces, func(i, j int) bool {
 		a, b := latest[traces[i]], latest[traces[j]]
-		if a.Equal(b) {
+		if a == b {
 			return traces[i] < traces[j]
 		}
-		return a.After(b)
+		return a > b
 	})
 	if len(traces) > LiveTraceGroupLimit {
 		result.TraceGroupsTruncated = true
@@ -260,6 +259,22 @@ func liveRetainTraces(result *LiveSnapshot) []string {
 	return traces
 }
 
+// liveMatchingParent returns the eligible parent ID without changing its case.
+// Logs refer to their own span; spans refer to their parent span.
+func liveMatchingParent(r LiveRecord) (string, bool) {
+	if r.Kind == "span" && !liveValidID(r.SpanID, 16) {
+		return "", false
+	}
+	parent := r.ParentSpanID
+	if r.Kind == "log" {
+		parent = r.SpanID
+	}
+	if r.ParentConflict || !liveValidID(r.TraceID, 32) || !liveValidID(parent, 16) {
+		return "", false
+	}
+	return parent, true
+}
+
 // Keep only the available ancestor paths of matching records. This is an
 // in-memory bounded graph walk, never a recursive database request.
 func liveAncestors(contextRecords, matching []LiveRecord) []LiveRecord {
@@ -273,14 +288,8 @@ func liveAncestors(contextRecords, matching []LiveRecord) []LiveRecord {
 	}
 	keep := map[string]bool{}
 	for _, r := range matching {
-		if r.Kind == "span" && !liveValidID(r.SpanID, 16) {
-			continue
-		}
-		parent := r.ParentSpanID
-		if r.Kind == "log" {
-			parent = r.SpanID
-		}
-		if r.ParentConflict || !liveValidID(r.TraceID, 32) {
+		parent, ok := liveMatchingParent(r)
+		if !ok {
 			continue
 		}
 		visited := map[string]bool{}

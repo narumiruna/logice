@@ -1,7 +1,7 @@
 import { type FormEvent, type ReactNode, useEffect, useState } from "react"
 import { useI18n } from "./i18n"
 import { ProjectAlerts } from "./project-alerts"
-import { type Page, type Project, projectRequest } from "./project-api"
+import { type Page, type Project, projectErrorMessage, projectRequest } from "./project-api"
 import { ProjectContext } from "./project-context"
 import { ProjectDashboard } from "./project-dashboard"
 import { localProjectPath, projectId } from "./project-path"
@@ -21,7 +21,7 @@ export function ProjectGate({ children }: { children: ReactNode }) {
   const projectIndex = ["/", "/projects", "/projects/"].includes(path)
   const [projects, setProjects] = useState<Page<Project> | null>(null)
   const [selected, setSelected] = useState<Project | null>(null)
-  const [error, setError] = useState("")
+  const [error, setError] = useState<Error | string>("")
   const [offset, setOffset] = useState(0)
   const [revision, setRevision] = useState(0)
   // biome-ignore lint/correctness/useExhaustiveDependencies: Retry explicitly reloads authorization and project metadata.
@@ -50,8 +50,7 @@ export function ProjectGate({ children }: { children: ReactNode }) {
         }
       })
       .catch((error) => {
-        if (!controller.signal.aborted)
-          setError(error instanceof Error ? error.message : "Try again.")
+        if (!controller.signal.aborted) setError(error instanceof Error ? error : "Try again.")
       })
     return () => controller.abort()
   }, [id, offset, revision])
@@ -103,9 +102,7 @@ export function ProjectGate({ children }: { children: ReactNode }) {
                   <h2>{t("Project list unavailable")}</h2>
                   <p>
                     {t("Projects could not be loaded. {error}", {
-                      error: /^Project request failed \(\d+\)\.$/.test(error)
-                        ? t("Project request failed ({status}).", { status: error.slice(24, -2) })
-                        : t(error),
+                      error: projectErrorMessage(error, t),
                     })}
                   </p>
                   <button
@@ -155,7 +152,7 @@ function ProjectList({
   const [name, setName] = useState("")
   const [search, setSearch] = useState("")
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState("")
+  const [error, setError] = useState<Error | string>("")
   const visible = page.items.filter((p) =>
     `${p.name} ${p.id} ${p.role} ${t(p.role)}`.toLowerCase().includes(search.toLowerCase()),
   )
@@ -168,7 +165,7 @@ function ProjectList({
       if (!validProject(project)) throw new Error("Invalid project response.")
       window.location.assign(`/projects/${project.id}/setup`)
     } catch (error) {
-      setError(error instanceof Error ? error.message : "Project creation failed.")
+      setError(error instanceof Error ? error : "Project creation failed.")
     } finally {
       setBusy(false)
     }
@@ -196,13 +193,7 @@ function ProjectList({
             {t("Create project")}
           </button>
         </form>
-        {error && (
-          <p role="alert">
-            {/^Project request failed \(\d+\)\.$/.test(error)
-              ? t("Project request failed ({status}).", { status: error.slice(24, -2) })
-              : t(error)}
-          </p>
-        )}
+        {error && <p role="alert">{projectErrorMessage(error, t)}</p>}
       </section>
       <div className="project-list-toolbar">
         <label>

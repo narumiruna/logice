@@ -328,9 +328,27 @@ test("Live scroll anchor drifts less than 3px after late-parent and earlier-row 
   await expect(jump).toBeVisible()
   await advance(page, state)
   await expect(jump).toBeVisible()
+  const notice = page.getByText(/Scroll anchor left the window or result limits/)
+  await expect(notice).toHaveCount(0)
+  const anchorIndex = Number(await row(page, anchor.id).getAttribute("aria-rowindex"))
+  const forwardId = await page
+    .locator(`[data-event-id][aria-rowindex="${anchorIndex + 1}"]`)
+    .getAttribute("data-event-id")
+  if (!forwardId) throw new Error("No forward anchor neighbor")
   state.data = snapshot(state.data.spans.filter((item) => item.id !== anchor.id))
   await advance(page, state)
-  await expect(page.getByText(/Scroll anchor left the window or result limits/)).toBeVisible()
+  await expect(notice).toBeVisible()
+  const neighborOffset = await row(page, forwardId).evaluate(
+    (element) =>
+      element.getBoundingClientRect().top -
+      (element.closest(".lv-scroll")?.getBoundingClientRect().top ?? 0),
+  )
+  expect(Math.abs(neighborOffset - anchor.offset)).toBeLessThan(3)
+  await advance(page, state)
+  await expect(notice).toBeVisible()
+  await page.getByRole("button", { name: "Dismiss", exact: true }).click()
+  await advance(page, state)
+  await expect(notice).toHaveCount(0)
   await jump.click()
   await expect(page.getByLabel("Follow latest", { exact: true })).toBeChecked()
   expect(
@@ -376,6 +394,31 @@ test("Live tree arrows preserve manual collapse and expose error context without
   await page.getByRole("button", { name: "Apply filters", exact: true }).click()
   await expect(row(page, child.id)).toBeVisible()
   await expect(page.getByRole("button", { name: "Collapse all", exact: true })).toBeDisabled()
+  await expect(page.getByRole("button", { name: "Expand all", exact: true })).toBeDisabled()
+  const parentRow = row(page, parent.id)
+  const toggle = parentRow.getByRole("button", { name: "Collapse Healthy context", exact: true })
+  await expect(parentRow).toHaveAttribute("aria-expanded", "true")
+  await expect(toggle).toHaveAttribute("aria-expanded", "true")
+  await expect(toggle).toBeDisabled()
+  await expect(toggle).toHaveAttribute("title", "Filters keep matching paths expanded")
+  await tree.focus()
+  await page.keyboard.press("Home")
+  await page.clock.runFor(50)
+  await page.keyboard.press("ArrowLeft")
+  await expect(parentRow).toBeFocused()
+  await expect(parentRow).toHaveAttribute("aria-expanded", "true")
+  await page.keyboard.press("ArrowRight")
+  await page.clock.runFor(50)
+  await expect(row(page, child.id)).toBeFocused()
+  await page.keyboard.press("ArrowLeft")
+  await page.clock.runFor(50)
+  await expect(parentRow).toBeFocused()
+  await page.getByRole("button", { name: "Reset filters", exact: true }).click()
+  await expect(row(page, child.id)).toHaveCount(0)
+  await expect(parentRow).toHaveAttribute("aria-expanded", "false")
+  await expect(
+    parentRow.getByRole("button", { name: "Expand Healthy context", exact: true }),
+  ).toBeEnabled()
 })
 
 for (const failure of ["invalid JSON", "invalid schema", "503"] as const) {

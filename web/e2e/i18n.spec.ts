@@ -97,6 +97,27 @@ test("existing API errors change language without retrying the request", async (
   expect(calls).toBe(count)
 })
 
+test("existing project errors change language without retrying the request", async ({ page }) => {
+  let calls = 0
+  await page.route("**/api/projects?**", (route) => {
+    calls++
+    return route.fulfill({ status: 500, body: "private database details" })
+  })
+  await page.goto("/projects")
+  const error = page.getByRole("alert")
+  await expect(error).toContainText("Project request failed (500).")
+  await expect(error).not.toContainText("private database details")
+  const count = calls
+  const before = page.url()
+  await page.locator(".language-select select").selectOption("it")
+  await expect(error).toContainText(
+    it["Project request failed ({status})."].replace("{status}", "500"),
+  )
+  await expect(error).not.toContainText("private database details")
+  expect(calls).toBe(count)
+  expect(page.url()).toBe(before)
+})
+
 test("project search matches translated and original roles", async ({ page }) => {
   await page.route("**/api/projects?**", (route) =>
     route.fulfill({

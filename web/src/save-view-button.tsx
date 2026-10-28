@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useI18n } from "./i18n"
-import { canManageTokens, projectRequest } from "./project-api"
+import { canManageTokens, projectErrorMessage, projectRequest } from "./project-api"
 import { useProject } from "./project-context"
 import { captureView, type ViewDefinition, viewHref } from "./view-definition"
 
@@ -10,7 +10,7 @@ export function SaveViewButton({ definition }: { definition?: ViewDefinition }) 
   const [open, setOpen] = useState(false)
   const [name, setName] = useState("")
   const [busy, setBusy] = useState(false)
-  const [message, setMessage] = useState("")
+  const [message, setMessage] = useState<Error | string>("")
   if (!context || !canManageTokens(context.project.role)) return null
   return (
     <div>
@@ -43,7 +43,7 @@ export function SaveViewButton({ definition }: { definition?: ViewDefinition }) 
                 setMessage("View saved.")
                 setOpen(false)
               } catch (error) {
-                setMessage(error instanceof Error ? error.message : "Cannot save view.")
+                setMessage(error instanceof Error ? error : "Cannot save view.")
               } finally {
                 setBusy(false)
               }
@@ -59,13 +59,7 @@ export function SaveViewButton({ definition }: { definition?: ViewDefinition }) 
           </button>
         </form>
       )}
-      {message && (
-        <p role="status">
-          {/^Project request failed \(\d+\)\.$/.test(message)
-            ? t("Project request failed ({status}).", { status: message.slice(24, -2) })
-            : t(message)}
-        </p>
-      )}
+      {message && <p role="status">{projectErrorMessage(message, t)}</p>}
     </div>
   )
 }

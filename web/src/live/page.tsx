@@ -9,7 +9,7 @@ import { captureView, liveDisplay } from "../view-definition"
 import { LiveApiError, type LiveRecord, type LiveSnapshot } from "./api"
 import { Histogram } from "./histogram"
 import { Inspector } from "./inspector"
-import { allRecordIds, buildTree, countNewRecords, flatten } from "./model"
+import { allRecordIds, buildTree, countNewRecords, flatten, matchingAncestorIds } from "./model"
 import { DEFAULT_LIVE_ROUTE, type LiveRoute, liveHref, parseLiveRoute } from "./route"
 import { LiveTree, type TreeHandle } from "./tree"
 import { useLive } from "./use-live"
@@ -103,6 +103,10 @@ function LiveWorkspace({
   )
   const model = useMemo(() => (snapshot ? buildTree(snapshot) : null), [snapshot])
   const forced = Boolean(route.service || route.search || route.errorsOnly || route.minSeverity)
+  const forcedOpen = useMemo(
+    () => (model && forced ? matchingAncestorIds(model) : new Set<string>()),
+    [model, forced],
+  )
   // Open new ancestors in the same render as their records. A passive-only
   // expansion update would temporarily hide an existing orphan and lose focus.
   const effectiveExpanded = useMemo(() => {
@@ -115,8 +119,8 @@ function LiveWorkspace({
     return next
   }, [expanded, autoExpand, snapshot])
   const rows = useMemo(
-    () => (model ? flatten(model, effectiveExpanded, forced) : []),
-    [model, effectiveExpanded, forced],
+    () => (model ? flatten(model, effectiveExpanded, forcedOpen) : []),
+    [model, effectiveExpanded, forcedOpen],
   )
   useEffect(() => {
     setDraft(route)
@@ -575,7 +579,7 @@ function LiveWorkspace({
           rows={rows}
           selected={selected?.id ?? null}
           expanded={effectiveExpanded}
-          forced={forced}
+          forcedOpen={forcedOpen}
           follow={follow}
           headers={headers}
           window={snapshot?.window ?? null}

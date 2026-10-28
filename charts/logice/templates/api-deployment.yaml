@@ -34,13 +34,7 @@ spec:
           imagePullPolicy: {{ .Values.api.image.pullPolicy }}
           args: ["migrate"]
           securityContext:
-            runAsNonRoot: true
-            runAsUser: 65532
-            runAsGroup: 65532
-            readOnlyRootFilesystem: true
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop: [ALL]
+            {{- include "logice.apiSecurityContext" . | nindent 12 }}
           env:
             {{- include "logice.apiEnv" . | nindent 12 }}
           resources:
@@ -51,13 +45,7 @@ spec:
           imagePullPolicy: {{ .Values.api.image.pullPolicy }}
           args: ["-listen", "0.0.0.0:8080"]
           securityContext:
-            runAsNonRoot: true
-            runAsUser: 65532
-            runAsGroup: 65532
-            readOnlyRootFilesystem: true
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop: [ALL]
+            {{- include "logice.apiSecurityContext" . | nindent 12 }}
           env:
             {{- include "logice.apiEnv" . | nindent 12 }}
           ports:
