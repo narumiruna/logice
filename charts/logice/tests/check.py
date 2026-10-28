@@ -10,6 +10,14 @@ from pathlib import Path
 import yaml
 
 CHART = Path(__file__).resolve().parents[1]
+API_SECURITY_CONTEXT = {
+    "runAsNonRoot": True,
+    "runAsUser": 65532,
+    "runAsGroup": 65532,
+    "readOnlyRootFilesystem": True,
+    "allowPrivilegeEscalation": False,
+    "capabilities": {"drop": ["ALL"]},
+}
 VALUES = {
     "existingSecret": "test-secret",
     "api.image.repository": "registry.example.com/api",
@@ -36,7 +44,23 @@ def render(values=None, release="test"):
     return output, [item for item in yaml.safe_load_all(output) if item]
 
 
+def check_api_security_context(documents, worker_enabled=False):
+    deployments = {
+        item["metadata"]["labels"]["app.kubernetes.io/component"]: item
+        for item in documents
+        if item["kind"] == "Deployment"
+    }
+    api_pod = deployments["api"]["spec"]["template"]["spec"]
+    containers = [api_pod["initContainers"][0], api_pod["containers"][0]]
+    assert ("alerts-worker" in deployments) is worker_enabled
+    if worker_enabled:
+        containers.append(deployments["alerts-worker"]["spec"]["template"]["spec"]["containers"][0])
+    for container in containers:
+        assert container["securityContext"] == API_SECURITY_CONTEXT, container["name"]
+
+
 def check_resources(documents, prefix, secret="test-secret", origin="https://logice.narumi.dev"):
+    check_api_security_context(documents)
     objects = {(item["kind"], item["metadata"]["name"]): item for item in documents}
     assert len(objects) == len(documents), "Duplicate object names"
     assert not any(item["kind"] == "Secret" for item in documents)
@@ -130,9 +154,18 @@ def check_resources(documents, prefix, secret="test-secret", origin="https://log
     assert pg_env["POSTGRES_USER"]["value"] == "logice"
     assert pg_env["POSTGRES_DB"]["value"] == "logice"
     assert pg_env["POSTGRES_PASSWORD"]["valueFrom"]["secretKeyRef"]["key"] == "POSTGRES_PASSWORD"
-    assert postgres_pod["securityContext"]["fsGroup"] == 70
-    assert postgres_pod["securityContext"]["runAsUser"] == 70
-    assert postgres["securityContext"]["readOnlyRootFilesystem"] is True
+    assert postgres_pod["securityContext"] == {
+        "runAsNonRoot": True,
+        "runAsUser": 70,
+        "runAsGroup": 70,
+        "fsGroup": 70,
+        "fsGroupChangePolicy": "OnRootMismatch",
+    }
+    assert postgres["securityContext"] == {
+        "readOnlyRootFilesystem": True,
+        "allowPrivilegeEscalation": False,
+        "capabilities": {"drop": ["ALL"]},
+    }
     assert {mount["mountPath"] for mount in postgres["volumeMounts"]} == {
         "/var/lib/postgresql", "/var/run/postgresql", "/tmp"
     }
@@ -252,7 +285,10 @@ def main():
     assert "nodePort" not in web_service["spec"]["ports"][0]
     digests = {name: "sha256:" + char * 64 for name, char in (("api", "a"), ("web", "b"))}
     pins = {**VALUES, **{f"{name}.image.digest": digest for name, digest in digests.items()}}
+    _, pinned_without_worker = render({**pins, "api.image.tag": "", "web.image.tag": ""})
+    check_api_security_context(pinned_without_worker)
     _, pinned = render({**pins, "api.image.tag": "", "web.image.tag": "", "alertsWorker.enabled": "true"})
+    check_api_security_context(pinned, worker_enabled=True)
     for item in pinned:
         if item["kind"] == "Deployment":
             component = item["metadata"]["labels"]["app.kubernetes.io/component"]
@@ -269,6 +305,7 @@ def main():
             failure = helm("template", "test", str(CHART), values={**VALUES, f"{component}.image.digest": invalid}, succeeds=False)
             assert f"{component}.image.digest" in failure
     _, enabled = render({**VALUES, "alertsWorker.enabled": "true"})
+    check_api_security_context(enabled, worker_enabled=True)
     worker = next(item for item in enabled if item["kind"] == "Deployment" and item["metadata"]["name"] == "test-logice-alerts-worker")
     assert worker["metadata"]["annotations"]["argocd.argoproj.io/sync-wave"] == "2"
     pod = worker["spec"]["template"]["spec"]

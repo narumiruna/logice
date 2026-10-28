@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { flushSync } from "react-dom"
 import { useI18n } from "./i18n"
-import { canManageTokens, type Project, projectRequest } from "./project-api"
+import { canManageTokens, type Project, projectErrorMessage, projectRequest } from "./project-api"
 import { observeReceipt, type ReceiptState, type ReceiptWindow } from "./project-receipt"
 import { AppShell } from "./shell"
 
@@ -14,7 +14,7 @@ export function ProjectSetup({ project }: { project: Project }) {
   const [name, setName] = useState("Application")
   const [secret, setSecret] = useState("")
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState("")
+  const [error, setError] = useState<Error | string>("")
   const [copy, setCopy] = useState("")
   const [state, setState] = useState<ReceiptState>("stopped")
   const [window, setWindow] = useState<ReceiptWindow | null>(null)
@@ -57,7 +57,7 @@ export function ProjectSetup({ project }: { project: Project }) {
       if (mounted.current && version === generation.current) setSecret(result.token)
     } catch (error) {
       if (mounted.current && version === generation.current)
-        setError(error instanceof Error ? error.message : "Token creation failed.")
+        setError(error instanceof Error ? error : "Token creation failed.")
     } finally {
       creating.current = false
       if (mounted.current) setBusy(false)
@@ -147,13 +147,7 @@ export function ProjectSetup({ project }: { project: Project }) {
               )}
             </p>
           )}
-          {error && (
-            <p role="alert">
-              {/^Project request failed \(\d+\)\.$/.test(error)
-                ? t("Project request failed ({status}).", { status: error.slice(24, -2) })
-                : t(error)}
-            </p>
-          )}
+          {error && <p role="alert">{projectErrorMessage(error, t)}</p>}
           {secret && (
             <div className="secret-card">
               <p>

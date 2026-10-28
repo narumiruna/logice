@@ -4,6 +4,37 @@
 
 Validate the local trace/log workflow, Go API, frontend tooling, selected storage, Collector, native Go drivers, and migration behavior with disposable data. This is not a production deployment. Authentication, multi-project authorization, load targets, and public Cloudflare routing remain separate acceptance gates. Historical foundation evidence below applies to its recorded revision.
 
+## Behavior-preserving simplifications: 2026-10-28
+
+The six review findings are resolved. Project request errors retain status metadata and use one render-time formatter. Live shares forced-open ancestry and uses one tested scroll-anchor resolver. Backend context ranking and ancestor traversal share parent eligibility, and trace ranking compares signed nanoseconds directly. Migration, API, and alert worker templates share one fixed security context.
+
+No HTTP API, schema, dependency, permission, telemetry limit, or rendered deployment setting changed. Preview models, DOM focus and pixel-offset handling, query normalization and exclusions, and PostgreSQL security settings remain separate.
+
+| Check | Actual result |
+| --- | --- |
+| Go source, modules, and race checks | `GOTOOLCHAIN=go1.26.10 sh scripts/check-go.sh`, module verification, and race-enabled internal unit tests passed. |
+| Frontend CI | Biome, TypeScript, all 395 unit tests, and the production build passed. The existing catalog bundle-size warning remains. |
+| Helm | Chart checks passed. Seven complete parsed-manifest comparisons matched the pre-change output; checks assert the full expected security mapping with the worker enabled and disabled. |
+| Deployment guards | All 29 tests in `tests/deployment/check.py` passed. |
+| Native integration and authentication | Every case passed across two runs. The initial combined run did not pass because later native cases exhausted its work budget; details follow. Authentication passed in 252.095 seconds. |
+| Disposable Compose/browser validation | All 162 Chromium tests passed in 2.2 minutes, followed by static/API checks, readiness recovery, changed-IP API recovery, and cleanup. The complete command passed in 323 seconds. |
+| Changed E2E TypeScript and whitespace | Strict checks for both changed browser specs and `git diff --check` passed. |
+
+The first race-enabled combined native/authentication run used the existing eight-minute Go deadline. Live contract/resource, compatibility, ingestion, overview, and alert-delivery cases passed. The project-isolation startup then reached the work deadline, and the query and stack cases refused startup to preserve the 70-second cleanup reserve. The three cases passed in a separate race-enabled run in 121 seconds:
+
+```sh
+GOTOOLCHAIN=go1.26.10 go test -race -tags=integration -count=1 -timeout=8m -v \
+  -run '^(TestProjectOTLPIsolation|TestTelemetryQueries|TestStackFeasibility)$' ./tests/integration/...
+```
+
+This is passing case coverage across two runs, not a successful single combined run. No test limit was increased and no assertion was weakened. The owned disposable containers were removed; the pre-existing `logice-*` Compose container names matched before and after validation.
+
+The optional strict typecheck over all E2E files still reports the existing `web/e2e/mobile-ui.spec.ts:13` error: `TimeWindow` is not assignable to the `URLSearchParams` constructor input. That file and `web/src/api.ts` are unchanged from the base commit. The configured frontend typecheck and strict checks for both changed E2E specs pass. This unrelated fixture and compiler configuration were left unchanged.
+
+New coverage checks status/error redaction and language changes without another request; shared forced ancestry, disabled toggles, keyboard actions, and ARIA state; exact anchor neighbors, offsets, notices, and retained focus; malformed parent identities and SQL exclusions; and negative, zero, tied, and extreme nanosecond timestamps. Independent diff review found no concrete correctness or scope issue.
+
+Local tools were Go 1.26.10, Node.js 26.10.0, npm 11.19.1, Docker 29.8.2, and Compose 5.5.0. No registry publication, deployment, live migration, or operator-data change was performed. Local checks do not establish hosted CI or production acceptance.
+
 ## UI wording and terminology: 2026-10-27
 
 The six wording findings are resolved across the UI and all nine catalogs. [UI wording rules](design/ui-copy.md) define the terms. Alert conditions, delivery failures, and audit actions now use readable display labels while retaining their original API values. Root-span metrics and thresholds name duration, not request latency; sample-count labels distinguish traces from root spans. The header toggle is **Column headers**. Saved-view actions are **Open view** and **Copy link**. Setup and settings use ingestion-token terminology, and empty/network-error states no longer assume a local validation deployment.

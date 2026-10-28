@@ -1,3 +1,6 @@
+import { ApiError } from "./api"
+import type { Translate } from "./i18n"
+
 export interface Project {
   id: string
   name: string
@@ -23,6 +26,12 @@ export interface Page<T> {
 
 export function canManageTokens(role: Project["role"]): boolean {
   return role === "Owner" || role === "Developer"
+}
+
+export function projectErrorMessage(error: Error | string, t: Translate): string {
+  if (error instanceof ApiError && error.code === "project_request_failed")
+    return t("Project request failed ({status}).", { status: error.status })
+  return t(error instanceof Error ? error.message : error)
 }
 
 export async function projectRequest<T>(
@@ -53,15 +62,20 @@ export async function projectRequest<T>(
     ...(method === "GET" ? {} : { body: JSON.stringify(body ?? {}) }),
   })
   if (response.status === 401) window.dispatchEvent(new Event("logice:session-expired"))
-  if (!response.ok)
-    throw new Error(
+  if (!response.ok) {
+    const message =
       response.status === 404
         ? path === "" || path.startsWith("?")
           ? "Project API unavailable. Deploy matching API/web versions and apply the project migration."
           : "Project or resource is unavailable."
         : response.status === 403
           ? "Your project role does not permit this action."
-          : `Project request failed (${response.status}).`,
+          : null
+    throw new ApiError(
+      message ?? `Project request failed (${response.status}).`,
+      response.status,
+      message ? "project_access_failed" : "project_request_failed",
     )
+  }
   return response.json() as Promise<T>
 }

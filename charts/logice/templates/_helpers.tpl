@@ -15,6 +15,16 @@
 {{- end -}}
 {{- end -}}
 
+{{- define "logice.apiSecurityContext" -}}
+runAsNonRoot: true
+runAsUser: 65532
+runAsGroup: 65532
+readOnlyRootFilesystem: true
+allowPrivilegeEscalation: false
+capabilities:
+  drop: [ALL]
+{{- end -}}
+
 {{- define "logice.apiEnv" -}}
 - name: CLICKHOUSE_ADDR
   value: {{ include "logice.name" . }}-clickhouse:9000

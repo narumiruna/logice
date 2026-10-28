@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react"
 import { useI18n } from "./i18n"
-import { canManageTokens, type Page, type Project, projectRequest } from "./project-api"
+import {
+  canManageTokens,
+  type Page,
+  type Project,
+  projectErrorMessage,
+  projectRequest,
+} from "./project-api"
 import { AppShell } from "./shell"
 import { viewHref } from "./view-definition"
 
@@ -17,7 +23,7 @@ export function SavedViews({ project }: { project: Project }) {
   const [data, setData] = useState<Page<SavedView> | null>(null)
   const [offset, setOffset] = useState(0)
   const [revision, setRevision] = useState(0)
-  const [error, setError] = useState("")
+  const [error, setError] = useState<Error | string>("")
   const [busy, setBusy] = useState(false)
   const [editing, setEditing] = useState<SavedView | null>(null)
   const [name, setName] = useState("")
@@ -71,7 +77,7 @@ export function SavedViews({ project }: { project: Project }) {
       setEditing(null)
       setRevision((n) => n + 1)
     } catch (error) {
-      setError(error instanceof Error ? error.message : "View update failed.")
+      setError(error instanceof Error ? error : "View update failed.")
     } finally {
       setBusy(false)
     }
@@ -103,11 +109,7 @@ export function SavedViews({ project }: { project: Project }) {
         {message && <p role="status">{t(message, { path: messagePath })}</p>}
         {error && (
           <div role="alert" className="workspace-error">
-            <p>
-              {/^Project request failed \(\d+\)\.$/.test(error)
-                ? t("Project request failed ({status}).", { status: error.slice(24, -2) })
-                : t(error)}
-            </p>
+            <p>{projectErrorMessage(error, t)}</p>
             <button
               className="button button-secondary"
               type="button"

@@ -179,13 +179,24 @@ describe("real Live hierarchy", () => {
     const match = record("r4", { parentSpanId: middle.spanId })
     const tree = buildTree(snapshot([match, unused, middle, root]))
     expect([...tree.byId.keys()]).toEqual(["r1", "r2", "r4"])
-    expect(matchingAncestorIds(tree)).toEqual(new Set(["r2", "r1"]))
+    const forcedOpen = matchingAncestorIds(tree)
+    expect(forcedOpen).toEqual(new Set(["r2", "r1"]))
     const expanded = new Set<string>()
     expect(flatten(tree, expanded)).toHaveLength(1)
     expect(flatten(tree, expanded, true).map((row) => row.record.id)).toEqual(["r1", "r2", "r4"])
+    expect(flatten(tree, expanded, forcedOpen).map((row) => row.record.id)).toEqual([
+      "r1",
+      "r2",
+      "r4",
+    ])
     expect(expanded.size).toBe(0)
+    expect(forcedOpen).toEqual(new Set(["r2", "r1"]))
     expect(flatten(tree, expanded, new Set(["r1"]))).toHaveLength(2)
     expect(flatten(tree, expanded)[0]).toMatchObject({ hasChildren: true, childCount: 1 })
+    expanded.add("r1")
+    expect(flatten(tree, expanded, forcedOpen)).toHaveLength(3)
+    expect(flatten(tree, expanded).map((row) => row.record.id)).toEqual(["r1", "r2"])
+    expect(expanded).toEqual(new Set(["r1"]))
   })
   it("sorts roots and siblings by exact nanoseconds then stable ID, not map or arrival order", () => {
     const first = record("r1", {
@@ -287,14 +298,99 @@ describe("nanosecond time mapping and bounded reconciliation", () => {
       outside: false,
     })
   })
-  it("keeps the anchor or chooses the nearest retained neighbor with an eviction notice", () => {
-    const old = rows([record("r1"), record("r2"), record("r3"), record("r4")])
-    expect(reconcileAnchor(old, old, "r2")).toEqual({ id: "r2", evicted: false })
-    expect(reconcileAnchor(old, rows([record("r1"), record("r3")]), "r2")).toEqual({
-      id: "r3",
+})
+
+describe("Live scroll anchor reconciliation", () => {
+  const previous = rows([record("r1"), record("r2"), record("r3"), record("r4"), record("r5")])
+
+  it("keeps a retained identity at its new index without an eviction notice", () => {
+    const next = [previous[2], previous[0], previous[1]]
+    expect(reconcileAnchor(previous, next, { id: "r2", index: 1 })).toEqual({
+      index: 2,
+      evicted: false,
+    })
+    // A retained identity wins even when the saved index or previous rows differ.
+    expect(reconcileAnchor([], next, { id: "r3", index: 4 })).toEqual({
+      index: 0,
+      evicted: false,
+    })
+  })
+
+  it("prefers the forward neighbor on a tie, independent of the next row order", () => {
+    expect(reconcileAnchor(previous, [previous[3], previous[1]], { id: "r3", index: 2 })).toEqual({
+      index: 0,
       evicted: true,
     })
-    expect(reconcileAnchor(old, rows([record("r9")]), "r4")).toEqual({ id: "r9", evicted: true })
-    expect(reconcileAnchor(old, [], "r4")).toEqual({ id: null, evicted: true })
+    expect(reconcileAnchor(previous, [previous[1], previous[3]], { id: "r3", index: 2 })).toEqual({
+      index: 1,
+      evicted: true,
+    })
+  })
+
+  it("prefers a closer backward neighbor over a more distant forward neighbor", () => {
+    expect(reconcileAnchor(previous, [previous[4], previous[1]], { id: "r3", index: 2 })).toEqual({
+      index: 1,
+      evicted: true,
+    })
+  })
+
+  it("searches around the saved index even when the identity is absent from previous rows", () => {
+    expect(
+      reconcileAnchor(previous, [previous[1], previous[3]], { id: "missing", index: 2 }),
+    ).toEqual({
+      index: 1,
+      evicted: true,
+    })
+    // Do not replace the saved index with the anchor's former position by ID.
+    expect(reconcileAnchor(previous, [previous[1], previous[3]], { id: "r1", index: 2 })).toEqual({
+      index: 1,
+      evicted: true,
+    })
+  })
+
+  it("searches retained neighbors at the ends and beyond the previous row count", () => {
+    expect(reconcileAnchor(previous, [previous[4]], { id: "r1", index: 0 })).toEqual({
+      index: 0,
+      evicted: true,
+    })
+    expect(reconcileAnchor(previous, [previous[0]], { id: "r5", index: 4 })).toEqual({
+      index: 0,
+      evicted: true,
+    })
+    expect(reconcileAnchor(previous, [previous[4]], { id: "missing", index: 5 })).toEqual({
+      index: 0,
+      evicted: true,
+    })
+  })
+
+  it("falls back to the saved index, clamped to the last new row, when no neighbor survives", () => {
+    const next = rows([record("r6"), record("r7"), record("r8")])
+    expect(reconcileAnchor(previous, next, { id: "r3", index: 2 })).toEqual({
+      index: 2,
+      evicted: true,
+    })
+    expect(reconcileAnchor(previous, next, { id: "missing", index: 1 })).toEqual({
+      index: 1,
+      evicted: true,
+    })
+    expect(reconcileAnchor(previous, next, { id: "r5", index: 4 })).toEqual({
+      index: 2,
+      evicted: true,
+    })
+    expect(reconcileAnchor([], next, { id: "missing", index: 1 })).toEqual({
+      index: 1,
+      evicted: true,
+    })
+  })
+
+  it("returns index -1 with an eviction notice for empty results", () => {
+    expect(reconcileAnchor(previous, [], { id: "r3", index: 2 })).toEqual({
+      index: -1,
+      evicted: true,
+    })
+    expect(reconcileAnchor([], [], { id: "missing", index: 0 })).toEqual({
+      index: -1,
+      evicted: true,
+    })
   })
 })

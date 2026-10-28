@@ -129,14 +129,7 @@ func liveContextQuery(f LiveFilter, traces []string, matching []LiveRecord) (str
 	ids := []string{}
 	for _, r := range matching {
 		ids = append(ids, r.ID)
-		if r.Kind == "span" && !liveValidID(r.SpanID, 16) {
-			continue
-		}
-		parent := r.ParentSpanID
-		if r.Kind == "log" {
-			parent = r.SpanID
-		}
-		if !r.ParentConflict && liveValidID(parent, 16) && liveValidID(r.TraceID, 32) {
+		if parent, ok := liveMatchingParent(r); ok {
 			pairs = append(pairs, strings.ToLower(r.TraceID)+":"+strings.ToLower(parent))
 		}
 	}

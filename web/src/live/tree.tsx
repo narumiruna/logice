@@ -7,7 +7,6 @@ import {
   useEffect,
   useImperativeHandle,
   useLayoutEffect,
-  useMemo,
   useRef,
   useState,
 } from "react"
@@ -16,7 +15,7 @@ import { useI18n } from "../i18n"
 import { Glyph } from "../preview/icons"
 import { formatDuration, isTraceId, severity, spanStatus } from "../telemetry"
 import type { LiveRecord } from "./api"
-import type { LiveRow } from "./model"
+import { type LiveRow, reconcileAnchor } from "./model"
 
 const height = 31
 // The service color must not change when a response is reordered or filtered.
@@ -34,7 +33,7 @@ export const LiveTree = forwardRef<
     rows: LiveRow[]
     selected: string | null
     expanded: ReadonlySet<string>
-    forced: boolean
+    forcedOpen: ReadonlySet<string>
     follow: boolean
     headers: boolean
     window: TimeWindow | null
@@ -51,7 +50,7 @@ export const LiveTree = forwardRef<
     rows,
     selected,
     expanded,
-    forced,
+    forcedOpen,
     follow,
     headers,
     window,
@@ -178,26 +177,11 @@ export const LiveTree = forwardRef<
     if (follow) element.scrollTop = Math.max(0, rows.length * height - viewportHeight)
     else if (anchor.current) {
       const old = anchor.current
-      let index = rows.findIndex((row) => row.record.id === old.id)
-      if (index < 0) {
-        const ids = new Set(rows.map((row) => row.record.id))
-        const before = previousRows.current
-        let neighbor: string | undefined
-        for (let distance = 1; distance < before.length && !neighbor; distance++) {
-          for (const candidate of [before[old.index + distance], before[old.index - distance]]) {
-            if (candidate && ids.has(candidate.record.id)) {
-              neighbor = candidate.record.id
-              break
-            }
-          }
-        }
-        index = neighbor
-          ? rows.findIndex((row) => row.record.id === neighbor)
-          : Math.min(old.index, rows.length - 1)
+      const { index, evicted } = reconcileAnchor(previousRows.current, rows, old)
+      if (evicted)
         setNotice(
           "Scroll anchor left the window or result limits. Showing the nearest retained row.",
         )
-      }
       element.scrollTop = Math.max(0, index * height - old.offset)
     }
     previousRows.current = rows
@@ -222,20 +206,6 @@ export const LiveTree = forwardRef<
       programmatic.current = false
     })
   }, [rows, follow, viewportHeight, remember, restoreMountedFocus])
-  const forcedOpen = useMemo(() => {
-    const result = new Set<string>()
-    if (!forced) return result
-    const parents = new Map(rows.map((row) => [row.record.id, row.parentId]))
-    for (const row of rows) {
-      if (row.record.contextOnly) continue
-      let parent = row.parentId
-      while (parent && !result.has(parent)) {
-        result.add(parent)
-        parent = parents.get(parent) ?? null
-      }
-    }
-    return result
-  }, [rows, forced])
   const effectiveActive = rows.some((row) => row.record.id === active) ? active : rows[0]?.record.id
   return (
     <section className="lv-feed lp-feed" aria-label={t("Unified live event tree")}>
