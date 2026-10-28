@@ -22,6 +22,8 @@ The API exposes project-scoped `/views` collection and `/{viewId}` resources. De
 
 `GET /api/projects/{id}/overview` accepts `from`, `to`, and optional `service`. Windows are half-open UTC intervals and at most 24 hours. Dashboard presets are 15 minutes, one hour, and 24 hours. The response contains up to 60 equal-width nanosecond buckets and full-window totals; recent explorer lists remain separate bounded samples.
 
+Select a time range and exact service name, then select **Apply filters** to submit both values. **Refresh dashboard** updates the applied range without applying pending edits. The applied service and exact UTC interval appear below the controls. Metric and bucket links keep that scope. The activity chart shows stored traces and Error traces; **Full-window trends (60 UTC buckets)** exposes the exact values and interval links. **Metric definitions** retains p50 duration, conflict counts, and population details. See [the Dashboard UX design](design/dashboard-ux.md).
+
 Statistics describe stored matching telemetry, not all application traffic or complete traces:
 
 1. Valid span identities use project/trace/span IDs; malformed spans use canonical content identity. Repeated identical exports do not inflate logical span counts.
