@@ -26,6 +26,11 @@ function variables(message: string): string[] {
   return [...new Set([...message.matchAll(/\{(\w+)\}/g)].map((match) => match[1]))].sort()
 }
 
+function Counter() {
+  const { number } = useI18n()
+  return <span>{number(9_007_199_254_740_993n)}</span>
+}
+
 describe("language preference", () => {
   it("offers only English and the eight selected languages", () => {
     expect(languages.map(({ locale }) => locale)).toEqual([
@@ -199,10 +204,6 @@ describe("localized UI rendering", () => {
   })
 
   it("formats large numbers with the selected locale without losing precision", () => {
-    function Counter() {
-      const { number } = useI18n()
-      return <span>{number(9_007_199_254_740_993n)}</span>
-    }
     const html = renderToStaticMarkup(
       <LocaleProvider initialLocale="de">
         <Counter />
