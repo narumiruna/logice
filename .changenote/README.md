@@ -6,7 +6,7 @@ Install the reviewed CLI revision:
 
 ```sh
 cargo install --git https://github.com/narumiruna/changenote \
-  --rev 66afe581b2f7b19f96188a1f217518c41aaaf77d --locked
+  --rev f027b7825867044782ae46cc70b01f23e046c5ef --locked
 ```
 
 Add a note from the repository root:
