@@ -46,7 +46,7 @@ jobs:
       - name: Inspect publication without write permissions
         id: preview
         if: github.event_name == 'push' || inputs.operation == 'retry-publication'
-        uses: narumiruna/changenote/preview@66afe581b2f7b19f96188a1f217518c41aaaf77d # v0.7.0
+        uses: narumiruna/changenote/preview@f027b7825867044782ae46cc70b01f23e046c5ef # v0.9.2
         with:
           base-branch: main
       - name: Select only new publication work or an explicit retry
