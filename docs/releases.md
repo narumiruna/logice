@@ -1,6 +1,6 @@
 # Releases
 
-Logice uses [narumiruna/changenote](https://github.com/narumiruna/changenote) for language-independent versioning, change notes, and GitHub source releases. The CLI and Actions use the same reviewed revision: `66afe581b2f7b19f96188a1f217518c41aaaf77d` (`v0.7.0`). CI caches that CLI by source revision, Rust 1.92.0, runner OS, and architecture. A cache miss builds it; every use checks the CLI version. No Changesets npm dependency or root npm package is required.
+Logice uses [narumiruna/changenote](https://github.com/narumiruna/changenote) for language-independent versioning, change notes, and GitHub source releases. The CLI and Actions use the same reviewed revision: `f027b7825867044782ae46cc70b01f23e046c5ef` (`v0.9.2`). CI caches that CLI by source revision, Rust 1.92.0, runner OS, and architecture. A cache miss builds it; every use checks the CLI version. No Changesets npm dependency or root npm package is required.
 
 ## One application version
 
@@ -40,7 +40,7 @@ Install the pinned CLI. Source installation needs Rust with edition 2024 support
 
 ```sh
 cargo install --git https://github.com/narumiruna/changenote \
-  --rev 66afe581b2f7b19f96188a1f217518c41aaaf77d --locked
+  --rev f027b7825867044782ae46cc70b01f23e046c5ef --locked
 changenote add --patch logice -m "Fix the stated behavior."
 changenote status
 ```
@@ -55,7 +55,7 @@ Use `--minor logice` for a feature or `--major logice` for a breaking change. Co
 2. The selected commit runs reusable source CI once within Release: Go, frontend, vulnerability, native integration, Helm, deployment, and release checks. The local-image browser job is skipped here because Docker later tests the published digest pair. Application and release PRs, main pushes, manual runs, and merge queues retain full application checks. Only verified documentation-only PRs skip native integration and local-image browser checks. No cross-run check-result cache is used.
 3. On a `main` push, the Release PR job uses tooling from the triggering commit. The pinned Action refreshes pending notes from `main` and opens or updates `narumi/chore/changenote-release-main`. Reserve that branch for automation. PR generation is not publication approval. Removing all pending notes closes its managed PR.
 4. Review the generated version files, lockfile, changelog, consumed notes, and saved batch. Complete CI on the exact PR head and all applicable operator release gates before merge.
-5. Publication requires successful source CI and checks out only the selected, checked release commit. It invokes the pinned upstream `publish.sh` with that expected commit because the composite publication Action has no expected-commit input. The script fetches `main`, reconstructs the latest batch, and compares its commit with the expected value before any tag or Release write. A new batch stops publication and requires a new validation run. Unrelated commits or pending notes do not change the selected target. No batch means no publication job.
+5. Publication requires successful source CI and checks out only the selected, checked release commit. It invokes the pinned upstream `publish.sh` with that expected commit. The script fetches `main`, reconstructs the latest batch, and compares its commit with the expected value before any tag or Release write. A new batch stops publication and requires a new validation run. Unrelated commits or pending notes do not change the selected target. No batch means no publication job.
 6. Existing matching tags and Releases remain unchanged. A partial failure can be retried without moving a tag or replacing release notes. Docker builds both images, reads both digest records, runs the container/browser checks against that pair, and only then records the candidate. It does not call source CI again.
 
 Publication also runs on ordinary `main` pushes when the preview finds incomplete publication work for the latest batch. It can recover an earlier batch if Release PR management fails, but it cannot run after validation fails or the workflow is cancelled. It does not publish an unmerged release PR. Full-tree validation rejects manually edited release batches or release commits with unrelated source changes.
@@ -99,7 +99,7 @@ Require `Checks`, `Integration`, and `E2E` when configuring main branch rules. T
 tools=$(mktemp -d)
 git init "$tools/source"
 git -C "$tools/source" fetch --depth=1 --no-tags https://github.com/narumiruna/changenote \
-  66afe581b2f7b19f96188a1f217518c41aaaf77d
+  f027b7825867044782ae46cc70b01f23e046c5ef
 git -C "$tools/source" checkout --detach FETCH_HEAD
 cargo install --path "$tools/source" --locked --root "$tools"
 export PATH="$tools/bin:$PATH"

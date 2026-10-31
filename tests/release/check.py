@@ -16,7 +16,7 @@ import unittest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
-PIN = "66afe581b2f7b19f96188a1f217518c41aaaf77d"
+PIN = "f027b7825867044782ae46cc70b01f23e046c5ef"
 
 
 class ReleaseTests(unittest.TestCase):
@@ -52,7 +52,7 @@ class ReleaseTests(unittest.TestCase):
         self.write(".changenote/feature.md", "---\nlogice: minor\n---\n\nAdd the release fixture.\n")
         self.run_command("git", "init", "--initial-branch=main")
         self.commit("test: initial fixture")
-        self.assertEqual(self.run_command(self.cli, "--version").stdout.strip(), "changenote 0.7.0")
+        self.assertEqual(self.run_command(self.cli, "--version").stdout.strip(), "changenote 0.9.2")
 
     def write(self, path, content):
         destination = self.root / path
@@ -470,7 +470,7 @@ class RepositoryContractTests(unittest.TestCase):
             mock.mkdir()
             cargo = mock / "cargo"
             cargo.write_text('#!/bin/sh\nprintf "%s\\n" "$*" >> "$RUNNER_TEMP/cargo-calls"\n'
-                             'printf \'#!/bin/sh\\nprintf "changenote 0.7.0\\\\n"\\n\' > "$RUNNER_TEMP/changenote/bin/changenote"\n'
+                             'printf \'#!/bin/sh\\nprintf "changenote 0.9.2\\\\n"\\n\' > "$RUNNER_TEMP/changenote/bin/changenote"\n'
                              'chmod +x "$RUNNER_TEMP/changenote/bin/changenote"\n')
             cargo.chmod(0o755)
             env = dict(os.environ, RUNNER_TEMP=directory, CHANGENOTE_SOURCE="/pinned/source",

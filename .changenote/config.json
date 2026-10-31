@@ -1,5 +1,5 @@
 {
-  "$schema": "https://raw.githubusercontent.com/narumiruna/changenote/66afe581b2f7b19f96188a1f217518c41aaaf77d/schema.json",
+  "$schema": "https://raw.githubusercontent.com/narumiruna/changenote/f027b7825867044782ae46cc70b01f23e046c5ef/schema.json",
   "packages": {
     "logice": {
       "path": ".",
