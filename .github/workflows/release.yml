@@ -95,7 +95,7 @@ jobs:
       - run: HUSKY=0 npm --prefix web ci --ignore-scripts
       - uses: ./.github/actions/setup-changenote
       - name: Create or update the release PR
-        uses: narumiruna/changenote@f027b7825867044782ae46cc70b01f23e046c5ef # v0.9.2
+        uses: narumiruna/changenote@1e54e8af4f142c1f169565c6c49c0bfe92fbd7f3 # v0.15.0
         with:
           base-branch: main
           commit-message: "chore(release): version Logice"
