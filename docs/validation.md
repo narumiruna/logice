@@ -293,7 +293,7 @@ The first browser attempts exposed test-selector mismatches and fixture re-seedi
 
 ## Reproduce
 
-Use a local Docker Engine 28 or later with Compose 2.24 or later, Go 1.26.10 or a patched later release, and sufficient image/module download space. Initial verification used Docker 29.7.2, Compose 5.5.1, Go 1.27.1, Node 26.11.1, and npm 11.20.0. Current revalidation uses patched Go 1.26.10.
+Use Docker Engine 28 or later with Compose 2.24 or later, Go 1.26.11 or a patched later release, and enough space for images and modules.
 
 From the repository root:
 
@@ -370,7 +370,7 @@ Source/build research also built the Goose 3.29.0 CLI with PostgreSQL and ClickH
 
 ```sh
 # TOOLS must be a new operator-selected temporary directory.
-GOTOOLCHAIN=go1.26.10 GOBIN="$TOOLS/bin" go install \
+GOTOOLCHAIN=go1.26.11 GOBIN="$TOOLS/bin" go install \
   -tags='no_mysql no_sqlite3 no_ydb no_libsql no_mssql no_vertica no_azuresql' \
   github.com/pressly/goose/v3/cmd/goose@v3.29.0
 "$TOOLS/bin/goose" -env=none -version

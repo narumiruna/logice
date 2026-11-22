@@ -33,7 +33,7 @@ The integration suite uses small functional fixtures. Local browser workflows ar
 
 | Area | Selection | Reason and evidence |
 | --- | --- | --- |
-| Runtime | Go; standard-library `net/http` | One application process; no server framework required. The language version is Go 1.26; CI and the API build use patched Go 1.26.10. See the certificate-distrust revalidation in `validation.md`. |
+| Runtime | Go; standard-library `net/http` | One application process; no server framework required. The language version is Go 1.26; CI and the API build use Go 1.26.11 with the standard-library fix for [GO-2026-6859](https://pkg.go.dev/vuln/GO-2026-6859). |
 | PostgreSQL | 18.6, `pgx/v5` 5.11.0 | Transactional application data; native driver verified in the feasibility test. |
 | ClickHouse | 26.8.30.8 LTS, `clickhouse-go/v2` 2.49.0 | Append-oriented telemetry and aggregations; verify schema and queries against this pinned server. |
 | Collection | Collector Contrib 0.163.1 | OTLP HTTP and gRPC, authentication, resource enrichment, bounded batching, and retries. Traces/logs exporter stability is beta; metrics are alpha. |

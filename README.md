@@ -45,7 +45,7 @@ Open [the live explorer preview](http://localhost:5173/preview) after building t
 
 ## Verify the stack
 
-Requirements: a local Docker Engine 28 or later with Compose 2.24 or later, Go 1.26.10 or a patched later release, and network access to pull the pinned images/modules. Initial verification used Docker 29.7.2, Compose 5.5.1, and Go 1.27.1; the current Go revalidation uses 1.26.10. Allow at least 4 GiB free RAM for the proof and additional space for image/module caches.
+Requirements: a local Docker Engine 28 or later with Compose 2.24 or later, Go 1.26.11 or a patched later release, and network access to pull the pinned images/modules. Allow at least 4 GiB free RAM for the proof and additional space for image/module caches.
 
 ```sh
 go test -tags=integration -count=1 -timeout=8m -v ./tests/integration/...
@@ -100,9 +100,9 @@ Keep Cloudflare Access enabled. The web Service defaults to NodePort `30173`, wh
 
 ## Local development
 
-Go 1.26.10 and 1.27.3 include the certificate-distrust fix for [GO-2026-6809](https://pkg.go.dev/vuln/GO-2026-6809). CI and the API image use Go 1.26.10. The module's language version remains Go 1.26.
+CI and the API image use Go 1.26.11, which fixes [GO-2026-6859](https://pkg.go.dev/vuln/GO-2026-6859). The module's language version remains Go 1.26.
 
-Use Go 1.26.10 or a patched later release and Node.js 26.11.1 with npm 11.20.0. Install the private frontend package once:
+Use Go 1.26.11 or a patched later release and Node.js 26.11.1 with npm 11.20.0. Install the private frontend package once:
 
 ```sh
 npm --prefix web ci
