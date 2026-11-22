@@ -125,7 +125,7 @@ The completed execution plan `docs/plans/2026-10-24_changenote-migration-plan.md
 
 ## Recovery and rollback
 
-Upgrade the CLI, Action pins, and schema pin together. Keep Node.js/npm compatible with the version used to generate each batch. Publication replays offline lockfile synchronization; the dependency cache must contain the release dependencies. If they are missing after later dependency changes, populate the cache from the selected release's parent lockfile in an isolated checkout before retrying. Do not use the hidden no-lockfile reconstruction option for new releases.
+Upgrade the CLI, Action pins, and schema pin together. Dependabot skips the two legacy Action references so it cannot upgrade them independently. The newer Actions live in `changenote/action`; changing those references requires updating and testing the release workflow and CLI together. Keep Node.js/npm compatible with the version used to generate each batch. Publication replays offline lockfile synchronization; the dependency cache must contain the release dependencies. If they are missing after later dependency changes, populate the cache from the selected release's parent lockfile in an isolated checkout before retrying. Do not use the hidden no-lockfile reconstruction option for new releases.
 
 After a partial publication or Docker image failure, rerun Release on `main` with `operation=retry-publication`. Inspect tags, Releases, and registry images first. Do not merge another release PR until the latest batch is fully published: discovery covers only the latest batch. Wrong tag targets, draft Releases, a Release without its tag, edited batches, or unavailable remote data stop publication. Do not force-push, move tags, or edit committed batches to bypass validation.
 

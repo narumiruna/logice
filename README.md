@@ -124,6 +124,17 @@ npm --prefix web run dev
 
 Go defaults to `127.0.0.1:8080`; Compose explicitly uses `-listen 0.0.0.0:8080` inside the API container. `GET /api/healthz` reports process liveness. `GET /api/readyz` checks PostgreSQL/schema and configured ClickHouse access without exposing data. Neither replaces authenticated application acceptance. See [GitOps deployment and recovery](docs/deployment.md). Vite listens on `127.0.0.1:5173` and forwards `/api` and `/v1` to Go. Browse with `http://localhost:5173` to match `AUTH_ORIGIN`. A port conflict fails instead of selecting another port. Go does not yet serve frontend assets. Do not expose these development servers publicly.
 
+## Run all tests
+
+Install `just`, Go and Node.js (see [local development](#local-development)), `uv`, and Helm. Follow the [release test setup](docs/releases.md#validation) to install the pinned changenote CLI and set `CHANGENOTE_ACTION_PATH`. Use Docker Engine 28 or later with Compose 2.24.4 or later, plus Git, GNU `timeout`, `curl`, `jq`, and OpenSSL. Set up the frontend dependencies and Playwright Chromium once:
+
+```sh
+npm --prefix web ci
+npm --prefix web exec -- playwright install --with-deps chromium
+```
+
+Run `just test` from the repository root. It runs the Go and web unit tests, Python example tests, Helm, deployment and release tests, tooling checks, Docker-backed Go integration tests, and Chromium end-to-end tests. It attempts each suite and exits with a failure status if any suite fails. The hook check tests the committed revision in a temporary clone. The integration and browser suites use disposable Docker resources and can take several minutes.
+
 ## Repository checks
 
 ```sh

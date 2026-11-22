@@ -4,6 +4,10 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    ignore:
+      # Update the Actions, CLI, and schema together. New Actions live in changenote/action.
+      - dependency-name: "narumiruna/changenote"
+      - dependency-name: "narumiruna/changenote/preview"
   - package-ecosystem: "npm"
     directory: "/web"
     schedule:
