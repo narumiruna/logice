@@ -2,6 +2,12 @@
 
 Release notes for the Go application and private React frontend. No application release has been published by this setup.
 
+## 0.3.1
+
+### Patch Changes
+
+- Update application dependencies and container base images, including Go 1.27.4, Node.js 26.13.1, PostgreSQL 18.7, ClickHouse 26.8.44.3 LTS, and OpenTelemetry Collector 0.165.0.
+
 ## 0.3.0
 
 ### Minor Changes
