@@ -43,7 +43,7 @@ func disposablePostgres(t *testing.T) (*pgxpool.Pool, context.Context) {
 		}
 		return strings.TrimSpace(string(output))
 	}
-	id := docker("run", "--detach", "--rm", "-e", "POSTGRES_PASSWORD=fake-auth-test-password", "-e", "POSTGRES_DB=auth_test", "-p", "127.0.0.1::5432", "postgres:18.6-alpine3.23@sha256:885cf05d376c7cf27afef02073e6bdac3841252537f16e244fd1c1e6a7c99fb1")
+	id := docker("run", "--detach", "--rm", "-e", "POSTGRES_PASSWORD=fake-auth-test-password", "-e", "POSTGRES_DB=auth_test", "-p", "127.0.0.1::5432", "postgres:18.7-alpine3.23@sha256:339a86bf416979bb4d3d2e30a1f9e096e7302564faff4151b804cf53463059d5")
 	t.Cleanup(func() { docker("rm", "--force", id) })
 	address := docker("port", id, "5432/tcp")
 	host, port, err := net.SplitHostPort(address)

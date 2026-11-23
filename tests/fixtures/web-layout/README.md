@@ -29,7 +29,7 @@ authentication flow, API, or production application is implemented. Browser
 behavior, accessibility, and complete application integration remain untested.
 The repository root npm migration remains future work.
 
-Verified with Node v26.11.1 and npm 11.20.0:
+Run with Node.js 26.13.1 and npm 11.20.0:
 
 - `npm ci`: `added 140 packages`.
 - `npm audit --audit-level=low`: `found 0 vulnerabilities`.

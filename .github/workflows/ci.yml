@@ -31,7 +31,7 @@ jobs:
     outputs:
       docs-only: ${{ steps.changes.outputs.docs-only }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
         with:
           ref: ${{ inputs.revision || github.sha }}
           fetch-depth: 0
@@ -44,13 +44,13 @@ jobs:
         env:
           REVISION: ${{ inputs.revision }}
         run: uv run scripts/ci-docs-only.py
-      - uses: actions/setup-go@v7
+      - uses: actions/setup-go@v7.1.0
         with:
-          go-version: 1.26.11
+          go-version: 1.27.4
           cache: true
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@v7.1.0
         with:
-          node-version: 26.11.1
+          node-version: 26.13.1
           cache: npm
           cache-dependency-path: web/package-lock.json
       - name: Verify npm version
@@ -62,7 +62,7 @@ jobs:
       - name: Check Go source
         run: sh scripts/check-go.sh
       - name: Check Go vulnerabilities
-        run: timeout --kill-after=5s 240 go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 -test -tags=integration ./...
+        run: timeout --kill-after=5s 240 go run golang.org/x/vuln/cmd/govulncheck@v1.10.0 -test -tags=integration ./...
       - name: Install frontend dependencies
         run: HUSKY=0 npm --prefix web ci
       - name: Check frontend source
@@ -92,13 +92,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
         with:
           ref: ${{ inputs.revision || github.sha }}
           persist-credentials: false
-      - uses: actions/setup-go@v7
+      - uses: actions/setup-go@v7.1.0
         with:
-          go-version: 1.26.11
+          go-version: 1.27.4
           cache: true
       - name: Validate ingestion and database migrations
         run: go test -race -tags=integration -count=1 -timeout=8m -v ./tests/integration/... ./internal/auth/...
@@ -111,14 +111,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
         with:
           ref: ${{ inputs.revision || github.sha }}
           persist-credentials: false
       - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@v7.1.0
         with:
-          node-version: 26.11.1
+          node-version: 26.13.1
           cache: npm
           cache-dependency-path: web/package-lock.json
       - run: HUSKY=0 npm --prefix web ci

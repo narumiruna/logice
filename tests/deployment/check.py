@@ -462,7 +462,7 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(image_job["permissions"], {"contents": "read", "packages": "read"})
         build = next(step for step in build_job["steps"] if step.get("id") == "build")
         record = next(step for step in build_job["steps"] if "steps.build.outputs.digest" in step.get("env", {}).get("IMAGE", ""))
-        self.assertEqual(build["uses"], "docker/build-push-action@v7")
+        self.assertEqual(build["uses"], "docker/build-push-action@v7.4.0")
         self.assertNotIn("if", record)
         self.assertNotIn(":latest", record["env"]["IMAGE"])
         steps = image_job["steps"]
@@ -503,7 +503,7 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(selector["run"], "uv run scripts/ci-docs-only.py")
         self.assertEqual(selector["env"], {"REVISION": "${{ inputs.revision }}"})
         commands = "\n".join(step.get("run", "") for step in checks["steps"])
-        for command in ("go mod verify", "sh scripts/check-go.sh", "govulncheck@v1.9.0",
+        for command in ("go mod verify", "sh scripts/check-go.sh", "govulncheck@v1.10.0",
                         "npm --prefix web ci", "npm --prefix web run ci", "npm --prefix web audit --audit-level=low",
                         "uv run charts/logice/tests/check.py", "uv run tests/deployment/check.py",
                         "uv run scripts/deployment.py check --base origin/main",

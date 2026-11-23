@@ -79,7 +79,7 @@ services:
     mem_limit: 128m
 
   postgres:
-    image: postgres:18.6-alpine3.23@sha256:885cf05d376c7cf27afef02073e6bdac3841252537f16e244fd1c1e6a7c99fb1
+    image: postgres:18.7-alpine3.23@sha256:339a86bf416979bb4d3d2e30a1f9e096e7302564faff4151b804cf53463059d5
     environment:
       POSTGRES_USER: logice
       POSTGRES_DB: logice
@@ -98,7 +98,7 @@ services:
     mem_limit: 256m
 
   clickhouse:
-    image: clickhouse/clickhouse-server:26.8.30.8@sha256:4c520c82c14c817f40107fbe90547a43200bf293fe2a99ce7d7d89e528004f92
+    image: clickhouse/clickhouse-server:26.8.44.3@sha256:4df95084ff95ba95fbe0c512f199b214a738f913fa9e23d2b5e379fffdfa62fc
     environment:
       CLICKHOUSE_USER: logice
       CLICKHOUSE_DB: logice
@@ -123,7 +123,7 @@ services:
     mem_limit: 2g
 
   collector:
-    image: otel/opentelemetry-collector-contrib:0.163.1@sha256:1175b03003053962012f5a231f5567f66a3e8fdb960c7835c0e48f7aa1555806
+    image: otel/opentelemetry-collector-contrib:0.165.0@sha256:e40d61f10c9a617cca1ffd1be4d7e2b3a4b0f0001798ff07e58cabe82e618cea
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
     environment:
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?Set CLICKHOUSE_PASSWORD}

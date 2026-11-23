@@ -33,7 +33,7 @@ Each top-level test starts only PostgreSQL, ClickHouse, and the Collector in its
 
 ## Deterministic telemetry compatibility
 
-The [source contract and exact fixture matrix](../../docs/telemetry-compatibility.md) record expectations from the pinned source before the integration assertions. Collector 0.163.1 contains clickhouseexporter v0.163.0 and pdata v1.69.0; do not assume the exporter module has the image version.
+The [source contract and exact fixture matrix](../../docs/telemetry-compatibility.md) record expectations from the pinned source before the integration assertions. Collector 0.165.0 contains clickhouseexporter v0.165.0 and pdata v1.71.0; verify the distribution manifest for each upgrade.
 
 ```sh
 # Ordinary fixture tests need no Docker or integration build tag.
