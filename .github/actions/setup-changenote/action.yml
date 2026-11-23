@@ -19,7 +19,7 @@ runs:
         test "$(git -C "$source_dir" rev-parse HEAD)" = f027b7825867044782ae46cc70b01f23e046c5ef
         echo "path=$source_dir" >> "$GITHUB_OUTPUT"
         echo "CHANGENOTE_ACTION_PATH=$source_dir" >> "$GITHUB_ENV"
-    - uses: actions/cache@v5
+    - uses: actions/cache@v6.1.0
       id: cli-cache
       with:
         path: ${{ runner.temp }}/changenote/bin

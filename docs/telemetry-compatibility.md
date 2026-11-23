@@ -1,19 +1,17 @@
 # Pinned telemetry compatibility
 
-## Source contract (recorded before integration assertions)
+## Source contract
 
-`compose.yaml` pins Collector **0.163.1**, image digest `sha256:1175b03003053962012f5a231f5567f66a3e8fdb960c7835c0e48f7aa1555806`.
-The image label identifies releases revision `e3bd087aedd311e3b1a5cdbb4c4f82043f02f1f2`.
-Its [distribution manifest](https://github.com/open-telemetry/opentelemetry-collector-releases/blob/e3bd087aedd311e3b1a5cdbb4c4f82043f02f1f2/distributions/otelcol-contrib/manifest.yaml) pins **clickhouseexporter v0.163.0**, not v0.163.1. The contrib v0.163.1 source URLs return HTTP 404; do not substitute an unrelated exporter version.
+`compose.yaml` pins Collector **0.165.0**, image digest `sha256:e40d61f10c9a617cca1ffd1be4e2b3a4b0f0001798ff07e58cabe82e618cea`.
+The image label identifies releases revision `b9425f263115f328bc3bd4e65b825101b499f144`.
+Its [distribution manifest](https://github.com/open-telemetry/opentelemetry-collector-releases/blob/b9425f263115f328bc3bd4e65b825101b499f144/distributions/otelcol-contrib/manifest.yaml) pins **clickhouseexporter v0.165.0**.
 
-Source was downloaded with `curl --fail --location` into a temporary directory:
-
-- [Exporter module archive](https://proxy.golang.org/github.com/open-telemetry/opentelemetry-collector-contrib/exporter/clickhouseexporter/@v/v0.163.0.zip), source revision `df849b5403c041d5e799e7846392a6f18b0b55ae` (module proxy origin metadata).
-- [Trace insertion and event/link conversion](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/clickhouseexporter/v0.163.0/exporter/clickhouseexporter/exporter_traces.go), `pushTraceData`, `convertEvents`, `convertLinks`.
-- [Log insertion](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/clickhouseexporter/v0.163.0/exporter/clickhouseexporter/exporter_logs.go), `pushLogsData`.
-- [Attribute conversion](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/clickhouseexporter/v0.163.0/exporter/clickhouseexporter/internal/util.go), `AttributesToMap` calls `Value.AsString`.
-- [Schema directory](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/exporter/clickhouseexporter/v0.163.0/exporter/clickhouseexporter/internal/sqltemplates), `traces_table.sql`, `logs_table.sql` and insertion templates.
-- The exporter go.mod pins pdata **v1.69.0**, source revision `5177a6a85ca3783068077e25aec6cebbe1d50d1f`. [pdata module archive](https://proxy.golang.org/go.opentelemetry.io/collector/pdata/@v/v1.69.0.zip); [value conversion](https://github.com/open-telemetry/opentelemetry-collector/blob/pdata/v1.69.0/pdata/pcommon/value.go), `AsString`, `marshalJSONNoHTMLEscape`, `float64AsString`.
+- [Exporter module archive](https://proxy.golang.org/github.com/open-telemetry/opentelemetry-collector-contrib/exporter/clickhouseexporter/@v/v0.165.0.zip), source revision `f56f9a38c9864e892af542f1dbd28f475d6779dc` (module proxy origin metadata).
+- [Trace insertion and event/link conversion](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/f56f9a38c9864e892af542f1dbd28f475d6779dc/exporter/clickhouseexporter/exporter_traces.go), `pushTraceData`, `convertEvents`, `convertLinks`.
+- [Log insertion](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/f56f9a38c9864e892af542f1dbd28f475d6779dc/exporter/clickhouseexporter/exporter_logs.go), `pushLogsData`.
+- [Attribute conversion](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/f56f9a38c9864e892af542f1dbd28f475d6779dc/exporter/clickhouseexporter/internal/util.go), `AttributesToMap` calls `Value.AsString`.
+- [Schema directory](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/f56f9a38c9864e892af542f1dbd28f475d6779dc/exporter/clickhouseexporter/internal/sqltemplates), `traces_table.sql`, `logs_table.sql` and insertion templates. Fresh tables use a higher ZSTD compression level. Logs tables also gain an event-name index when full-text search is unavailable.
+- The exporter go.mod pins pdata **v1.71.0**, source revision `e883d737e49935984df6b064e512eed6cdc0d289`. [pdata module archive](https://proxy.golang.org/go.opentelemetry.io/collector/pdata/@v/v1.71.0.zip); [value conversion](https://github.com/open-telemetry/opentelemetry-collector/blob/e883d737e49935984df6b064e512eed6cdc0d289/pdata/pcommon/value.go), `AsString`, `marshalJSONNoHTMLEscape`, `float64AsString`.
 
 The expectations below apply to the default string-map schema, not the optional JSON schema. Each accepted HTTP protobuf export must return 200; each accepted gRPC export must return OK. Partial-success rejected counts must be zero and error messages empty. Acceptance alone is not storage evidence.
 

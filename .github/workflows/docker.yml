@@ -28,7 +28,7 @@ jobs:
       matrix:
         component: [api, web]
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
         with:
           ref: ${{ inputs.revision }}
           persist-credentials: false
@@ -62,17 +62,17 @@ jobs:
             echo "$name:$VERSION_TAG"
             echo 'IMAGE_TAGS'
           } >> "$GITHUB_OUTPUT"
-      - uses: docker/setup-qemu-action@v4
-      - uses: docker/setup-buildx-action@v4
+      - uses: docker/setup-qemu-action@v4.4.0
+      - uses: docker/setup-buildx-action@v4.4.1
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v4
+        uses: docker/login-action@v4.8.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build and push
         id: build
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@v7.4.0
         with:
           context: .
           file: deploy/${{ matrix.component }}.Dockerfile
@@ -90,7 +90,7 @@ jobs:
           REVISION: ${{ steps.image.outputs.revision }}
           IMAGE: ${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}
         run: jq -n --arg component "$COMPONENT" --arg revision "$REVISION" --arg image "$IMAGE" '{component:$component,revision:$revision,image:$image}' > "$COMPONENT.json"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@v7.0.2
         with:
           name: logice-image-${{ github.run_attempt }}-${{ matrix.component }}
           path: ${{ matrix.component }}.json
@@ -105,24 +105,24 @@ jobs:
       contents: read
       packages: read
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
         with:
           ref: ${{ inputs.revision }}
           persist-credentials: false
       - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@v7.1.0
         with:
-          node-version: 26.11.1
+          node-version: 26.13.1
           cache: npm
           cache-dependency-path: web/package-lock.json
       - run: HUSKY=0 npm --prefix web ci
       - run: npm --prefix web exec -- playwright install --with-deps chromium
-      - uses: docker/login-action@v4
+      - uses: docker/login-action@v4.8.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@v8.0.2
         with:
           pattern: logice-image-${{ github.run_attempt }}-*
           path: image-records
@@ -144,7 +144,7 @@ jobs:
           API_IMAGE: ${{ steps.pair.outputs.api }}
           WEB_IMAGE: ${{ steps.pair.outputs.web }}
         run: uv run scripts/deployment.py candidate --revision "$REVISION" --version "$VERSION" --api-image "$API_IMAGE" --web-image "$WEB_IMAGE" --output candidate.json
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@v7.0.2
         with:
           name: logice-deployment-${{ github.run_attempt }}
           path: candidate.json
